@@ -169,6 +169,17 @@ let warning_attribute attrs =
     )
     attrs
 
+let with_warning_attribute attrs f =
+  try
+    warning_enter_scope ();
+    warning_attribute attrs;
+    let ret = f () in
+    warning_leave_scope ();
+    ret
+  with exn ->
+    warning_leave_scope ();
+    raise exn
+
 type variable_context = int * (string, type_expr) Tbl.t
 
 (* Local definitions *)
@@ -240,6 +251,7 @@ let find_class env loc lid =
   r
 
 let find_value env loc lid =
+  Env.check_value_name (Longident.last lid) loc;
   let (path, decl) as r =
     find_component Env.lookup_value (fun lid -> Unbound_value lid) env loc lid
   in
@@ -421,7 +433,12 @@ let rec transl_type env policy styp =
   | Ptyp_arrow(l, st1, st2) ->
     let cty1 = transl_type env policy st1 in
     let cty2 = transl_type env policy st2 in
-    let ty = newty (Tarrow(l, cty1.ctyp_type, cty2.ctyp_type, Cok)) in
+    let ty1 = cty1.ctyp_type in
+    let ty1 =
+      if Btype.is_optional l
+      then newty (Tconstr(Predef.path_option,[ty1], ref Mnil))
+      else ty1 in
+    let ty = newty (Tarrow(l, ty1, cty2.ctyp_type, Cok)) in
     ctyp (Ttyp_arrow (l, cty1, cty2)) ty
   | Ptyp_tuple stl ->
     if List.length stl < 2 then

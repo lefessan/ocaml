@@ -14,9 +14,9 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
-#include "config.h"
-#include "misc.h"
-#include "memory.h"
+#include "caml/config.h"
+#include "caml/misc.h"
+#include "caml/memory.h"
 
 #ifdef DEBUG
 
@@ -114,6 +114,19 @@ int caml_ext_table_add(struct ext_table * tbl, void * data)
   tbl->contents[res] = data;
   tbl->size++;
   return res;
+}
+
+void caml_ext_table_remove(struct ext_table * tbl, void * data)
+{
+  int i;
+  for (i = 0; i < tbl->size; i++) {
+    if (tbl->contents[i] == data) {
+      caml_stat_free(tbl->contents[i]);
+      memmove(&tbl->contents[i], &tbl->contents[i + 1],
+              (tbl->size - i - 1) * sizeof(void *));
+      tbl->size--;
+    }
+  }
 }
 
 void caml_ext_table_free(struct ext_table * tbl, int free_entries)

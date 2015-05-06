@@ -17,13 +17,10 @@
 #include <ctype.h>
 #include <stdio.h>
 #include <stdarg.h>
-#include "alloc.h"
-#include "fail.h"
-#include "mlvalues.h"
-#include "misc.h"
-#ifdef HAS_LOCALE
-#include <locale.h>
-#endif
+#include "caml/alloc.h"
+#include "caml/fail.h"
+#include "caml/mlvalues.h"
+#include "caml/misc.h"
 
 /* returns a number of bytes (chars) */
 CAMLexport mlsize_t caml_string_length(value s)
@@ -277,21 +274,6 @@ CAMLprim value caml_fill_string(value s, value offset, value len, value init)
 {
   memset(&Byte(s, Long_val(offset)), Int_val(init), Long_val(len));
   return Val_unit;
-}
-
-CAMLprim value caml_is_printable(value chr)
-{
-  int c;
-
-#ifdef HAS_LOCALE
-  static int locale_is_set = 0;
-  if (! locale_is_set) {
-    setlocale(LC_CTYPE, "");
-    locale_is_set = 1;
-  }
-#endif
-  c = Int_val(chr);
-  return Val_bool(isprint(c));
 }
 
 CAMLprim value caml_bitvect_test(value bv, value n)

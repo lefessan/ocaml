@@ -14,16 +14,16 @@
 /* Operations on objects */
 
 #include <string.h>
-#include "alloc.h"
-#include "fail.h"
-#include "gc.h"
-#include "interp.h"
-#include "major_gc.h"
-#include "memory.h"
-#include "minor_gc.h"
-#include "misc.h"
-#include "mlvalues.h"
-#include "prims.h"
+#include "caml/alloc.h"
+#include "caml/fail.h"
+#include "caml/gc.h"
+#include "caml/interp.h"
+#include "caml/major_gc.h"
+#include "caml/memory.h"
+#include "caml/minor_gc.h"
+#include "caml/misc.h"
+#include "caml/mlvalues.h"
+#include "caml/prims.h"
 
 /* [size] is a value encoding a number of bytes */
 CAMLprim value caml_static_alloc(value size)
@@ -36,21 +36,6 @@ CAMLprim value caml_static_free(value blk)
   caml_stat_free((void *) blk);
   return Val_unit;
 }
-
-/* signal to the interpreter machinery that a bytecode is no more
-   needed (before freeing it) - this might be useful for a JIT
-   implementation */
-
-CAMLprim value caml_static_release_bytecode(value blk, value size)
-{
-#ifndef NATIVE_CODE
-  caml_release_bytecode((code_t) blk, (asize_t) Long_val(size));
-#else
-  caml_failwith("Meta.static_release_bytecode impossible with native code");
-#endif
-  return Val_unit;
-}
-
 
 CAMLprim value caml_static_resize(value blk, value new_size)
 {

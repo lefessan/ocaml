@@ -80,9 +80,12 @@ val no_overflow_add: int -> int -> bool
 val no_overflow_sub: int -> int -> bool
         (* [no_overflow_add n1 n2] returns [true] if the computation of
            [n1 - n2] does not overflow. *)
-val no_overflow_lsl: int -> bool
-        (* [no_overflow_add n] returns [true] if the computation of
-           [n lsl 1] does not overflow. *)
+val no_overflow_mul: int -> int -> bool
+        (* [no_overflow_mul n1 n2] returns [true] if the computation of
+           [n1 * n2] does not overflow. *)
+val no_overflow_lsl: int -> int -> bool
+        (* [no_overflow_lsl n k] returns [true] if the computation of
+           [n lsl k] does not overflow. *)
 
 val chop_extension_if_any: string -> string
         (* Like Filename.chop_extension but returns the initial file
@@ -100,6 +103,10 @@ val search_substring: string -> string -> int -> int
            occurrence of string [pat] in string [str].  Search starts
            at offset [start] in [str].  Raise [Not_found] if [pat]
            does not occur. *)
+
+val replace_substring: before:string -> after:string -> string -> string
+        (* [search_substring ~before ~after str] replaces all occurences
+           of [before] with [after] in [str] and returns the resulting string. *)
 
 val rev_split_words: string -> string list
         (* [rev_split_words s] splits [s] in blank-separated words, and return

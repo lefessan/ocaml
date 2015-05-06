@@ -523,7 +523,7 @@ let check_well_founded env loc path to_check ty =
         (* Will be detected by check_recursion *)
         Btype.backtrack snap
   in
-  check ty TypeSet.empty ty
+  Ctype.wrap_trace_gadt_instances env (check ty TypeSet.empty) ty
 
 let check_well_founded_manifest env loc path decl =
   if decl.type_manifest = None then () else
@@ -985,8 +985,8 @@ let name_recursion sdecl id decl =
     else decl
   | _ -> decl
 
-(* Translate a set of mutually recursive type declarations *)
-let transl_type_decl env sdecl_list =
+(* Translate a set of type declarations, mutually recursive or not *)
+let transl_type_decl env rec_flag sdecl_list =
   (* Add dummy types for fixed rows *)
   let fixed_types = List.filter is_fixed_type sdecl_list in
   let sdecl_list =
@@ -1013,7 +1013,11 @@ let transl_type_decl env sdecl_list =
   Ctype.init_def(Ident.current_time());
   Ctype.begin_def();
   (* Enter types. *)
-  let temp_env = List.fold_left2 enter_type env sdecl_list id_list in
+  let temp_env =
+    match rec_flag with
+    | Asttypes.Nonrecursive -> env
+    | Asttypes.Recursive -> List.fold_left2 enter_type env sdecl_list id_list
+  in
   (* Translate each declaration. *)
   let current_slot = ref None in
   let warn_unused = Warnings.is_active (Warnings.Unused_type_declaration "") in
@@ -1053,9 +1057,13 @@ let transl_type_decl env sdecl_list =
       decls env
   in
   (* Update stubs *)
-  List.iter2
-    (fun id sdecl -> update_type temp_env newenv id sdecl.ptype_loc)
-    id_list sdecl_list;
+  begin match rec_flag with
+    | Asttypes.Nonrecursive -> ()
+    | Asttypes.Recursive ->
+      List.iter2
+        (fun id sdecl -> update_type temp_env newenv id sdecl.ptype_loc)
+        id_list sdecl_list
+  end;
   (* Generalize type declarations. *)
   Ctype.end_def();
   List.iter (fun (_, decl) -> generalize_decl decl) decls;
@@ -1443,7 +1451,7 @@ let transl_with_constraint env id row_path orig_decl sdecl =
   let decl = name_recursion sdecl id decl in
   let decl =
     {decl with type_variance =
-     compute_variance_decl env false decl
+     compute_variance_decl env true decl
        (add_injectivity (List.map snd sdecl.ptype_params), sdecl.ptype_loc)} in
   Ctype.end_def();
   generalize_decl decl;

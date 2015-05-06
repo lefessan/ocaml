@@ -91,10 +91,11 @@ let extract_crc_implementations () =
 let lib_ccobjs = ref []
 let lib_ccopts = ref []
 
-let add_ccobjs l =
+let add_ccobjs origin l =
   if not !Clflags.no_auto_link then begin
     lib_ccobjs := l.lib_ccobjs @ !lib_ccobjs;
-    lib_ccopts := l.lib_ccopts @ !lib_ccopts
+    let replace_origin = Misc.replace_substring ~before:"$CAMLORIGIN" ~after:origin in
+    lib_ccopts := List.map replace_origin l.lib_ccopts @ !lib_ccopts
   end
 
 let runtime_lib () =
@@ -179,7 +180,7 @@ let scan_file obj_name tolink = match read_file obj_name with
   | Library (file_name,infos) ->
       (* This is an archive file. Each unit contained in it will be linked
          in only if needed. *)
-      add_ccobjs infos;
+      add_ccobjs (Filename.dirname file_name) infos;
       List.fold_right
         (fun (info, crc) reqd ->
            if info.ui_force_link
@@ -260,7 +261,7 @@ let link_shared ppf objfiles output_name =
     (List.rev !Clflags.ccobjs) in
 
   let startup =
-    if !Clflags.keep_startup_file
+    if !Clflags.keep_startup_file || !Emitaux.binary_backend_available
     then output_name ^ ".startup" ^ ext_asm
     else Filename.temp_file "camlstartup" ext_asm in
   let startup_obj = output_name ^ ".startup" ^ ext_obj in
@@ -317,14 +318,16 @@ let link ppf objfiles output_name =
   Clflags.all_ccopts := !lib_ccopts @ !Clflags.all_ccopts;
                                                (* put user's opts first *)
   let startup =
-    if !Clflags.keep_startup_file then output_name ^ ".startup" ^ ext_asm
+    if !Clflags.keep_startup_file || !Emitaux.binary_backend_available
+    then output_name ^ ".startup" ^ ext_asm
     else Filename.temp_file "camlstartup" ext_asm in
   let startup_obj = Filename.temp_file "camlstartup" ext_obj in
   Asmgen.compile_unit
     startup !Clflags.keep_startup_file startup_obj
     (fun () -> make_startup_file ppf units_tolink);
-  call_linker (List.map object_file_name objfiles) startup_obj output_name;
-  remove_file startup_obj
+  Misc.try_finally
+    (fun () -> call_linker (List.map object_file_name objfiles) startup_obj output_name)
+    (fun () -> remove_file startup_obj)
 
 (* Error report *)
 
