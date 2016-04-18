@@ -169,4 +169,10 @@ typedef uint64 uintnat;
 #define Max_percent_free_def 500
 
 
+#ifdef CAML_WITH_GETENV
+#define CAML_GETENV(s) getenv(s)
+#else
+#define CAML_GETENV(s) NULL
+#endif
+
 #endif /* CAML_CONFIG_H */

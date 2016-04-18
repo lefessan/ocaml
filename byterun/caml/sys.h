@@ -16,6 +16,10 @@
 
 #include "misc.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define NO_ARG Val_int(0)
 
 CAMLextern void caml_sys_error (value);
@@ -24,5 +28,9 @@ extern void caml_sys_init (char * exe_name, char ** argv);
 CAMLextern value caml_sys_exit (value);
 
 extern char * caml_exe_name;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* CAML_SYS_H */

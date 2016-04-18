@@ -47,6 +47,8 @@ with_frame_pointers=false
 no_naked_pointers=false
 TOOLPREF=""
 with_cfi=true
+with_cplugins=true
+with_getenv=true
 
 # Try to turn internationalization off, can cause config.guess to malfunction!
 unset LANG
@@ -154,6 +156,10 @@ while : ; do
         no_naked_pointers=true;;
     -no-cfi|--no-cfi)
         with_cfi=false;;
+    -no-getenv|--no-getenv)
+        with_getenv=false;;
+    -no-cplugins|--no-cplugins)
+        with_cplugins=false;;
     *) if echo "$1" | grep -q -e '^--\?[a-zA-Z0-9-]\+='; then
          err "configure expects arguments of the form '-prefix /foo/bar'," \
              "not '-prefix=/foo/bar' (note the '=')."
@@ -1701,6 +1707,13 @@ case "$buggycc" in
     nativecccompopts="$nativecccompopts -fomit-frame-pointer";;
 esac
 
+if $with_cplugins; then
+  echo "#define CAML_WITH_CPLUGINS" >> m.h
+fi
+if $with_getenv; then
+  echo "#define CAML_WITH_GETENV" >> m.h
+fi
+
 # Finish generated files
 
 cclibs="$cclibs $mathlib"
@@ -1772,6 +1785,8 @@ echo "WITH_OCAMLDOC=${with_ocamldoc}" >>Makefile
 echo "WITH_OCAMLBUILD=${with_ocamlbuild}" >>Makefile
 echo "ASM_CFI_SUPPORTED=$asm_cfi_supported" >> Makefile
 echo "WITH_FRAME_POINTERS=$with_frame_pointers" >> Makefile
+echo "WITH_CPLUGINS=$with_cplugins" >> Makefile
+echo "WITH_GETENV=$with_getenv" >> Makefile
 echo "TARGET=$target" >> Makefile
 echo "HOST=$host" >> Makefile
 if [ "$ostype" = Cygwin ]; then
@@ -1836,6 +1851,16 @@ else
   inf "        naked pointers forbidden.. yes"
   else
   inf "        naked pointers forbidden.. no"
+  fi
+  if $with_getenv; then
+  inf "        getenv variables.......... yes"
+  else
+  inf "        getenv variables.......... no"
+  fi
+  if $with_cplugins; then
+  inf "        C plugins................. yes"
+  else
+  inf "        C plugins................. no"
   fi
   inf "        native dynlink ........... $natdynlink"
   if test "$profiling" = "prof"; then
