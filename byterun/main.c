@@ -39,9 +39,9 @@ int main(int argc, char **argv)
       caml_gc_message (-1, " %s", argv[i]);
     }
     caml_gc_message (-1, "\n", 0);
-    ocp = getenv ("OCAMLRUNPARAM");
+    ocp = CAML_GETENV ("OCAMLRUNPARAM");
     caml_gc_message (-1, "### OCAMLRUNPARAM=%s\n", ocp == NULL ? "" : ocp);
-    cp = getenv ("CAMLRUNPARAM");
+    cp = CAML_GETENV ("CAMLRUNPARAM");
     caml_gc_message (-1, "### CAMLRUNPARAM=%s\n", cp == NULL ? "" : cp);
     caml_gc_message (-1, "### working dir: %s\n", getcwd (NULL, 0));
   }

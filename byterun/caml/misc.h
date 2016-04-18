@@ -92,7 +92,79 @@ CAMLextern void caml_fatal_error_arg2 (char *fmt1, char *arg1,
 CAMLextern char * caml_strdup(const char * s);
 CAMLextern char * caml_strconcat(int n, ...); /* n args of const char * type */
 
-/* <private> */
+/* Use macros for some system calls being called from OCaml itself.
+  These calls can be either traced for security reasons, or changed to
+  virtualize the program. */
+
+#ifndef CAML_WITH_CPLUGINS
+
+#define CAML_SYS_EXIT(retcode) exit(retcode)
+#define CAML_SYS_OPEN(filename,flags,perm) open(filename,flags,perm)
+#define CAML_SYS_CLOSE(fd) close(fd)
+#define CAML_SYS_STAT(filename,st) stat(filename,st)
+#define CAML_SYS_UNLINK(filename) unlink(filename)
+#define CAML_SYS_RENAME(old_name,new_name) rename(old_name, new_name)
+#define CAML_SYS_CHDIR(dirname) chdir(dirname)
+#define CAML_SYS_GETENV(varname) getenv(varname)
+#define CAML_SYS_SYSTEM(command) system(command)
+#define CAML_SYS_READ_DIRECTORY(dirname,tbl) caml_read_directory(dirname,tbl)
+
+#else
+
+#define CAML_CPLUGINS_EXIT 0
+#define CAML_CPLUGINS_OPEN 1
+#define CAML_CPLUGINS_CLOSE 2
+#define CAML_CPLUGINS_STAT 3
+#define CAML_CPLUGINS_UNLINK 4
+#define CAML_CPLUGINS_RENAME 5
+#define CAML_CPLUGINS_CHDIR 6
+#define CAML_CPLUGINS_GETENV 7
+#define CAML_CPLUGINS_SYSTEM 8
+#define CAML_CPLUGINS_READ_DIRECTORY 9
+
+extern intnat (*caml_cplugins_prim)(int,intnat,intnat,intnat);
+
+#define CAML_SYS_PRIM_1(code,prim,arg1)               \
+  (caml_cplugins_prim == NULL) ? prim(arg1) :    \
+  caml_cplugins_prim(code,(intnat) (arg1),0,0)
+#define CAML_SYS_STRING_PRIM_1(code,prim,arg1)               \
+  (caml_cplugins_prim == NULL) ? prim(arg1) :    \
+  (char*)caml_cplugins_prim(code,(intnat) (arg1),0,0)
+#define CAML_SYS_PRIM_2(code,prim,arg1,arg2)                         \
+  (caml_cplugins_prim == NULL) ? prim(arg1,arg2) :              \
+  caml_cplugins_prim(code,(intnat) (arg1), (intnat) (arg2),0)
+#define CAML_SYS_PRIM_3(code,prim,arg1,arg2,arg3)                            \
+  (caml_cplugins_prim == NULL) ? prim(arg1,arg2,arg3) :                 \
+  caml_cplugins_prim(code,(intnat) (arg1), (intnat) (arg2),(intnat) (arg3))
+
+#define CAML_SYS_EXIT(retcode) \
+  CAML_SYS_PRIM_1(CAML_CPLUGINS_EXIT,exit,retcode)
+#define CAML_SYS_OPEN(filename,flags,perm)                      \
+  CAML_SYS_PRIM_3(CAML_CPLUGINS_OPEN,open,filename,flags,perm)
+#define CAML_SYS_CLOSE(fd)                      \
+  CAML_SYS_PRIM_1(CAML_CPLUGINS_CLOSE,close,fd)
+#define CAML_SYS_STAT(filename,st)                      \
+  CAML_SYS_PRIM_2(CAML_CPLUGINS_STAT,stat,filename,st)
+#define CAML_SYS_UNLINK(filename)                       \
+  CAML_SYS_PRIM_1(CAML_CPLUGINS_UNLINK,unlink,filename)
+#define CAML_SYS_RENAME(old_name,new_name)                              \
+  CAML_SYS_PRIM_2(CAML_CPLUGINS_RENAME,rename,old_name,new_name)
+#define CAML_SYS_CHDIR(dirname)                         \
+  CAML_SYS_PRIM_1(CAML_CPLUGINS_CHDIR,chdir,dirname)
+#define CAML_SYS_GETENV(varname)                        \
+  CAML_SYS_STRING_PRIM_1(CAML_CPLUGINS_GETENV,getenv,varname)
+#define CAML_SYS_SYSTEM(command)                        \
+  CAML_SYS_PRIM_1(CAML_CPLUGINS_SYSTEM,system,command)
+#define CAML_SYS_READ_DIRECTORY(dirname,tbl)                            \
+  CAML_SYS_PRIM_2(CAML_CPLUGINS_READ_DIRECTORY,caml_read_directory,     \
+                  dirname,tbl)
+
+extern void caml_cplugins_init(char * exe_name, char ** argv);
+
+/* to write plugins for CAML_SYS_READ_DIRECTORY, we will need the
+   definition of struct ext_table to be public. */
+  
+#endif
 
 /* Data structures */
 
@@ -105,6 +177,8 @@ struct ext_table {
 extern void caml_ext_table_init(struct ext_table * tbl, int init_capa);
 extern int caml_ext_table_add(struct ext_table * tbl, void * data);
 extern void caml_ext_table_free(struct ext_table * tbl, int free_entries);
+
+/* <private> */
 
 /* GC flags and messages */
 

@@ -136,7 +136,7 @@ char * caml_search_exe_in_path(char * name)
   char * res;
 
   caml_ext_table_init(&path, 8);
-  tofree = caml_decompose_path(&path, getenv("PATH"));
+  tofree = caml_decompose_path(&path, CAML_GETENV("PATH"));
 #ifndef __CYGWIN__
   res = caml_search_in_path(&path, name);
 #else

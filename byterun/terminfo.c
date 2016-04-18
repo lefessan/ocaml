@@ -47,7 +47,7 @@ CAMLprim value caml_terminfo_setup (value vchan)
 
   chan = Channel (vchan);
 
-  term = getenv ("TERM");
+  term = CAML_GETENV ("TERM");
   if (term == NULL) return Bad_term;
   if (tgetent(buffer, term) != 1) return Bad_term;
 
