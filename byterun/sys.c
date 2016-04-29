@@ -478,19 +478,29 @@ value (*caml_cplugins_prim)(int,value,value,value) = NULL;
 #define DLL_EXECUTABLE 1
 #define DLL_NOT_GLOBAL 0
 
+static void* caml_cplugins_query(int query)
+{
+  switch(query){
+  case CAML_CPLUGINS_PRIM_HOOK:
+    return (void*)&caml_cplugins_prim;
+  case CAML_CPLUGINS_PRIM_READ_DIRECTORY:
+    return (void*)caml_read_directory;
+  }
+  return NULL;
+}
+
 void caml_load_plugin(char *plugin, char* exe_name, char** argv)
 {
   void* dll_handle = NULL;
   
   dll_handle = caml_dlopen(plugin, DLL_EXECUTABLE, DLL_NOT_GLOBAL);
   if( dll_handle != NULL ){
-    void (* dll_init)(char*,char**,void*,void*) =
+    void (* dll_init)(char*,char**,void*) =
       caml_dlsym(dll_handle, "caml_cplugin_init");
     if( dll_init != NULL ){
-      /* We pass caml_cplugins_prim and caml_read_directory because
-         plugins cannot access them directly in native code, since the
-         default runtime is compiled without -fPIC */
-      dll_init(exe_name,argv,&caml_cplugins_prim,caml_read_directory);
+      /* We pass caml_cplugins_query, a function that can be used
+         to query for specific functions of the runtime.      */
+      dll_init(exe_name,argv,caml_cplugins_query);
     } else {
       caml_dlclose(dll_handle);
     }

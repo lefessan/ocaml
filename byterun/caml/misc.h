@@ -161,6 +161,21 @@ extern intnat (*caml_cplugins_prim)(int,intnat,intnat,intnat);
 
 extern void caml_cplugins_init(char * exe_name, char ** argv);
 
+/* A plugin MUST define a symbol "caml_cplugin_init" with the prototype:
+
+void caml_cplugin_init(char* exe_name, char** argv, void* query)
+
+and use the [query] parameter to set:
+
+static void* (*cplugins_query)(int query);
+
+This function can then be used to query the address of other symbols
+in the executable, limited to the following queries:
+*/
+#define CAML_CPLUGINS_PRIM_HOOK           0
+#define CAML_CPLUGINS_PRIM_READ_DIRECTORY 1
+
+
 /* to write plugins for CAML_SYS_READ_DIRECTORY, we will need the
    definition of struct ext_table to be public. */
   
