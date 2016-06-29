@@ -35,7 +35,7 @@ let interface ppf sourcefile outputprefix =
   let ast = Pparse.parse_interface ~tool_name ppf sourcefile in
   if !Clflags.dump_parsetree then fprintf ppf "%a@." Printast.interface ast;
   if !Clflags.dump_source then fprintf ppf "%a@." Pprintast.signature ast;
-  let tsg = Typemod.type_interface initial_env ast in
+  let tsg = Typemod.type_interface sourcefile initial_env ast in
   if !Clflags.dump_typedtree then fprintf ppf "%a@." Printtyped.interface tsg;
   let sg = tsg.sig_type in
   if !Clflags.print_types then
@@ -96,7 +96,7 @@ let implementation ppf sourcefile outputprefix ~backend =
         +++ print_if ppf Clflags.dump_rawlambda Printlambda.lambda
         ++ Timings.time (Timings.Generate sourcefile) (fun lambda ->
           lambda
-          +++ Simplif.simplify_lambda
+          +++ Simplif.simplify_lambda sourcefile
           +++ print_if ppf Clflags.dump_lambda Printlambda.lambda
           ++ (fun ((module_ident, size), lam) ->
               Middle_end.middle_end ppf ~source_provenance
@@ -118,8 +118,9 @@ let implementation ppf sourcefile outputprefix ~backend =
         ++ print_if ppf Clflags.dump_rawlambda Printlambda.program
         ++ Timings.(time (Generate sourcefile))
             (fun { Lambda.code; main_module_block_size } ->
-              { Lambda.code = Simplif.simplify_lambda code;
+              { Lambda.code = Simplif.simplify_lambda sourcefile code;
                 main_module_block_size }
+
               ++ print_if ppf Clflags.dump_lambda Printlambda.program
               ++ Asmgen.compile_implementation_clambda ~source_provenance
                 outputprefix ppf;
