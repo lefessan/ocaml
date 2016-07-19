@@ -58,6 +58,7 @@
 #include "caml/stacks.h"
 #include "caml/sys.h"
 #include "caml/version.h"
+#include "caml/roots.h"
 
 static char * error_message(void)
 {
