@@ -143,3 +143,11 @@ DECLARE_HOOK1(caml_final_do_call_begin_hook,);
 DECLARE_HOOK1(caml_final_do_call_end_hook,);
 DECLARE_HOOK1(caml_execute_signal_begin_hook,);
 DECLARE_HOOK1(caml_execute_signal_end_hook,);
+
+/* Hooks to profile systhreads */
+DECLARE_HOOK3(caml_st_root_scan_hook,
+              value thread_id,
+              char* bottom,
+              uintnat retaddr);
+DECLARE_HOOK2(caml_st_change_hook, value thread_id, int change);
+
