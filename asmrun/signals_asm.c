@@ -72,6 +72,7 @@ extern char caml_system__code_begin, caml_system__code_end;
 
 void caml_garbage_collection(void)
 {
+  MAYBE_HOOK1(caml_garbage_collection_hook,0);
   caml_young_limit = caml_young_trigger;
   if (caml_requested_major_slice || caml_requested_minor_gc ||
       caml_young_ptr - caml_young_trigger < Max_young_whsize){
@@ -83,6 +84,8 @@ void caml_garbage_collection(void)
     caml_spacetime_automatic_snapshot();
   }
 #endif
+  /* Spacetime-specific code could be moved here. */
+  MAYBE_HOOK1(caml_garbage_collection_hook,1);
 
   caml_process_pending_signals();
 }

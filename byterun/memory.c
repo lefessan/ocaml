@@ -483,10 +483,16 @@ static inline value caml_alloc_shr_aux (mlsize_t wosize, tag_t tag,
     else
       return 0;
   }
+#ifdef WITH_GC_HOOKS
+  MAYBE_HOOK3(caml_alloc_shr_begin_hook, wosize, tag, profinfo);
+#endif
   hp = caml_fl_allocate (wosize);
   if (hp == NULL){
     new_block = expand_heap (wosize);
     if (new_block == NULL) {
+#ifdef WITH_GC_HOOKS
+      MAYBE_HOOK1(caml_alloc_shr_end_hook, -1);
+#endif
       if (!raise_oom)
         return 0;
       else if (caml_in_minor_collection)
@@ -525,6 +531,9 @@ static inline value caml_alloc_shr_aux (mlsize_t wosize, tag_t tag,
       Field (Val_hp (hp), i) = Debug_uninit_major;
     }
   }
+#endif
+#ifdef WITH_GC_HOOKS
+  MAYBE_HOOK1(caml_alloc_shr_end_hook, Val_hp(hp) );
 #endif
   return Val_hp (hp);
 }

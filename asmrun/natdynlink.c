@@ -29,10 +29,6 @@
 #include "caml/spacetime.h"
 #endif
 
-#include "caml/hooks.h"
-
-CAMLexport void (*caml_natdynlink_hook)(void* handle, char* unit) = NULL;
-
 #include <stdio.h>
 #include <string.h>
 
