@@ -112,6 +112,14 @@ module Options = Main_args.Make_opttop_options (struct
   let _dlinear = set dump_linear
   let _dstartup = set keep_startup_file
 
+  (* Added by OCamlPro *)
+  let _dcse = set dump_cse
+  let _error_size n = error_size := n
+  let _noinit = set noinit
+  let _unsafe_string = set unsafe_string
+  let _safe_string = clear unsafe_string
+  let _open s = open_modules := s :: !open_modules
+
   let anonymous = file_argument
 end);;
 

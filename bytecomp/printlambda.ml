@@ -17,6 +17,11 @@ open Types
 open Lambda
 
 
+let locid ppf locid =
+  match Memprof.get_alloc locid.id with
+  | NoAlloc -> ()
+  | LocId offset -> Format.pp_print_int ppf offset
+
 let rec struct_const ppf = function
   | Const_base(Const_int n) -> fprintf ppf "%i" n
   | Const_base(Const_char c) -> fprintf ppf "%C" c
@@ -94,6 +99,13 @@ let string_of_loc_kind = function
   | Loc_POS -> "loc_POS"
   | Loc_LOC -> "loc_LOC"
 
+let string_of_loc_kind = function
+  | Loc_FILE -> "loc_FILE"
+  | Loc_LINE -> "loc_LINE"
+  | Loc_MODULE -> "loc_MODULE"
+  | Loc_POS -> "loc_POS"
+  | Loc_LOC -> "loc_LOC"
+
 let primitive ppf = function
   | Pidentity -> fprintf ppf "id"
   | Pignore -> fprintf ppf "ignore"
@@ -102,17 +114,18 @@ let primitive ppf = function
   | Ploc kind -> fprintf ppf "%s" (string_of_loc_kind kind)
   | Pgetglobal id -> fprintf ppf "global %a" Ident.print id
   | Psetglobal id -> fprintf ppf "setglobal %a" Ident.print id
-  | Pmakeblock(tag, Immutable) -> fprintf ppf "makeblock %i" tag
-  | Pmakeblock(tag, Mutable) -> fprintf ppf "makemutable %i" tag
+  | Pmakeblock(tag, Immutable, _) -> fprintf ppf "makeblock %i" tag
+  | Pmakeblock(tag, Mutable, _) -> fprintf ppf "makemutable %i" tag
   | Pfield n -> fprintf ppf "field %i" n
   | Psetfield(n, ptr) ->
       let instr = if ptr then "setfield_ptr " else "setfield_imm " in
       fprintf ppf "%s%i" instr n
-  | Pfloatfield n -> fprintf ppf "floatfield %i" n
+  | Pfloatfield (n, _) -> fprintf ppf "floatfield %i" n
   | Psetfloatfield n -> fprintf ppf "setfloatfield %i" n
-  | Pduprecord (rep, size) -> fprintf ppf "duprecord %a %i" record_rep rep size
+  | Pduprecord (rep, size, _) ->
+      fprintf ppf "duprecord %a %i" record_rep rep size
   | Plazyforce -> fprintf ppf "force"
-  | Pccall p -> fprintf ppf "%s" p.prim_name
+  | Pccall (p, _) -> fprintf ppf "%s" p.prim_name
   | Praise k -> fprintf ppf "%s" (Lambda.raise_kind k)
   | Psequand -> fprintf ppf "&&"
   | Psequor -> fprintf ppf "||"
@@ -138,13 +151,13 @@ let primitive ppf = function
   | Poffsetint n -> fprintf ppf "%i+" n
   | Poffsetref n -> fprintf ppf "+:=%i"n
   | Pintoffloat -> fprintf ppf "int_of_float"
-  | Pfloatofint -> fprintf ppf "float_of_int"
-  | Pnegfloat -> fprintf ppf "~."
-  | Pabsfloat -> fprintf ppf "abs."
-  | Paddfloat -> fprintf ppf "+."
-  | Psubfloat -> fprintf ppf "-."
-  | Pmulfloat -> fprintf ppf "*."
-  | Pdivfloat -> fprintf ppf "/."
+  | Pfloatofint _ -> fprintf ppf "float_of_int"
+  | Pnegfloat _ -> fprintf ppf "~."
+  | Pabsfloat _ -> fprintf ppf "abs."
+  | Paddfloat _ -> fprintf ppf "+."
+  | Psubfloat _ -> fprintf ppf "-."
+  | Pmulfloat _ -> fprintf ppf "*."
+  | Pdivfloat _ -> fprintf ppf "/."
   | Pfloatcomp(Ceq) -> fprintf ppf "==."
   | Pfloatcomp(Cneq) -> fprintf ppf "!=."
   | Pfloatcomp(Clt) -> fprintf ppf "<."
@@ -173,28 +186,28 @@ let primitive ppf = function
   | Pisint -> fprintf ppf "isint"
   | Pisout -> fprintf ppf "isout"
   | Pbittest -> fprintf ppf "testbit"
-  | Pbintofint bi -> print_boxed_integer "of_int" ppf bi
+  | Pbintofint (bi,_) -> print_boxed_integer "of_int" ppf bi
   | Pintofbint bi -> print_boxed_integer "to_int" ppf bi
-  | Pcvtbint (bi1, bi2) -> print_boxed_integer_conversion ppf bi1 bi2
-  | Pnegbint bi -> print_boxed_integer "neg" ppf bi
-  | Paddbint bi -> print_boxed_integer "add" ppf bi
-  | Psubbint bi -> print_boxed_integer "sub" ppf bi
-  | Pmulbint bi -> print_boxed_integer "mul" ppf bi
-  | Pdivbint bi -> print_boxed_integer "div" ppf bi
-  | Pmodbint bi -> print_boxed_integer "mod" ppf bi
-  | Pandbint bi -> print_boxed_integer "and" ppf bi
-  | Porbint bi -> print_boxed_integer "or" ppf bi
-  | Pxorbint bi -> print_boxed_integer "xor" ppf bi
-  | Plslbint bi -> print_boxed_integer "lsl" ppf bi
-  | Plsrbint bi -> print_boxed_integer "lsr" ppf bi
-  | Pasrbint bi -> print_boxed_integer "asr" ppf bi
+  | Pcvtbint (bi1, bi2, _) -> print_boxed_integer_conversion ppf bi1 bi2
+  | Pnegbint (bi,_) -> print_boxed_integer "neg" ppf bi
+  | Paddbint (bi,_) -> print_boxed_integer "add" ppf bi
+  | Psubbint (bi,_) -> print_boxed_integer "sub" ppf bi
+  | Pmulbint (bi,_) -> print_boxed_integer "mul" ppf bi
+  | Pdivbint (bi,_) -> print_boxed_integer "div" ppf bi
+  | Pmodbint (bi,_) -> print_boxed_integer "mod" ppf bi
+  | Pandbint (bi,_) -> print_boxed_integer "and" ppf bi
+  | Porbint (bi,_) -> print_boxed_integer "or" ppf bi
+  | Pxorbint (bi,_) -> print_boxed_integer "xor" ppf bi
+  | Plslbint (bi,_) -> print_boxed_integer "lsl" ppf bi
+  | Plsrbint (bi,_) -> print_boxed_integer "lsr" ppf bi
+  | Pasrbint (bi,_) -> print_boxed_integer "asr" ppf bi
   | Pbintcomp(bi, Ceq) -> print_boxed_integer "==" ppf bi
   | Pbintcomp(bi, Cneq) -> print_boxed_integer "!=" ppf bi
   | Pbintcomp(bi, Clt) -> print_boxed_integer "<" ppf bi
   | Pbintcomp(bi, Cgt) -> print_boxed_integer ">" ppf bi
   | Pbintcomp(bi, Cle) -> print_boxed_integer "<=" ppf bi
   | Pbintcomp(bi, Cge) -> print_boxed_integer ">=" ppf bi
-  | Pbigarrayref(unsafe, n, kind, layout) ->
+  | Pbigarrayref(unsafe, n, kind, layout, _) ->
       print_bigarray "get" unsafe kind ppf layout
   | Pbigarrayset(unsafe, n, kind, layout) ->
       print_bigarray "set" unsafe kind ppf layout
@@ -202,10 +215,10 @@ let primitive ppf = function
   | Pstring_load_16(unsafe) ->
      if unsafe then fprintf ppf "string.unsafe_get16"
      else fprintf ppf "string.get16"
-  | Pstring_load_32(unsafe) ->
+  | Pstring_load_32(unsafe,_) ->
      if unsafe then fprintf ppf "string.unsafe_get32"
      else fprintf ppf "string.get32"
-  | Pstring_load_64(unsafe) ->
+  | Pstring_load_64(unsafe,_) ->
      if unsafe then fprintf ppf "string.unsafe_get64"
      else fprintf ppf "string.get64"
   | Pstring_set_16(unsafe) ->
@@ -220,10 +233,10 @@ let primitive ppf = function
   | Pbigstring_load_16(unsafe) ->
      if unsafe then fprintf ppf "bigarray.array1.unsafe_get16"
      else fprintf ppf "bigarray.array1.get16"
-  | Pbigstring_load_32(unsafe) ->
+  | Pbigstring_load_32(unsafe, _) ->
      if unsafe then fprintf ppf "bigarray.array1.unsafe_get32"
      else fprintf ppf "bigarray.array1.get32"
-  | Pbigstring_load_64(unsafe) ->
+  | Pbigstring_load_64(unsafe, _) ->
      if unsafe then fprintf ppf "bigarray.array1.unsafe_get64"
      else fprintf ppf "bigarray.array1.get64"
   | Pbigstring_set_16(unsafe) ->
@@ -236,7 +249,7 @@ let primitive ppf = function
      if unsafe then fprintf ppf "bigarray.array1.unsafe_set64"
      else fprintf ppf "bigarray.array1.set64"
   | Pbswap16 -> fprintf ppf "bswap16"
-  | Pbbswap(bi) -> print_boxed_integer "bswap" ppf bi
+  | Pbbswap(bi,_) -> print_boxed_integer "bswap" ppf bi
   | Pint_as_pointer -> fprintf ppf "int_as_pointer"
 
 let rec lam ppf = function
@@ -248,7 +261,7 @@ let rec lam ppf = function
       let lams ppf largs =
         List.iter (fun l -> fprintf ppf "@ %a" lam l) largs in
       fprintf ppf "@[<2>(apply@ %a%a)@]" lam lfun lams largs
-  | Lfunction(kind, params, body) ->
+  | Lfunction(kind, params, body, _) ->
       let pr_params ppf params =
         match kind with
         | Curried ->
@@ -263,11 +276,11 @@ let rec lam ppf = function
               params;
             fprintf ppf ")" in
       fprintf ppf "@[<2>(function%a@ %a)@]" pr_params params lam body
-  | Llet(str, id, arg, body) ->
+  | Llet(str, id, _loc, arg, body) ->
       let kind = function
         Alias -> "a" | Strict -> "" | StrictOpt -> "o" | Variable -> "v" in
       let rec letbody = function
-        | Llet(str, id, arg, body) ->
+        | Llet(str, id, _loc, arg, body) ->
             fprintf ppf "@ @[<2>%a =%s@ %a@]" Ident.print id (kind str) lam arg;
             letbody body
         | expr -> expr in
@@ -275,7 +288,7 @@ let rec lam ppf = function
         Ident.print id (kind str) lam arg;
       let expr = letbody body in
       fprintf ppf ")@]@ %a)@]" lam expr
-  | Lletrec(id_arg_list, body) ->
+  | Lletrec(id_arg_list, body, _) ->
       let bindings ppf id_arg_list =
         let spc = ref false in
         List.iter
@@ -312,7 +325,7 @@ let rec lam ppf = function
        "@[<1>(%s %a@ @[<v 0>%a@])@]"
        (match sw.sw_failaction with None -> "switch*" | _ -> "switch")
        lam larg switch sw
-  | Lstringswitch(arg, cases, default) ->
+  | Lstringswitch(arg, cases, default,_loc) ->
       let switch ppf cases =
         let spc = ref false in
         List.iter
@@ -328,7 +341,7 @@ let rec lam ppf = function
         end in
       fprintf ppf
        "@[<1>(stringswitch %a@ @[<v 0>%a@])@]" lam arg switch cases
-  | Lstaticraise (i, ls)  ->
+  | Lstaticraise (_, i, ls)  ->
       let lams ppf largs =
         List.iter (fun l -> fprintf ppf "@ %a" lam l) largs in
       fprintf ppf "@[<2>(exit@ %d%a)@]" i lams ls;

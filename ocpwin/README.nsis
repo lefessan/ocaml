@@ -1,0 +1,349 @@
+
+Installation de NSIS sous Linux
+-------------------------------
+
+Il faut recompiler le paquet pour avoir des chaînes de plus de 1024
+caractères (sinon, le PATH se retrouve effacé chez certains
+utilisateurs).
+
+$ apt-get update
+$ apt-get install apt-src g++-mingw-w64
+
+Next fetch the NSIS sources:
+
+$ apt-src install nsis
+
+Next open nsis-2.46/debian/rules in a text editor and add
+NSIS_MAX_STRLEN=8192 to the suitable place:
+
+SCONSOPTS_NSIS   := $(SCONSOPTS) NSIS_MAX_STRLEN=8192 SKIPUTILS=$(IGNORE_UTILS_NSIS) SKIPDOC=COPYING
+SCONSOPTS_COMMON := $(SCONSOPTS) NSIS_MAX_STRLEN=8192 SKIPUTILS=$(IGNORE_UTILS_COMMON) SKIPDOC=COPYING
+
+Now build the packages:
+
+$ apt-src build nsis
+
+Finally, install the customized packages using dpkg (les paquets ont
+été générés dans le répertoire au-dessus, et il faut probablement
+uniquement sélectionner les paquets "amd64"):
+
+$ dpkg -i nsis_2.46-* nsis-common_2.46-*
+
+Génération de la configuration de l'installeur
+----------------------------------------------
+
+Les règles de génération sont dans `ocpwin/Makefile.install`.
+
+1/ Une règle permet de générer `cross/nsis/config.nsi` à partir du
+  fichier `Makefile.config`.
+
+2/ On place les fichiers à installer dans `cross/local/`. Ce sont les règles
+  `install-{mingw*,msvc*}`. En général, on recopie:
+   2.1/ On crée les répertoires (`install-mkdirs`)
+   2.2/ On y place la distribution OCaml (`install-distrib`)
+     Ainsi que les fichiers `ocaml.config` pour Mingw et MSVC (depuis
+        `cross/configs/****??/host/ocaml.config`).
+     A noter que cette installation essaie de fusionner certains fichiers
+       (ocamlopt=ocamlc, ocamlopt.opt=ocamlc.opt=ocamldep.opt,etc.)
+   2.3/ On y place les fichiers TypeRex (`install-typerex`)
+     2.3.1/ Le fichier `ocpwin/typerex-mingw??/ocp-build.exe`
+     2.3.2/ Les fichiers .ocp correspondant (même répertoire)
+   2.4/ On recopie le fichier `use_ocaml.bat`
+   2.5/ On recopie les fichiers pour MSVC:
+     2.5.1/ Les fichiers MSVC pour Flexdll (depuis `croos/typerex-mingw??/`)
+     2.5.2/ Le fichier `cross/configs/msvc??/host/ocaml.config`
+  2.6/ On recopie les fichiers pour Mingw :
+     2.6.1/ Le fichier `cross/ocaml.config`
+     2.6.2/ Les fichiers de la distribution Mingw:
+    
+       * bin/x86_64-w64-mingw32-gcc.exe
+       * bin/libwinpthread-1.dll
+       * bin/ar.exe
+       * bin/windres.exe
+       * bin/ld.exe
+       * bin/ld.exe -> x86_64-w64-mingw32-ld.exe
+       * bin/ar.exe -> x86_64-w64-mingw32-ar.exe
+       * bin/ranlib.exe -> x86_64-w64-mingw32-ranlib.exe
+       * libexec/
+       * lib/gcc/
+       * x86_64-w64-mingw32/
+       * licenses/ -> Licenses.$(MINGW_SYSTEM)
+
+  3/ On applique une réduction des fichiers, telles que fournie par
+      `ocpwin/make-minimal-mingw??.sh`. Celle-ci consiste à supprimer
+      de Mingw (32 ou 64 bit) les fichiers qui ne sont pas strictement utiles
+      à l'utilisation d'OCaml. Ceux-ci ont été déterminés en faisant
+      passer des tests de compilation à ocpwin, après suppression de groupes
+      de fichiers (voir le répertoire tester/ qui contient ce script).
+
+  $ cd cross/local; ../../ocpwin/make-minimal-$(MINGW_SYSTEM).sh
+  
+  4/ On recopie les fichiers dans cross/nsis/files/, en utilisant l'outil
+      `cross/ocpwin-nsis/ocpwin-nsis-pre`:
+      
+  $ rm -rf cross/nsis/files 
+  $ ./cross/ocpwin-nsis/ocpwin-nsis-pre -fake -src cross/local -nsis cross/nsis
+
+  TODO: expliquer ce qu'il fait.
+
+  5/ On génère le fichier `cross/nsis/system.nsi` :
+
+  $ echo '!define PRODUCT_OPTION "mini"' > cross/nsis/system.nsi
+
+  6/ On lance le génèrateur `makensis`, et on récupère le fichier généré :
+
+  $ makensis cross/nsis/install.nsi
+  $ cp cross/nsis/$(MIN_INSTALLER).exe $(SHAREDWINDIR)/
+
+
+Fonctionnement de l'installeur:
+-------------------------------
+
+Pour comprendre le fonctionnement de l'installeur, l'idéal est de
+lire le contenu du fichier `install.nsi`, utilisé pour le générer:
+
+(*********************************************************************)
+(*********************************************************************)
+(*********************************************************************)
+(*********************************************************************)
+(*********************************************************************)
+(*********************************************************************)
+(*********************************************************************)
+
+(* Chargement des modules nécessaires *)
+!include "config.nsi" (* généré par Makefile.install *)
+!include "system.nsi" (* généré par Makefile.install *)
+!include "MUI2.nsh"
+!include "winmessages.nsh"
+!include "LogicLib.nsh"
+!include "EnvVarUpdate.nsh"
+!include "IfKeyExists.nsh"
+!include "MultiUser.nsh"
+!include "ReplaceInFile.nsh"
+
+!define MUI_PRODUCT "OCamlPro\OCPWin${OCPWIN_TARGET}"
+!define MULTIUSER_EXECUTIONLEVEL Highest
+
+Name "OCamlPro OCPWin${OCPWIN_TARGET}"
+
+(* Le fichier à générer... *)
+OutFile "ocpwin${OCPWIN_TARGET}-${MUI_VERSION}-${MUI_SYSTEMS}.exe"
+InstallDir "$PROGRAMFILES\${MUI_PRODUCT}"
+!define ROOT_DIR "files"
+
+!define SHCNE_ASSOCCHANGED 0x8000000
+!define SHCNF_IDLIST 0
+
+!define env_all     '"SYSTEM\CurrentControlSet\Control\Session Manager\Environment"'
+!define env_current '"Environment"'
+
+!define MUI_WELCOMEPAGE_TITLE "OCamlPro's OCPWin${OCPWIN_TARGET} installer."
+!define MUI_WELCOMEPAGE_TEXT \
+   "This wizard will install OCPWin${OCPWIN_TARGET} version ${MUI_VERSION}, \
+for ${MUI_SYSTEMS}.$\n \
+OCPWin${OCPWIN_TARGET} is a version of OCaml specially packaged by OCamlPro \
+to work better on the Windows operating system. \
+   "
+!insertmacro MUI_PAGE_WELCOME
+
+!define MUI_STARTMENUPAGE_REGISTRY_ROOT "SHCTX"
+!define MUI_STARTMENUPAGE_REGISTRY_KEY "Software\OCamlPro"
+!define MUI_STARTMENUPAGE_REGISTRY_VALUENAME "Start Menu Folder"
+Var STARTMENUFOLDER
+!insertmacro MUI_PAGE_STARTMENU Application $STARTMENUFOLDER
+
+!define MUI_LICENSEPAGE_TEXT_TOP "This version of OCaml is distributed under a specific license.$\n"
+!define MUI_LICENSEPAGE_TEXT_BOTTOM "You must agree with the terms of that license below before installing this softare."
+!insertmacro MUI_PAGE_LICENSE ../LICENSE.txt
+
+!insertmacro MUI_PAGE_DIRECTORY
+!insertmacro MUI_PAGE_INSTFILES
+!insertmacro MUI_PAGE_FINISH
+!insertmacro MUI_UNPAGE_CONFIRM
+!insertmacro MUI_UNPAGE_INSTFILES
+!insertmacro MUI_LANGUAGE "English"
+
+(* Essayer de récupérer l'ancien répertoire d'installation dans
+  la base des registres. Sinon, proposer les répertoires "classiques". *)
+Function .onInit
+  !insertmacro MULTIUSER_INIT
+  ${If} $MultiUser.InstallMode == "AllUsers"
+      ReadRegStr $0 HKLM "Software\OCamlPro\OCPWin${OCPWIN_TARGET}" "CurrentInstallFolder"
+      ${If} $0 != ""
+         StrCpy $INSTDIR "$0"
+      ${Else}
+         StrCpy $INSTDIR  "$PROGRAMFILES32\${MUI_PRODUCT}"
+      ${EndIf}
+  ${ElseIf} $MultiUser.InstallMode == "CurrentUser"
+     ReadRegStr $0 HKCU "Software\OCamlPro\OCPWin${OCPWIN_TARGET}" "CurrentInstallFolder"
+     ${If} $0 != ""
+        StrCpy $INSTDIR "$0"
+     ${Else}
+        StrCpy $INSTDIR "$APPDATA\${MUI_PRODUCT}"
+     ${EndIf}
+  ${EndIf}
+FunctionEnd
+
+(* La section d'installation *)
+Section "OCaml" SecOCaml
+
+(* Définir le répertoire cible (celui défini par .onInit) *)
+  SetOutPath "$INSTDIR"
+(* Recopier les répertoires et fichiers habituels *)
+  File /r ${ROOT_DIR}/bin
+  File /r ${ROOT_DIR}/lib
+  File /r ${ROOT_DIR}/cmas  (* celui-ci est étrange, non ? *)
+  File ${ROOT_DIR}/Changes.ocaml.txt
+  File ${ROOT_DIR}/License.flexdll.txt
+  File ${ROOT_DIR}/License.ocamlpro.txt
+  File ${ROOT_DIR}/Readme.ocamlpro.txt
+  File ${ROOT_DIR}/License.inria.txt
+  File ${ROOT_DIR}/Readme.inria.txt
+  File ${ROOT_DIR}/use_ocaml.bat
+  File ${ROOT_DIR}/build-camlp4.cmd
+
+(* Recopier les répertoires optionels (ceux de Mingw, en l'occurrence *)
+  !include install_lines_${PRODUCT_OPTION}.nsi
+
+  ${If} $MultiUser.InstallMode == "AllUsers"
+
+    ; This is for the OCamlTopWin thing
+    WriteRegStr HKLM "Software\Objective Caml" "InterpreterPath" "$INSTDIR\bin\ocaml.exe"
+
+(* Modifier la base de registres pour y ajouter nos variables *)
+    WriteRegStr HKLM "Software\OCamlPro\OCPWin${OCPWIN_TARGET}" "CurrentInstallFolder" $INSTDIR
+    WriteRegStr HKLM "Software\OCamlPro\OCPWin${OCPWIN_TARGET}" "DefaultVersion" "ocamlwin-${MUI_VERSION}"
+
+;;    WriteRegStr HKLM ${env_all} "OCAMLLIB" "$INSTDIR\lib"
+;;    WriteRegStr HKLM ${env_all} "OCAMLFIND_CONF" "$INSTDIR\etc\findlib.conf"
+(* Modifier le PATH pour y ajouter notre chemin *)
+    ${EnvVarUpdate} $0 "PATH" "P" "HKLM" "$INSTDIR\bin"
+
+  ${ElseIf} $MultiUser.InstallMode == "CurrentUser"
+
+     ; This is for the OCamlTopWin thing
+    WriteRegStr HKCU "Software\Objective Caml" "InterpreterPath" "$INSTDIR\bin\ocaml.exe"
+
+    WriteRegStr HKCU "Software\OCamlPro\OCPWin${OCPWIN_TARGET}" "CurrentInstallFolder" $INSTDIR
+    WriteRegStr HKCU "Software\OCamlPro\OCPWin${OCPWIN_TARGET}" "DefaultVersion" "ocpwin${OCPWIN_TARGET}-${MUI_VERSION}"
+
+    ; EnvVarUpdate won't work if PATH doesn't exist or is empty...
+    !insertmacro IfKeyExists "HKLM" ${env_current} "PATH"
+    Pop $R0
+    ${If} $R0 == 1 ; PATH exists, update it (and hope it's not empty)
+      ${EnvVarUpdate} $0 "PATH" "P" "HKCU" "$INSTDIR\bin"
+    ${Else}
+      WriteRegStr HKCU ${env_current} "PATH" "$INSTDIR\bin"
+    ${EndIf}
+  ${Else}
+    SetErrors
+    DetailPrint "Error: $MultiUser.InstallMode unexpected value"
+  ${EndIf}
+
+(* Signaler à tout le monde que PATH a été modifié *)
+  SendMessage ${HWND_BROADCAST} ${WM_WININICHANGE} 0 "STR:Environment" /TIMEOUT=5000
+
+(* Exécute le post-install hook pour construire les bibliothèques camlp4.
+   Voir le script `cross/build-camlp4.bat`
+*)
+  ExpandEnvStrings $0 %COMSPEC%
+  nsExec::Exec '"$0" "/C" "$INSTDIR\build-camlp4.cmd" "$INSTDIR"'
+;;  Delete "$INSTDIR\build-camlp4.cmd"
+
+(* Enregistrer le désinstalleur correspondant *)
+  WriteRegExpandStr SHCTX "Software\Microsoft\Windows\CurrentVersion\Uninstall\OCPWin${OCPWIN_TARGET}" "UninstallString" "$INSTDIR\uninstall.exe"
+  WriteRegExpandStr SHCTX "Software\Microsoft\Windows\CurrentVersion\Uninstall\OCPWin${OCPWIN_TARGET}" "InstallLocation" "$INSTDIR"
+  WriteRegStr SHCTX "Software\Microsoft\Windows\CurrentVersion\Uninstall\OCPWin${OCPWIN_TARGET}" "DisplayName" "OCPWin${OCPWIN_TARGET}"
+  WriteRegStr SHCTX "Software\Microsoft\Windows\CurrentVersion\Uninstall\OCPWin${OCPWIN_TARGET}" "DisplayIcon" "$INSTDIR\ocaml-icon.ico"
+  WriteRegStr SHCTX "Software\Microsoft\Windows\CurrentVersion\Uninstall\OCPWin${OCPWIN_TARGET}" "DisplayVersion" "${MUI_VERSION}"
+  WriteRegStr SHCTX "Software\Microsoft\Windows\CurrentVersion\Uninstall\OCPWin${OCPWIN_TARGET}" "Publisher" "OCamlPro"
+
+  WriteUninstaller $INSTDIR\uninstall.exe
+SectionEnd
+
+
+Function un.onInit
+  !insertmacro MULTIUSER_UNINIT
+FunctionEnd
+
+Section "Uninstall"
+
+(* Effacer les fichiers installés automatiquement *)
+  !include uninstall_lines.nsi
+  Delete "$INSTDIR\uninstall.exe"
+
+(* Effacer les fichier générés par `build-camlp4.cmd` *)
+  Delete "$INSTDIR\bin\camlp4boot.exe"
+  Delete "$INSTDIR\bin\camlp4o.exe"
+  Delete "$INSTDIR\bin\camlp4oof.exe"
+  Delete "$INSTDIR\bin\camlp4rf.exe"
+  Delete "$INSTDIR\bin\camlp4.exe"
+  Delete "$INSTDIR\bin\camlp4of.exe"
+  Delete "$INSTDIR\bin\camlp4orf.exe"
+  Delete "$INSTDIR\bin\camlp4r.exe"
+  Delete "$INSTDIR\lib\camlp4\camlp4lib.cma"
+  Delete "$INSTDIR\lib\camlp4\camlp4fulllib.cma"
+  Delete "$INSTDIR\lib\camlp4\camlp4o.cma"
+  Delete "$INSTDIR\lib\camlp4\camlp4oof.cma"
+  Delete "$INSTDIR\lib\camlp4\camlp4r.cma"
+  Delete "$INSTDIR\lib\camlp4\camlp4of.cma"
+  Delete "$INSTDIR\lib\camlp4\camlp4orf.cma"
+  Delete "$INSTDIR\lib\camlp4\camlp4rf.cma"
+
+(* Effacer ensuite les répertoires, quand ils sont vides *)
+  RMDir /r "$INSTDIR\cmas"
+  Delete "$INSTDIR\${UninstLog}"
+  RMDir "$INSTDIR"
+
+(* Nettoyer la base de registres *)
+  ${If} $MultiUser.InstallMode == "AllUsers"
+    ${un.EnvVarUpdate} $0 "PATH" "R" "HKLM" "$INSTDIR\bin"
+
+    DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\OCPWin${OCPWIN_TARGET}"
+
+  ${ElseIf} $MultiUser.InstallMode == "CurrentUser"
+
+    ReadRegStr $R1 HKCU ${env_current} "PATH"
+    ${If} $R1 == "$INSTDIR\bin"
+      DeleteRegValue HKCU ${env_current} "PATH"
+    ${Else}
+      ${un.EnvVarUpdate} $0 "PATH" "R" "HKCU" "$INSTDIR\bin"
+    ${EndIf}
+
+    DeleteRegKey HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\OCPWin${OCPWIN_TARGET}"
+
+  ${Else}
+    SetErrors
+    DetailPrint "Error: $MultiUser.InstallMode unexpected value"
+  ${EndIf}
+
+(* Prévenir toutes les applications des changements *)
+  SendMessage ${HWND_BROADCAST} ${WM_WININICHANGE} 0 "STR:Environment" /TIMEOUT=5000
+
+SectionEnd
+
+(*********************************************************************)
+(*********************************************************************)
+(*********************************************************************)
+(*********************************************************************)
+(*********************************************************************)
+(*********************************************************************)
+(*********************************************************************)
+
+Le programme ocpwin-nsis-pre :
+------------------------------
+
+Ce programme est situé dans `cross/ocpwin-nsis`. Compilé avec Makefile.cross,
+il répond à la description ocp-build:
+
+
+
+Le script cross/build-camlp4.bat :
+----------------------------------
+
+Ce script prend en argument le répertoire d'installation. Il commence
+par faire un "cd" dedans, avant d'y compiler les bibliothèques de
+Camlp4. En effet, celles-ci contiennent beaucoup de fichiers en
+commun, il est donc plus simple de les recomposer après installation
+que de mettre chaque bibliothèque dans l'installeur.
+

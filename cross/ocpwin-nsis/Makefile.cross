@@ -1,0 +1,12 @@
+OCPWIN_NSIS_DIR=../../../ocpwin/ocpwin-nsis
+
+include $(OCPWIN_NSIS_DIR)/Makefile
+
+FILES= $(BUILD_SOURCES)
+
+$(FILES): %: $(OCPWIN_NSIS_DIR)/%
+	rm -f $*
+	ln -s $(OCPWIN_NSIS_DIR)/$* $*
+
+clean::
+	rm -f $(FILES)

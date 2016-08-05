@@ -1,0 +1,290 @@
+
+# The lexer
+
+parsing/ocpp_lexer.ml: parsing/ocpp_lexer.mll
+	$(CAMLLEX) parsing/ocpp_lexer.mll
+
+partialclean::
+	rm -f parsing/ocpp_lexer.ml
+
+beforedepend:: parsing/ocpp_lexer.ml
+
+# The preprocessor directives parser
+
+parsing/ocpp_parser.mli parsing/ocpp_parser.ml: parsing/ocpp_parser.mly
+	$(CAMLYACC) $(YACCFLAGS) parsing/ocpp_parser.mly
+
+# also remove old location files
+partialclean::
+	rm -f parsing/ocpp_parser.mli parsing/ocpp_parser.ml parsing/ocpp_parser.output
+	rm -f parsing/ocpp_parser.mli parsing/ocpp_parser.ml parsing/ocpp_parser.output
+
+beforedepend:: parsing/ocpp_parser.mli parsing/ocpp_parser.ml
+
+
+# The lexer
+
+driver/patch_lexer.ml: driver/patch_lexer.mll
+	$(CAMLLEX) driver/patch_lexer.mll
+
+partialclean::
+	rm -f driver/patch_lexer.ml
+
+beforedepend:: driver/patch_lexer.ml
+
+# The patch parser
+
+driver/patch_parser.mli driver/patch_parser.ml: driver/patch_parser.mly
+	$(CAMLYACC) $(YACCFLAGS) driver/patch_parser.mly
+
+# also remove old location files
+partialclean::
+	rm -f driver/patch_parser.mli driver/patch_parser.ml driver/patch_parser.output
+	rm -f driver/patch_parser.mli driver/patch_parser.ml driver/patch_parser.output
+
+beforedepend:: driver/patch_parser.mli driver/patch_parser.ml
+
+
+OCP_SOURCES=								\
+									\
+  byterun/memprof.h byterun/memprof.c byterun/ocpwin.c			\
+									\
+  stdlib/ocpstd.ml stdlib/ocpstd.mli stdlib/stringCompat.ml		\
+									\
+  utils/ocputils.ml utils/ocputils.mli utils/msvc.ml			\
+									\
+  parsing/src_cache.ml parsing/ocpp_types.ml parsing/ocpp_version.ml	\
+  parsing/ocpp_parser.mly parsing/ocpp_lexer.mll parsing/ocpp.ml	\
+  parsing/ocpp.mli parsing/parsetreeIter.ml parsing/parsetreeMap.ml	\
+  parsing/parsetreeIter.mli parsing/parsetreeMap.mli			\
+									\
+  typing/globalize.ml typing/globalize.mli				\
+									\
+  bytecomp/memprof.ml bytecomp/memprof.mli				\
+									\
+  driver/patch_types.ml driver/patch_parser.mly				\
+  driver/patch_lexer.mll driver/patch_engine.ml driver/patch_main.ml	\
+									\
+  driver/styleCheck1.ml driver/needhcons.ml driver/toposort.ml		\
+  driver/maker.ml driver/tailrec.ml driver/tailrec.mli			\
+  driver/ocpMain.ml driver/ocpMain.mli					\
+									\
+  driver/intel_proc.ml driver/intel_gas.ml driver/intel_masm.ml		\
+  driver/intel_assembler.ml driver/coff.ml				\
+  driver/intel_coff.ml							\
+									\
+  driver/elf.ml								\
+  driver/intel_elf.ml							\
+  driver/intel_tests.ml							\
+									\
+  driver/intel_main.ml							\
+									\
+  utils/watcherUtils.ml							\
+  utils/watcherUtils.mli							\
+  utils/watcherCompilerProtocol.ml					\
+  utils/watcherCompilerProtocol.mli					\
+  driver/watcherCompilerBytecode.ml					\
+  driver/watcherCompilerNative.ml					\
+									
+
+
+sources: $(OCP_SOURCES)
+beforedepend:: $(OCP_SOURCES)
+
+byterun/ocpwin.c:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/ocpwin.c byterun/ocpwin.c
+byterun/memprof.h:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/memprof.h byterun/memprof.h
+byterun/memprof.c:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/memprof.c byterun/memprof.c
+stdlib/ocpstd.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/ocpstd.ml stdlib/ocpstd.ml
+stdlib/ocpstd.mli:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/ocpstd.mli stdlib/ocpstd.mli
+utils/ocputils.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/ocputils.ml utils/ocputils.ml
+utils/ocputils.mli:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/ocputils.mli utils/ocputils.mli
+utils/msvc.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/msvc.ml utils/msvc.ml
+parsing/src_cache.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/src_cache.ml parsing/src_cache.ml
+parsing/ocpp_types.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/ocpp_types.ml parsing/ocpp_types.ml
+parsing/ocpp_version.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/ocpp_version.ml parsing/ocpp_version.ml
+parsing/ocpp_parser.mly:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/ocpp_parser.mly parsing/ocpp_parser.mly
+parsing/ocpp_lexer.mll:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/ocpp_lexer.mll parsing/ocpp_lexer.mll
+parsing/ocpp.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/ocpp.ml parsing/ocpp.ml
+parsing/parsetreeIter.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/parsetreeIter.ml parsing/parsetreeIter.ml
+parsing/parsetreeMap.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/parsetreeMap.ml parsing/parsetreeMap.ml
+parsing/parsetreeIter.mli:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/parsetreeIter.mli parsing/parsetreeIter.mli
+parsing/parsetreeMap.mli:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/parsetreeMap.mli parsing/parsetreeMap.mli
+parsing/ocpp.mli:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/ocpp.mli parsing/ocpp.mli
+typing/globalize.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/globalize.ml typing/globalize.ml
+typing/globalize.mli:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/globalize.mli typing/globalize.mli
+bytecomp/memprof.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/memprof.ml bytecomp/memprof.ml
+bytecomp/memprof.mli:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/memprof.mli bytecomp/memprof.mli
+driver/patch_types.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/patch_types.ml driver/patch_types.ml
+driver/patch_lexer.mll:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/patch_lexer.mll driver/patch_lexer.mll
+driver/patch_parser.mly:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/patch_parser.mly driver/patch_parser.mly
+driver/patch_engine.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/patch_engine.ml driver/patch_engine.ml
+driver/patch_main.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/patch_main.ml driver/patch_main.ml
+driver/styleCheck1.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/styleCheck1.ml driver/styleCheck1.ml
+driver/needhcons.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/needhcons.ml driver/needhcons.ml
+driver/toposort.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/toposort.ml driver/toposort.ml
+driver/maker.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/maker.ml driver/maker.ml
+driver/tailrec.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/tailrec.ml driver/tailrec.ml
+driver/tailrec.mli:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/tailrec.mli driver/tailrec.mli
+driver/ocpMain.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/ocpMain.ml driver/ocpMain.ml
+driver/ocpMain.mli:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/ocpMain.mli driver/ocpMain.mli
+driver/intel_proc.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/intel_proc.ml driver/intel_proc.ml
+driver/intel_gas.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/intel_gas.ml driver/intel_gas.ml
+driver/intel_masm.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/intel_masm.ml driver/intel_masm.ml
+stdlib/stringCompat.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/stringCompat.ml stdlib/stringCompat.ml
+driver/intel_assembler.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/intel_assembler.ml driver/intel_assembler.ml
+driver/coff.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/coff.ml driver/coff.ml
+driver/intel_coff.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/intel_coff.ml driver/intel_coff.ml
+driver/elf.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/elf.ml driver/elf.ml
+driver/intel_elf.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/intel_elf.ml driver/intel_elf.ml
+driver/intel_tests.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/intel_tests.ml driver/intel_tests.ml
+driver/intel_main.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/intel_main.ml driver/intel_main.ml
+utils/watcherUtils.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/ocp-watcher/watcherUtils.ml utils/watcherUtils.ml
+utils/watcherUtils.mli:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/ocp-watcher/watcherUtils.mli utils/watcherUtils.mli
+utils/watcherCompilerProtocol.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/ocp-watcher/watcherCompilerProtocol.ml \
+	  utils/watcherCompilerProtocol.ml
+utils/watcherCompilerProtocol.mli:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/ocp-watcher/watcherCompilerProtocol.mli \
+	  utils/watcherCompilerProtocol.mli
+driver/watcherCompilerBytecode.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/ocp-watcher/watcherCompilerBytecode.ml \
+	  driver/watcherCompilerBytecode.ml
+driver/watcherCompilerNative.ml:
+	ln -sf ../$(TOP_OCAML_DIR)/ocamlpro/ocp-watcher/watcherCompilerNative.ml \
+	  driver/watcherCompilerNative.ml
+
+no-sources: ocp-distclean
+
+ocp-distclean:
+	rm -f $(OCP_SOURCES)
+
+typing/primitives.cmi: parsing/location.cmi
+
+partialclean::
+	for d in $(OCP_DIR); \
+	  do rm -f $$d/*.cm[iox] $$d/*.annot $$d/*.s $$d/*.$(O) $$d/*~; done
+
+asmclean:
+	rm -f asmcomp/arch.ml
+	rm -f asmcomp/proc.ml
+	rm -f asmcomp/selection.ml
+	rm -f asmcomp/reload.ml
+	rm -f asmcomp/scheduling.ml
+	rm -f asmcomp/emit.ml
+
+# Not in partialclean because it can be useful to have the command remaining
+clean::
+	rm -f ocp-watcher-client$(EXE)
+
+clean::
+	rm -f ocp-watcher-client.opt$(EXE)
+
+WATCHER_QUIT= -dbdir ocp-watcher-database -quit
+
+ocp-watcher:
+	$(MAKE) -C ocp-build-watcher ocp-watcher-client$(EXE)
+	if test -x "ocp-watcher-client$(EXE)"; then \
+	  CAML_LD_LIBRARY_PATH=otherlibs/unix ./ocp-watcher-client$(EXE) $(WATCHER_QUIT); \
+	  else :; fi
+	cp -f ocp-build-watcher/ocp-watcher-client$(EXE) ocp-watcher-client$(EXE)
+	rm ocp-build-watcher/ocp-watcher-client$(EXE)
+
+ocp-watcher.opt:
+	$(MAKE) -C ocp-build-watcher ocp-watcher-client.opt$(EXE)
+	if test -x "ocp-watcher-client.opt$(EXE)"; then \
+	  ./ocp-watcher-client.opt$(EXE) $(WATCHER_QUIT); \
+	  else :; fi
+	cp -f ocp-build-watcher/ocp-watcher-client.opt$(EXE) ocp-watcher-client.opt$(EXE)
+	rm ocp-build-watcher/ocp-watcher-client.opt$(EXE)
+
+ocp-watcher-start:
+	$(MAKE) core
+	$(MAKE) -C otherlibs/unix all
+	$(MAKE) -C otherlibs/dynlink all
+	$(MAKE) ocp-watcher
+	$(MAKE) partialclean
+
+OCPBWDBINSTALLDIR=$(DESTDIR)$(LIBDIR:/lib/ocaml=)
+ocp-watcher-install:
+	CAML_LD_LIBRARY_PATH=otherlibs/unix ./ocp-watcher-client$(EXE) $(WATCHER_QUIT)
+	if [ -e "$(DESTDIR)$(BINDIR)/ocp-watcher-client$(EXE)" ]; \
+	  then $(DESTDIR)$(BINDIR)/ocp-watcher-client$(EXE) -quit; \
+	  else :; fi
+	cp -f ocp-watcher-client$(EXE) $(DESTDIR)$(BINDIR)/ocp-watcher-client$(EXE)
+	if test -f ocp-watcher-client.opt$(EXE); \
+	  then cp ocp-watcher-client.opt$(EXE) $(DESTDIR)$(BINDIR)/ocp-watcher-client.opt$(EXE) ; \
+	  else :; fi
+	cp -rT ocp-watcher-database $(OCPBWDBINSTALLDIR)/ocp-watcher-database
+# Clean up ocp-build-watcher to prevent conflicts when rebuilding it from typerex
+	cd ocp-build-watcher; rm -f *.cm[ioxat] *.cmx[as] *.o *.a
+
+# Allow programs running during compilation (namely, ocp-watcher-client) to
+# find dllunix.so
+ifeq ($(findstring otherlibs/unix,$(CAML_LD_LIBRARY_PATH)),)
+CAML_LD_LIBRARY_PATH=$(CURDIR)/otherlibs/unix/
+export CAML_LD_LIBRARY_PATH
+endif
+
+alldepend::
+	cd ocp-build-watcher; $(MAKE) depend
+
+partialclean:: ocp-build-watcher
+	cd ocp-build-watcher; $(MAKE) partialclean
+
+clean:: ocp-build-watcher
+	cd ocp-build-watcher; $(MAKE) clean
+
+# Remove the database on clean
+clean::
+	rm -rf ocp-watcher-database
+
+.PHONY: ocp-watcher ocp-watcher.opt ocp-watcher-install ocp-watcher-start

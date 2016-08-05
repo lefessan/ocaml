@@ -1,0 +1,18 @@
+
+#     val r : int ref = {contents = 0}
+# val id : < .. > -> int = <fun>
+# - : unit = ()
+# - : int = 1
+# - : int = 2
+#   (1)
+- : unit = ()
+#           - : int * int * int = (3, 4, 5)
+#   (2)
+- : unit = ()
+#           Exception: Invalid_argument "output_value: abstract value (outside heap)".
+#   (3)
+- : unit = ()
+#           Exception: Invalid_argument "output_value: abstract value (outside heap)".
+# (4)
+- : unit = ()
+# 

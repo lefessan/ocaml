@@ -56,14 +56,29 @@ let rec regalloc ppf round fd =
 
 let (++) x f = f x
 
+type 'a passes = (string * bool ref * ('a -> 'a)) list ref
+let cmm_passes = ref []
+let mach_passes = ref
+  [ "allocation combining", dump_combine, Comballoc.fundecl ]
+let linear_passes = ref
+  [ "instruction scheduling", dump_scheduling, Scheduling.fundecl ]
+
+let add_pass passes name flag f =  passes := (name, flag, f) :: !passes
+
 let compile_fundecl (ppf : formatter) fd_cmm =
   Proc.init ();
   Reg.reset();
   fd_cmm
+  ++ List.fold_right (fun (name, dump_flag, pass) cmm ->
+    let cmm = pass cmm in
+    if !dump_flag then fprintf ppf "After %s:%a@." name Printcmm.fundecl cmm;
+    cmm
+  ) !cmm_passes
   ++ Selection.fundecl
   ++ pass_dump_if ppf dump_selection "After instruction selection"
-  ++ Comballoc.fundecl
-  ++ pass_dump_if ppf dump_combine "After allocation combining"
+  ++ List.fold_right (fun (name, dump_flag, pass) cmm ->
+    pass cmm ++ pass_dump_if ppf dump_flag ("After " ^ name)
+  ) !mach_passes
   ++ CSE.fundecl
   ++ pass_dump_if ppf dump_cse "After CSE"
   ++ liveness ppf
@@ -78,8 +93,9 @@ let compile_fundecl (ppf : formatter) fd_cmm =
   ++ regalloc ppf 1
   ++ Linearize.fundecl
   ++ pass_dump_linear_if ppf dump_linear "Linearized code"
-  ++ Scheduling.fundecl
-  ++ pass_dump_linear_if ppf dump_scheduling "After instruction scheduling"
+  ++ List.fold_right (fun (name, dump_flag, pass) cmm ->
+    pass cmm ++ pass_dump_linear_if ppf dump_flag ("After " ^ name)
+  ) !linear_passes
   ++ Emit.fundecl
 
 let compile_phrase ppf p =
@@ -99,7 +115,7 @@ let compile_genfuns ppf f =
        | _ -> ())
     (Cmmgen.generic_functions true [Compilenv.current_unit_infos ()])
 
-let compile_implementation ?toplevel prefixname ppf (size, lam) =
+let compile_implementation ?toplevel ?outputprefix prefixname ppf (size, lam) =
   let asmfile =
     if !keep_asm_file
     then prefixname ^ ext_asm
@@ -110,7 +126,7 @@ let compile_implementation ?toplevel prefixname ppf (size, lam) =
     Emit.begin_assembly();
     Closure.intro size lam
     ++ clambda_dump_if ppf
-    ++ Cmmgen.compunit size
+    ++ Cmmgen.compunit ?outputprefix size
     ++ List.iter (compile_phrase ppf) ++ (fun () -> ());
     (match toplevel with None -> () | Some f -> compile_genfuns ppf f);
 

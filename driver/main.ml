@@ -10,9 +10,16 @@
 (*                                                                     *)
 (***********************************************************************)
 
+(* Override the compilation modules *)
+module Compile = WatcherCompilerBytecode.Compile
+module Bytelibrarian = WatcherCompilerBytecode.Bytelibrarian
+module Bytepackager = WatcherCompilerBytecode.Bytepackager
+module Bytelink = WatcherCompilerBytecode.Bytelink
+
 open Config
 open Clflags
 open Compenv
+
 
 let process_interface_file ppf name =
   Compile.interface ppf name (output_prefix name)
@@ -88,7 +95,8 @@ module Options = Main_args.Make_bytecomp_options (struct
   let _for_pack s = for_package := Some s
   let _g = set debug
   let _i () = print_types := true; compile_only := true
-  let _I s = include_dirs := s :: !include_dirs
+  let _I s = if Maker.add_dir s then include_dirs := s :: !include_dirs
+  let _error_size n = error_size := n
   let _impl = impl
   let _intf = intf
   let _intf_suffix s = Config.interface_suffix := s
@@ -103,6 +111,7 @@ module Options = Main_args.Make_bytecomp_options (struct
   let _nolabels = set classic
   let _noautolink = set no_auto_link
   let _nostdlib = set no_std_include
+  let _nowatcher = unset use_ocp_watcher
   let _o s = output_name := Some s
   let _open s = open_modules := s :: !open_modules
   let _output_obj () = output_c_object := true; custom_runtime := true
@@ -158,12 +167,13 @@ let main () =
       Compmisc.init_path false;
 
       Bytelibrarian.create_archive ppf  (Compenv.get_objfiles ())
-                                   (extract_output !output_name);
+                                   (extract_output ~ext:".cma" !output_name);
       Warnings.check_fatal ();
     end
     else if !make_package then begin
+      Src_cache.clear_sources ();
       Compmisc.init_path false;
-      let extracted_output = extract_output !output_name in
+      let extracted_output = extract_output ~ext:".cmo" !output_name in
       let revd = get_objfiles () in
       Bytepackager.package_files ppf (Compmisc.initial_env ())
         revd (extracted_output);
@@ -186,13 +196,27 @@ let main () =
         else
           default_output !output_name
       in
+      Msvc.maybe_detect_env ();
       Compmisc.init_path false;
       Bytelink.link ppf (get_objfiles ()) target;
       Warnings.check_fatal ();
     end;
     exit 0
   with x ->
+    Location.report_backtrace (Printexc.get_backtrace ());
     Location.report_exception ppf x;
     exit 2
 
-let _ = main ()
+let _ =
+  Printexc.record_backtrace true;
+  let macros = [ "OCAML_BYTECODE" ] in
+  OcpMain.register_extensions ~macros ();
+    Maker.register
+      Format.err_formatter
+      true (* native *)
+      process_file
+      (fun ppf -> Bytepackager.package_files ppf  (Compmisc.initial_env ()))
+      Bytelibrarian.create_archive
+      Bytelink.link
+      Location.report_exception;
+  main ()

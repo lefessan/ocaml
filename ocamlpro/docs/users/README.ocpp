@@ -1,0 +1,70 @@
+A C-like line preprocessor included in OCaml
+============================================
+
+Usage Notes
+-----------
+
+  What is implemented:
+  #define MACRO TOKENS
+  #ifdef MACRO
+  #ifndef MACRO
+  #else
+  #if EXPRESSION
+  #elif EXPRESSION
+  #endif
+  #include STRING
+  #undef
+
+EXPRESSION ::=
+| STRING
+| INT
+| "ocaml_version"
+| PRIMITIVE EXPRESSION
+| EXPRESSION || EXPRESSION
+| EXPRESSION && EXPRESSION
+| ! EXPRESSION
+| EXPRESSION + EXPRESSION
+| EXPRESSION COMPARISON EXPRESSION
+
+COMPARISON ::=
+| "=" | "<>" | "<" | ">" | "<=" | ">="
+
+PRIMITIVE ::=
+| "version" (STRING | INT | VERSION)
+| "major" (VERSION | STRING)
+| "minor" (VERSION | STRING)
+| "defined" (STRING)
+| "int" (STRING | INT)
+| "string" (STRING | INT)
+    
+Debugging
+---------
+
+The variable OCPP_DEBUG can be used to activate printing debug information.
+
+
+Implementation Notes
+--------------------
+
+Included in the files:
+* parsing/ocpp_parser.mly
+* parsing/ocpp.ml
+* parsing/ocpp_main.ml (to force linking of Ocpp)
+
+The Lexer module, since 4.02, contains hooks that are used by ocpp
+to include itself.
+
+TODO
+----
+
+  What is not implemented:
+  #defun MACRO(ARGS) TOKENS
+  #define MACRO {{ MULTI-LINE TOKENS }}
+
+Hygienic macros:
+  #define[x] MACRO TOKENS
+  #define[x-] MACRO TOKENS
+  #define[x=MACRO.y] MACRO TOKENS
+  #define[x=-MACRO.y] MACRO TOKENS
+  #begin define MACRO
+  #end MACRO

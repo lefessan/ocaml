@@ -1,0 +1,42 @@
+
+OCPWIN_DIR=../ocpwin
+
+-include ${OCPWIN_DIR}/Makefile.local
+
+## This is Fabrice default settings
+## Configure these lines for your own installation, or
+## override them in Makefile.local
+MINGW_BUILDS?=$(HOME)/WindowsSharedFolder/mingw-builds/4.8.1
+MINGW64_DIR?=$(MINGW_BUILDS)/x64-4.8.1-release-posix-seh-rev5
+MINGW32_DIR?=$(MINGW_BUILDS)/x32-4.8.1-release-posix-dwarf-rev5
+
+all: ocpwin64-installer ocpwin32-installer 
+
+ocpwin64-installer:
+	cd ocpwin64; $(OCPWIN_DIR)/configure mingw64 $(MINGW64_DIR)
+	cd ocpwin64; $(MAKE) cross-clean
+	cd ocpwin64; $(MAKE) cross-ocaml
+	cd ocpwin64; $(MAKE) -f $(OCPWIN_DIR)/Makefile.install installer
+	cd ocpwin64; $(MAKE) -f $(OCPWIN_DIR)/Makefile.install save-installer
+
+ocpwin32-installer:
+	cd ocpwin32; $(OCPWIN_DIR)/configure mingw32 $(MINGW32_DIR)
+	cd ocpwin32; $(MAKE) cross-clean
+	cd ocpwin32; $(MAKE) cross-ocaml
+	cd ocpwin32; $(MAKE) -f $(OCPWIN_DIR)/Makefile.install installer
+	cd ocpwin32; $(MAKE) -f $(OCPWIN_DIR)/Makefile.install save-installer
+
+local-ocpwin64:
+	 $(OCPWIN_DIR)/configure mingw64 $(MINGW64_DIR)
+	 $(MAKE) cross-clean
+	 $(MAKE) cross-ocaml
+	 $(MAKE) -f $(OCPWIN_DIR)/Makefile.install installer
+	 $(MAKE) -f $(OCPWIN_DIR)/Makefile.install save-installer
+
+local-ocpwin32:
+	 $(OCPWIN_DIR)/configure mingw32 $(MINGW32_DIR)
+	 $(MAKE) cross-clean
+	 $(MAKE) cross-ocaml
+	 $(MAKE) -f $(OCPWIN_DIR)/Makefile.install installer
+	 $(MAKE) -f $(OCPWIN_DIR)/Makefile.install save-installer
+

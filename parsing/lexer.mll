@@ -216,6 +216,8 @@ let update_loc lexbuf file line absolute chars =
   }
 ;;
 
+
+let check_spaces = ref None
 let preprocessor = ref None
 
 (* Warn about Latin-1 characters used in idents *)
@@ -260,7 +262,8 @@ let () =
 }
 
 let newline = ('\013'* '\010')
-let blank = [' ' '\009' '\012']
+let space = [' ' '\012']
+let tabulation =  space* '\009' space*
 let lowercase = ['a'-'z' '_']
 let uppercase = ['A'-'Z']
 let identchar = ['A'-'Z' 'a'-'z' '_' '\'' '0'-'9']
@@ -300,8 +303,23 @@ rule token = parse
         | None -> token lexbuf
         | Some _ -> EOL
       }
-  | blank +
-      { token lexbuf }
+  | space+ newline
+      {
+        (match !check_spaces with | None -> ()
+        | Some f -> f ( Location.curr lexbuf ) "spaces at end of line");
+        update_loc lexbuf None 1 false 0;
+        match !preprocessor with
+        | None -> token lexbuf
+        | Some _ -> EOL
+      }
+(* tryocaml: accept js_of_ocaml method invocation *)
+  | "##" { SHARPJS }
+  | space + { token lexbuf }
+  | tabulation space* {
+    (match !check_spaces with | None -> ()
+    | Some f -> f ( Location.curr lexbuf ) "tabulation in file");
+       token lexbuf
+    }
   | "_"
       { UNDERSCORE }
   | "~"
@@ -418,6 +436,8 @@ rule token = parse
         ("\"" ([^ '\010' '\013' '"' ] * as name) "\"")?
         [^ '\010' '\013'] * newline
       { update_loc lexbuf name (int_of_string num) true 0;
+        (* ocpp: disable space checking for generated code *)
+        check_spaces := None;
         token lexbuf
       }
   | "#"  { SHARP }
@@ -647,7 +667,23 @@ and skip_sharp_bang = parse
        { update_loc lexbuf None 1 false 0 }
   | "" { () }
 
+and pp_lexer = parse
+    | "#" [' ' '\t']* (['0'-'9']+ as num) [' ' '\t']*
+        ("\"" ([^ '\010' '\013' '"' ] * as name) "\"")?
+        [^ '\010' '\013'] * newline
+        {
+          update_loc lexbuf name (int_of_string num) true 0;
+          pp_lexer lexbuf
+        }
+    | '#' [^ '\n']+ { OCPP_PP_DIRECTIVE (Lexing.lexeme lexbuf) }
+    | [^ '\n']+     { OCPP_PP_CONTENT (Lexing.lexeme lexbuf) }
+    | newline { update_loc lexbuf None 1 false 0; pp_lexer lexbuf }
+    | eof { failwith "EOF in pp_lexer" }
+    | _ { failwith "#begin_pp not supported" }
+
 {
+
+  let raw_lexer = token
 
   let token_with_comments lexbuf =
     match !preprocessor with

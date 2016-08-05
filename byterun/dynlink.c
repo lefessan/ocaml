@@ -11,7 +11,16 @@
 /*                                                                     */
 /***********************************************************************/
 
+
+/* Uncommenting this can help to find why dll libraries are not found */
+// #define OCAML_DEBUG_DLLPATH
+
+#include <stdio.h>
+
 /* Dynamic loading of C primitives. */
+#ifndef _WIN32
+#include <libgen.h>
+#endif
 
 #include <stddef.h>
 #include <stdlib.h>
@@ -70,42 +79,163 @@ static c_primitive lookup_primitive(char * name)
 
 #define LD_CONF_NAME "ld.conf"
 
+extern char * caml_exe_name;
+
+#ifdef _WIN32    
+#define FILEPATHSEP '\\'
+#define access _access
+#define R_OK 4
+#else
+#define FILEPATHSEP '/'
+#endif
+
+#ifdef _WIN32
+#include <windows.h>
+#include <psapi.h>
+static int ReadRegistryValue(HKEY h,
+                             char ** keys, int pos, int len,
+                             char *entry,
+                             DWORD *dwType,
+                             unsigned char *dest,
+                             unsigned long size)
+{
+    LONG ret;
+
+    if( pos < len ){
+      HKEY hret;
+      if(RegOpenKeyExA(h, keys[pos], 0, KEY_QUERY_VALUE, &hret)
+         != ERROR_SUCCESS)
+        return -1;
+      ret = ReadRegistryValue(hret, keys, pos+1,len,entry,dwType,dest,size);
+      RegCloseKey(hret);
+      return ret;
+    } else {
+      ret = RegQueryValueExA(h, entry, 0, dwType, dest, &size);
+      if (ret == ERROR_SUCCESS)
+        return size;
+      else
+        return -1;
+    }
+}
+#endif
+
 static char * parse_ld_conf(void)
 {
   char * stdlib, * ldconfname, * config, * p, * q;
   struct stat st;
   int ldconf, nread;
+  int need_free = 0;
 
   stdlib = getenv("OCAMLLIB");
   if (stdlib == NULL) stdlib = getenv("CAMLLIB");
+#ifdef _WIN32
+  /* In OCPWin, if nothing is specified by env variables, we
+    use the registry to find the current switch.
+   */
+  if (stdlib == NULL){
+    char bindir[MAX_PATH];
+    char *ocpwin_reg_key[] = {
+      "Software", "OCamlPro", "OCPWin", NULL
+    };
+    DWORD dwType;
+    int ok = ReadRegistryValue(HKEY_CURRENT_USER,
+                               ocpwin_reg_key, 0, 3,
+                               "CurrentBinDir",
+                               &dwType,
+                               (unsigned char*)bindir,
+                               MAX_PATH);
+    if(ok){
+      /* Assumes OCaml is in "lib", not "lib/ocaml" ! */
+      int len = strlen(bindir);
+      bindir[len-3] = 'l';
+      bindir[len-2] = 'i';
+      bindir[len-1] = 'b';
+      stdlib = caml_stat_alloc(len+1);
+      strncpy(stdlib, bindir, len+1);
+      need_free = 1;
+    }
+  }
+#else
   if (stdlib == NULL) stdlib = OCAML_STDLIB_DIR;
-  ldconfname = caml_strconcat(3, stdlib, "/", LD_CONF_NAME);
+  if (stdlib == NULL || access(stdlib, R_OK) != 0 ) {
+    /* Fabrice: is this really supposed to work on Unix anyway ?
+       caml_exe_name is the name of the bytecode program, not the
+       name of ocamlrun, so it will only work for bytecode programs
+       located in the bin/ directory of OCaml ?
+     */
+    
+    int prefix_len = strlen(caml_exe_name);
+    int ncount = 2;
+    while(ncount > 0 && prefix_len != 0){
+      prefix_len--;
+      if( caml_exe_name[prefix_len] == FILEPATHSEP ) ncount--;
+    }
+    stdlib = caml_stat_alloc( prefix_len + strlen(OCAML_STDLIB_DIR) + 2);
+    strncpy(stdlib, caml_exe_name, prefix_len);
+    stdlib[prefix_len] = FILEPATHSEP;
+    strncpy(stdlib + prefix_len + 1, OCAML_STDLIB_DIR, 5);
+    need_free = 1;
+  }
+#endif
+
+  ldconfname = caml_stat_alloc(strlen(stdlib) + 2 + sizeof(LD_CONF_NAME));
+  strcpy(ldconfname, stdlib);
+  strcat(ldconfname, "/" LD_CONF_NAME);
+#ifdef OCAML_DEBUG_DLLPATH
+  fprintf(stderr, "ldconfname=%s\n", ldconfname);
+#endif
   if (stat(ldconfname, &st) == -1) {
     caml_stat_free(ldconfname);
+    if( need_free ) caml_stat_free(stdlib);
     return NULL;
   }
   ldconf = open(ldconfname, O_RDONLY, 0);
-  if (ldconf == -1)
+  if (ldconf == -1){
+    if( need_free ) caml_stat_free(stdlib);
     caml_fatal_error_arg("Fatal error: cannot read loader config file %s\n",
                          ldconfname);
+  }
   config = caml_stat_alloc(st.st_size + 1);
   nread = read(ldconf, config, st.st_size);
-  if (nread == -1)
+  if (nread == -1){
+    if( need_free ) caml_stat_free(stdlib);
     caml_fatal_error_arg
       ("Fatal error: error while reading loader config file %s\n",
        ldconfname);
+  }
   config[nread] = 0;
   q = config;
   for (p = config; *p != 0; p++) {
     if (*p == '\n') {
       *p = 0;
-      caml_ext_table_add(&caml_shared_libs_path, q);
+      if( *q == '+' ){
+	int qlen = strlen(q);
+	int stdlen = strlen(stdlib);
+	char *dest = caml_stat_alloc(qlen + stdlen + 1);
+	strncpy(dest, stdlib, stdlen);
+#ifdef _WIN32
+	dest[stdlen] = '\\';
+#else
+	dest[stdlen] = '/';
+#endif
+	strncpy(dest+stdlen+1, q+1, qlen);
+#ifdef OCAML_DEBUG_DLLPATH
+	fprintf(stderr, "dllpath[+]:'%s'\n",dest);
+#endif
+	caml_ext_table_add(&caml_shared_libs_path, dest);
+      } else { 
+#ifdef OCAML_DEBUG_DLLPATH
+	fprintf(stderr, "dllpath[+]:'%s'\n",q);
+#endif
+	caml_ext_table_add(&caml_shared_libs_path, q);
+      }
       q = p + 1;
     }
   }
   if (q < p) caml_ext_table_add(&caml_shared_libs_path, q);
   close(ldconf);
   caml_stat_free(ldconfname);
+  if( need_free ) caml_stat_free(stdlib);
   return config;
 }
 
@@ -160,7 +290,7 @@ void caml_build_primitive_table(char * lib_path,
 #endif
   for (p = req_prims; *p != 0; p += strlen(p) + 1) {
     c_primitive prim = lookup_primitive(p);
-    if (prim == NULL)
+    if (prim == NULL  && getenv("OCAML_ALLOWS_UNKNOWN_PRIM") == NULL)
           caml_fatal_error_arg("Fatal error: unknown C primitive `%s'\n", p);
     caml_ext_table_add(&caml_prim_table, (void *) prim);
 #ifdef DEBUG

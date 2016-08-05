@@ -1,0 +1,10 @@
+
+#         Characters 42-69:
+  class a = let _ = new b in object end
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This kind of recursive class expression is not allowed
+#   Characters 11-38:
+  class a = let _ = new a in object end;;
+            ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Error: This kind of recursive class expression is not allowed
+# 

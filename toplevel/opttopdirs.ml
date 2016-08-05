@@ -94,8 +94,10 @@ let _ = Hashtbl.add directive_table "use" (Directive_string (dir_use std_out))
 
 (* Install, remove a printer *)
 
-type 'a printer_type_new = Format.formatter -> 'a -> unit
-type 'a printer_type_old = 'a -> unit
+(* tryocaml: ad-hoc implementation of polymorphic printers *)
+type 'a printer_type2 = Env.t -> Types.type_expr -> 'a -> Outcometree.out_value
+type 'a printer_type1 = Format.formatter -> 'a -> unit
+type 'a printer_type0 = 'a -> unit
 
 let match_printer_type ppf desc typename =
   let (printer_type, _) =
@@ -135,7 +137,7 @@ let find_printer_type ppf lid =
 let dir_install_printer ppf lid =
   try
     let (ty_arg, path, is_old_style) = find_printer_type ppf lid in
-    let v = eval_path path in
+    let v = eval_path !toplevel_env path in
     let print_function =
       if is_old_style then
         (fun formatter repr -> Obj.obj v (Obj.obj repr))

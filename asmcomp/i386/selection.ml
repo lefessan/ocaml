@@ -85,7 +85,7 @@ let rec float_needs = function
       let n1 = float_needs arg1 in
       let n2 = float_needs arg2 in
       if n1 = n2 then 1 + n1 else if n1 > n2 then n1 else n2
-  | Cop(Cextcall(fn, ty_res, alloc, dbg), args)
+  | Cop(Cextcall(fn, ty_res, alloc, _, dbg), args)
     when !fast_math && List.mem fn inline_float_ops ->
       begin match args with
         [arg] -> float_needs arg
@@ -158,7 +158,7 @@ method is_immediate (n : int) = true
 
 method! is_simple_expr e =
   match e with
-  | Cop(Cextcall(fn, _, alloc, _), args)
+  | Cop(Cextcall(fn, _, alloc, _, _), args)
     when !fast_math && List.mem fn inline_float_ops ->
       (* inlined float ops are simple if their arguments are *)
       List.for_all self#is_simple_expr args
@@ -225,7 +225,7 @@ method! select_operation op args =
           super#select_operation op args
       end
   (* Recognize inlined floating point operations *)
-  | Cextcall(fn, ty_res, false, dbg)
+  | Cextcall(fn, ty_res, false, _, dbg)
     when !fast_math && List.mem fn inline_float_ops ->
       (Ispecific(Ifloatspecial fn), args)
   (* i386 does not support immediate operands for multiply high signed *)

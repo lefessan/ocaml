@@ -1,0 +1,6 @@
+4.02.1+ocp1: modify Makfile: include ../ocpwin/Makefile.rules
+
+4.02.1+ocp1: modify configs/mingw64/host/Makefile to add UNIX_OR_WIN32
+
+4.02.1+ocp1: apply patch win32.c from 4.01.0 to 4.02.1
+

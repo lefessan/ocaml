@@ -12,6 +12,17 @@
 
 open Clflags
 
+(* patch: avoid printing duplicate warnings *)
+type warning = E of string | W of Location.t * Warnings.t
+let printed_warnings = Hashtbl.create 13
+let print_warning ppf w =
+  if not (Hashtbl.mem printed_warnings w) then begin
+    Hashtbl.add printed_warnings w ();
+    match w with
+    | W (loc, w) -> Location.print_warning loc ppf w
+    | E s -> Format.fprintf ppf "Warning: %s@." s
+  end
+
 let output_prefix name =
   let oname =
     match !output_name with
@@ -36,8 +47,17 @@ let fatal err =
   prerr_endline err;
   exit 2
 
-let extract_output = function
-  | Some s -> s
+let extract_output ?ext = function
+  | Some s ->
+    begin match ext with
+      | None -> s
+      | Some ex ->
+        if Filename.check_suffix s ex
+        then s
+        else
+          fatal ("Wrong output extension: " ^ s ^
+                 " does not have extension " ^ ex)
+    end
   | None ->
       fatal "Please specify the name of the output file, using option -o"
 
@@ -56,25 +76,27 @@ let first_objfiles = ref []
 let last_objfiles = ref []
 
 (* Check validity of module name *)
-let check_unit_name ppf filename name =
+let is_unit_name name =
   try
     begin match name.[0] with
     | 'A'..'Z' -> ()
     | _ ->
-       Location.print_warning (Location.in_file filename) ppf
-        (Warnings.Bad_module_name name);
        raise Exit;
     end;
     for i = 1 to String.length name - 1 do
       match name.[i] with
       | 'A'..'Z' | 'a'..'z' | '0'..'9' | '_' | '\'' -> ()
       | _ ->
-         Location.print_warning (Location.in_file filename) ppf
-           (Warnings.Bad_module_name name);
          raise Exit;
     done;
-  with Exit -> ()
+    true
+  with Exit -> false
 ;;
+
+let check_unit_name ppf filename name =
+  if not (is_unit_name name) then
+    Location.print_warning (Location.in_file filename) ppf
+      (Warnings.Bad_module_name name);;
 
 (* Compute name of module from output file name *)
 let module_of_filename ppf inputfile outputprefix =
@@ -131,9 +153,15 @@ let setter ppf f name options s =
     in
     List.iter (fun b -> b := f bool) options
   with Not_found ->
-    Location.print_warning Location.none ppf
-      (Warnings.Bad_env_variable ("OCAMLPARAM",
-                                  Printf.sprintf "bad value for %s" name))
+(* patch: avoid printing duplicate warnings *)
+    print_warning ppf (W
+        (Location.none,
+         Warnings.Bad_env_variable ("OCAMLPARAM",
+           Printf.sprintf "bad value for %s" name)))
+
+(* 'can-discard=' specifies which arguments can be discarded without warning
+   because they are not understood by some versions of OCaml. *)
+let can_discard = ref []
 
 (* 'can-discard=' specifies which arguments can be discarded without warning
    because they are not understood by some versions of OCaml. *)
@@ -146,8 +174,9 @@ let read_OCAMLPARAM ppf position =
       try
         parse_args s
       with SyntaxError s ->
-         Location.print_warning Location.none ppf
-           (Warnings.Bad_env_variable ("OCAMLPARAM", s));
+           (* patch: avoid printing duplicate warnings *)
+         print_warning ppf (W (Location.none,
+           Warnings.Bad_env_variable ("OCAMLPARAM", s)));
          [],[]
     in
     let set name options s =  setter ppf (fun b -> b) name options s in
@@ -176,7 +205,7 @@ let read_OCAMLPARAM ppf position =
       | "nopervasives" -> set "nopervasives" [ nopervasives ] v
       | "slash" -> set "slash" [ force_slash ] v (* for ocamldep *)
       | "keep-locs" -> set "keep-locs" [ Clflags.keep_locs ] v
-
+      | "custom" -> set "custom" [ Clflags.custom_runtime ] v
       | "compact" -> clear "compact" [ optimize_for_speed ] v
       | "no-app-funct" -> clear "no-app-funct" [ applicative_functors ] v
       | "nodynlink" -> clear "nodynlink" [ dlcode ] v
@@ -204,11 +233,13 @@ let read_OCAMLPARAM ppf position =
       | "inline" -> begin try
           inline_threshold := 8 * int_of_string v
         with _ ->
-          Location.print_warning Location.none ppf
-            (Warnings.Bad_env_variable ("OCAMLPARAM",
-                                        "non-integer parameter for \"inline\""))
+(* patch: avoid printing duplicate warnings *)
+          print_warning ppf (W
+            (Location.none, Warnings.Bad_env_variable ("OCAMLPARAM",
+               "non-integer parameter for \"inline\"")))
         end
 
+      | "error-size" -> Clflags.error_size := int_of_string v
       | "intf-suffix" -> Config.interface_suffix := v
 
       | "I" -> begin
@@ -265,15 +296,19 @@ let read_OCAMLPARAM ppf position =
             first_objfiles := v :: !first_objfiles
         end
 
+      | "ocp_watcher" -> set "ocp_watcher" [ Config.use_ocp_watcher ] v
+
       | "can-discard" ->
         can_discard := v ::!can_discard
 
       | _ ->
         if not (List.mem name !can_discard) then begin
           can_discard := name :: !can_discard;
-          Printf.eprintf
-            "Warning: discarding value of variable %S in OCAMLPARAM\n%!"
-            name
+          (* patch: avoid printing duplicate warnings *)
+          print_warning ppf (E (
+            Printf.sprintf
+              "Warning: discarding value of variable %S in OCAMLPARAM\n%!"
+            name))
         end
     ) (match position with
         Before_args -> before

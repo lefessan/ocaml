@@ -286,7 +286,8 @@ CAMLprim value caml_gc_quick_stat(value v)
   Store_field (res, 6, Val_long (heap_chunks));
   Store_field (res, 7, Val_long (0));
   Store_field (res, 8, Val_long (0));
-  Store_field (res, 9, Val_long (0));
+  /* Why OCaml doesnot use caml_fl_cur_size here ? */
+  Store_field (res, 9, Val_long (caml_fl_cur_size));
   Store_field (res, 10, Val_long (0));
   Store_field (res, 11, Val_long (0));
   Store_field (res, 12, Val_long (0));

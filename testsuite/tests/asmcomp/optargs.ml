@@ -29,5 +29,10 @@ let () =
     ignore (f l)
   done;
   let x2 = Gc.allocated_bytes () in
+
+(* Typerex-warning: this test will not pass if debugging is enabled. You
+must run the testsuite with:
+OCAMLPARAM=_,g=0 TERM= make all
+*)
   assert(x1 -. x0 = x2 -. x1)
      (* check that we have not allocated anything between x1 and x2 *)

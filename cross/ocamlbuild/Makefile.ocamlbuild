@@ -1,0 +1,11 @@
+# From 4.02, ocamlbuild is built using Makefiles, so we don't need to
+# do anything special anymore.
+
+all: byte-only native-only
+byte-only:
+	cd ocamlbuild && $(MAKE) all
+native-only:
+	cd ocamlbuild && $(MAKE) allopt
+clean:
+	cd ocamlbuild && $(MAKE) clean
+

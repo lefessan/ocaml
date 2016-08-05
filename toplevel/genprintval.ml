@@ -10,6 +10,12 @@
 (*                                                                     *)
 (***********************************************************************)
 
+(* We use a lazy values for [printers] and [abstract_type] to avoid
+   the side-effects of this initialization: since our ocamlopt
+   contains ocamltoplevel.cma, it will fail to generate the same .cmi
+   files as ocamlc if we create identifiers during initialization
+   (Ident.t in .cmi files have different counters).  *)
+
 (* To print values *)
 
 open Misc
@@ -104,7 +110,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
     (* The user-defined printers. Also used for some builtin types. *)
 
-    let printers = ref ([
+    let printers = lazy (ref ([
       Pident(Ident.create "print_int"), Predef.type_int,
         (fun x -> Oval_int (O.obj x : int));
       Pident(Ident.create "print_float"), Predef.type_float,
@@ -119,7 +125,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         (fun x -> Oval_nativeint (O.obj x : nativeint));
       Pident(Ident.create "print_int64"), Predef.type_int64,
         (fun x -> Oval_int64 (O.obj x : int64))
-    ] : (Path.t * type_expr * (O.t -> Outcometree.out_value)) list)
+    ] : (Path.t * type_expr * (O.t -> Outcometree.out_value)) list))
+
+    let printers () = Lazy.force printers
 
     let install_printer path ty fn =
       let print_val ppf obj =
@@ -127,6 +135,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
         | exn ->
            fprintf ppf "<printer %a raised an exception>" Printtyp.path path in
       let printer obj = Oval_printer (fun ppf -> print_val ppf obj) in
+      let printers = printers() in
       printers := (path, ty, printer) :: !printers
 
     let remove_printer path =
@@ -134,6 +143,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
       | [] -> raise Not_found
       | (p, ty, fn as printer) :: rem ->
           if Path.same p path then rem else printer :: remove rem in
+      let printers = printers() in
       printers := remove !printers
 
     let find_printer env ty =
@@ -143,7 +153,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
           if Ctype.moregeneral env false sch ty
           then printer
           else find remainder
-      in find !printers
+      in
+      let printers = printers() in
+      find !printers
 
     (* Print a constructor or label, giving it the same prefix as the type
        it comes from. Attempt to omit the prefix if the type comes from
@@ -173,8 +185,9 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
 
     (* An abstract type *)
 
-    let abstract_type =
-      Ctype.newty (Tconstr (Pident (Ident.create "abstract"), [], ref Mnil))
+    let abstract_type = lazy
+      (Ctype.newty (Tconstr (Pident (Ident.create "abstract"), [], ref Mnil)))
+    let abstract_type() = Lazy.force abstract_type
 
     (* The main printing function *)
 
@@ -273,7 +286,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                 | {type_kind = Type_abstract; type_manifest = Some body} ->
                     tree_of_val depth obj
                       (try Ctype.apply env decl.type_params body ty_list with
-                         Ctype.Cannot_apply -> abstract_type)
+                         Ctype.Cannot_apply -> abstract_type())
                 | {type_kind = Type_variant constr_list} ->
                     let tag =
                       if O.is_block obj
@@ -294,7 +307,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                       List.map
                         (function ty ->
                            try Ctype.apply env type_params ty ty_list with
-                             Ctype.Cannot_apply -> abstract_type)
+                             Ctype.Cannot_apply -> abstract_type())
                         cd_args in
                     tree_of_constr_with_args (tree_of_constr env path)
                                  (Ident.name cd_id) 0 depth obj ty_args
@@ -310,7 +323,7 @@ module Make(O : OBJ)(EVP : EVALPATH with type valu = O.t) = struct
                                   Ctype.apply env decl.type_params ld_type
                                     ty_list
                                 with
-                                  Ctype.Cannot_apply -> abstract_type in
+                                  Ctype.Cannot_apply -> abstract_type() in
                               let name = Ident.name ld_id in
                               (* PR#5722: print full module path only
                                  for first record field *)

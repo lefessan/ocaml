@@ -2103,9 +2103,9 @@ let fmt_ebb_of_string ?legacy_behavior str =
         | None -> char_format fmt_rest
         | Some 0 -> scan_format fmt_rest
         | Some _n ->
-	   if not legacy_behavior
-	   then invalid_nonnull_char_width str_ind
-	   else (* legacy ignores %c widths *) char_format fmt_rest
+       if not legacy_behavior
+      then invalid_nonnull_char_width str_ind
+      else (* legacy ignores %c widths *) char_format fmt_rest
       end
     | 'C' ->
       let Fmt_EBB fmt_rest = parse str_ind end_ind in
@@ -2139,9 +2139,9 @@ let fmt_ebb_of_string ?legacy_behavior str =
         let ignored = Ignored_int (iconv, get_pad_opt '_') in
         Fmt_EBB (Ignored_param (ignored, fmt_rest))
       else
-	(* %5.3d is accepted and meaningful: pad to length 5 with
-	   spaces, but first pad with zeros upto length 3 (0-padding
-	   is the interpretation of "precision" for integer formats).
+   (* %5.3d is accepted and meaningful: pad to length 5 with
+      spaces, but first pad with zeros upto length 3 (0-padding
+      is the interpretation of "precision" for integer formats).
 
            %05.3d is redundant: pad to length 5 *with zeros*, but
            first pad with zeros... To add insult to the injury, the
@@ -2150,7 +2150,7 @@ let fmt_ebb_of_string ?legacy_behavior str =
            interpretation for compatiblity, but statically reject this
            format when the legacy mode is disabled, to protect strict
            users from this corner case.
-	 *)
+    *)
         let pad = match get_pad (), get_prec () with
           | pad, No_precision -> pad
           | No_padding, _     -> No_padding

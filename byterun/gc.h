@@ -37,12 +37,30 @@
 #define Bluehd_hd(hd)  (((hd)  & ~Caml_black)  | Caml_blue)
 
 /* This depends on the layout of the header.  See [mlvalues.h]. */
-#define Make_header(wosize, tag, color)                                       \
+#define Make_compat32_header(wosize, tag, color)                                     \
       (/*Assert ((wosize) <= Max_wosize),*/                                   \
        ((header_t) (((header_t) (wosize) << 10)                               \
                     + (color)                                                 \
                     + (tag_t) (tag)))                                         \
       )
+
+extern uintnat caml_memprof_ccall_locid;
+#ifdef ARCH_SIXTYFOUR
+#define Make_header_loc(wosize, tag, color, prof)                             \
+      (/*Assert ((wosize) <= Max_wosize),*/                                   \
+       ((header_t) (((header_t) (wosize) << 32)                               \
+                    + ((profiling_t) (prof) << 10)                            \
+                    + (color)                                                 \
+                    + (tag_t) (tag)))                                         \
+     )
+#define Make_header(wosize, tag, color) \
+  Make_header_loc(wosize, tag, color, caml_memprof_ccall_locid)
+#else
+#define Make_header(wosize, tag, color) \
+        (Make_compat32_header(wosize, tag, color))
+#define Make_header_loc(wosize, tag, color, prof) \
+        Make_header(wosize, tag, color)
+#endif
 
 #define Is_white_val(val) (Color_val(val) == Caml_white)
 #define Is_gray_val(val) (Color_val(val) == Caml_gray)

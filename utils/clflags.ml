@@ -22,7 +22,7 @@ and include_dirs = ref ([] : string list)(* -I *)
 and no_std_include = ref false          (* -nostdlib *)
 and print_types = ref false             (* -i *)
 and make_archive = ref false            (* -a *)
-and debug = ref false                   (* -g *)
+and debug = ref true                    (* -g *)
 and fast = ref false                    (* -unsafe *)
 and link_everything = ref false         (* -linkall *)
 and custom_runtime = ref false          (* -custom *)
@@ -110,3 +110,4 @@ let runtime_variant = ref "";;      (* -runtime-variant *)
 
 let keep_locs = ref false              (* -keep-locs *)
 let unsafe_string = ref true;;         (* -safe-string / -unsafe-string *)
+let detect_msvc = ref ""

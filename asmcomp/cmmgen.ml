@@ -22,6 +22,22 @@ open Clambda
 open Cmm
 open Cmx_format
 
+let prof = Compilenv.wrap_locid
+let prof_int32 loc = prof (Memprof.locid loc.l loc.p Predef.type_int32)
+let prof_int64 loc = prof (Memprof.locid loc.l loc.p Predef.type_int64)
+
+let locid_float loc =
+  prof (Memprof.locid loc.l loc.p Predef.type_int32)
+let locid_complex loc=
+  prof (Memprof.internal loc.l loc.p "box_complex")
+
+let locid_int32 loc =
+  prof (Memprof.locid loc.l loc.p Predef.type_int32)
+let locid_int64 loc =
+  prof (Memprof.locid loc.l loc.p Predef.type_int64)
+let locid_nat loc =
+  prof (Memprof.locid loc.l loc.p Predef.type_nativeint)
+
 (* Local binding of complex expressions *)
 
 let bind name arg fn =
@@ -46,6 +62,10 @@ let caml_black = Nativeint.shift_left (Nativeint.of_int 3) 8
 let floatarray_tag = Cconst_int Obj.double_array_tag
 
 let block_header tag sz =
+  if Arch.size_int = 8 then
+    Nativeint.add (Nativeint.shift_left (Nativeint.of_int sz) 32)
+                  (Nativeint.of_int tag)
+  else
   Nativeint.add (Nativeint.shift_left (Nativeint.of_int sz) 10)
                 (Nativeint.of_int tag)
 (* Static data corresponding to "value"s must be marked black in case we are
@@ -64,14 +84,30 @@ let boxedint32_header = block_header Obj.custom_tag 2
 let boxedint64_header = block_header Obj.custom_tag (1 + 8 / size_addr)
 let boxedintnat_header = block_header Obj.custom_tag 2
 
-let alloc_block_header tag sz = Cconst_blockheader(block_header tag sz)
-let alloc_float_header = Cconst_blockheader(float_header)
-let alloc_floatarray_header len = Cconst_blockheader(floatarray_header len)
-let alloc_closure_header sz = Cconst_blockheader(white_closure_header sz)
-let alloc_infix_header ofs = Cconst_blockheader(infix_header ofs)
-let alloc_boxedint32_header = Cconst_blockheader(boxedint32_header)
-let alloc_boxedint64_header = Cconst_blockheader(boxedint64_header)
-let alloc_boxedintnat_header = Cconst_blockheader(boxedintnat_header)
+let alloc_closure_header_noalloc sz =
+  Cconst_natint (black_closure_header sz)
+
+let cconst_header locid header =
+  match locid with
+  | LocId (_, locid_base, ofs) ->
+    if Arch.size_int = 8 then
+      let header =
+        Nativeint.add
+          (Nativeint.shift_left (Nativeint.of_int ofs) 10)
+          header in
+      Cop(Caddi, [Cconst_natint header;
+                  Cop (Cload Word, [Cconst_symbol locid_base])])
+    else Cconst_natint header
+  | NoAlloc -> assert false (* Should never happen ! *)
+
+let alloc_block_header locid tag sz = cconst_header locid(block_header tag sz)
+let alloc_float_header locid () = cconst_header locid(float_header)
+let alloc_floatarray_header locid len = cconst_header locid(floatarray_header len)
+let alloc_closure_header locid sz = cconst_header locid(white_closure_header sz)
+let alloc_infix_header locid ofs = cconst_header locid(infix_header ofs)
+let alloc_boxedint32_header locid () = cconst_header locid(boxedint32_header)
+let alloc_boxedint64_header locid () = cconst_header locid(boxedint64_header)
+let alloc_boxedintnat_header locid () = cconst_header locid(boxedintnat_header)
 
 (* Integers *)
 
@@ -416,10 +452,15 @@ let test_bool = function
 
 (* Float *)
 
-let box_float c = Cop(Calloc, [alloc_float_header; c])
+let calloc = function
+  | NoAlloc -> Calloc Debuginfo.none
+  | LocId (loc,_,_) ->
+    Calloc (Debuginfo.from_location Debuginfo.Dinfo_call loc)
+
+let box_float locid c = Cop(calloc locid, [alloc_float_header locid (); c])
 
 let rec unbox_float = function
-    Cop(Calloc, [header; c]) -> c
+    Cop(Calloc _, [header; c]) -> c
   | Clet(id, exp, body) -> Clet(id, exp, unbox_float body)
   | Cifthenelse(cond, e1, e2) ->
       Cifthenelse(cond, unbox_float e1, unbox_float e2)
@@ -431,8 +472,9 @@ let rec unbox_float = function
 
 (* Complex *)
 
-let box_complex c_re c_im =
-  Cop(Calloc, [alloc_floatarray_header 2; c_re; c_im])
+let box_complex loc c_re c_im =
+  let locid = locid_complex loc in
+  Cop(calloc locid, [alloc_floatarray_header locid 2; c_re; c_im])
 
 let complex_re c = Cop(Cload Double_u, [c])
 let complex_im c = Cop(Cload Double_u,
@@ -459,8 +501,8 @@ let rec remove_unit = function
       Clet(id, c1, remove_unit c2)
   | Cop(Capply (mty, dbg), args) ->
       Cop(Capply (typ_void, dbg), args)
-  | Cop(Cextcall(proc, mty, alloc, dbg), args) ->
-      Cop(Cextcall(proc, typ_void, alloc, dbg), args)
+  | Cop(Cextcall(proc, mty, alloc, locid, dbg), args) ->
+      Cop(Cextcall(proc, typ_void, alloc, locid, dbg), args)
   | Cexit (_,_) as c -> c
   | Ctuple [] as c -> c
   | c -> Csequence(c, Ctuple [])
@@ -492,15 +534,28 @@ let get_tag ptr =
         [Cop(Cadda, [ptr; Cconst_int(tag_offset)])])
 
 let get_size ptr =
+  if Arch.size_int = 8 then
+    Cop(Clsr, [header ptr; Cconst_int 32])
+  else
   Cop(Clsr, [header ptr; Cconst_int 10])
+
+(* Modify header of block field *)
+
+let set_header ptr v =
+  Cop(Cstore Word, [Cop(Cadda, [ptr; Cconst_int(-size_int)]); v])
+
+let hex0xFF_FF_FF_FF_00_00_03_FFn =
+  Nativeint.logor
+    (Nativeint.shift_left 0xFF_FF_FF_FFn 32)
+    0x00_00_03_FFn
 
 (* Array indexing *)
 
 let log2_size_addr = Misc.log2 size_addr
 let log2_size_float = Misc.log2 size_float
 
-let wordsize_shift = 9
-let numfloat_shift = 9 + log2_size_float - log2_size_addr
+let wordsize_shift = if Arch.size_int = 4 then 9 else 31
+let numfloat_shift = wordsize_shift + log2_size_float - log2_size_addr
 
 let is_addr_array_hdr hdr =
   Cop(Ccmpi Cne, [Cop(Cand, [hdr; Cconst_int 255]); floatarray_tag])
@@ -532,11 +587,11 @@ let addr_array_ref arr ofs =
   Cop(Cload Word, [array_indexing log2_size_addr arr ofs])
 let unboxed_float_array_ref arr ofs =
   Cop(Cload Double_u, [array_indexing log2_size_float arr ofs])
-let float_array_ref arr ofs =
-  box_float(unboxed_float_array_ref arr ofs)
+let float_array_ref locid arr ofs =
+  box_float locid (unboxed_float_array_ref arr ofs)
 
 let addr_array_set arr ofs newval =
-  Cop(Cextcall("caml_modify", typ_void, false, Debuginfo.none),
+  Cop(Cextcall("caml_modify", typ_void, false, None, Debuginfo.none),
       [array_indexing log2_size_addr arr ofs; newval])
 let int_array_set arr ofs newval =
   Cop(Cstore Word, [array_indexing log2_size_addr arr ofs; newval])
@@ -565,7 +620,7 @@ let string_length exp =
 
 let lookup_tag obj tag =
   bind "tag" tag (fun tag ->
-    Cop(Cextcall("caml_get_public_method", typ_addr, false, Debuginfo.none),
+    Cop(Cextcall("caml_get_public_method", typ_addr, false, None, Debuginfo.none),
         [obj; tag]))
 
 let lookup_label obj lab =
@@ -582,26 +637,78 @@ let call_cached_method obj tag cache pos args dbg =
       obj :: tag :: cache :: args)
 
 (* Allocation *)
+(* locids passed to C calls are memoized. It is not clear if it is really
+   worth it (testing needed). However, it might be the case that these
+   symbols are less intruisive than computing the locid each time, as the
+   later choice would require to modify every Cextcall to do the computation
+   before, and store the result in some temporary variable (that has to be
+   taken into account in register allocation => much more work than just
+   passing a symbol).
+*)
+let locid_nums = ref 0
+let symbol_of_locid = Hashtbl.create 113
 
-let make_alloc_generic set_fn tag wordsize args =
+let clear_locids () =
+  locid_nums := 0;
+  Hashtbl.clear symbol_of_locid
+
+let get_locid_symbol locid =
+  match locid with
+  | NoAlloc -> assert false
+  | LocId _ when Arch.size_int = 4 -> None
+  | LocId (_, locid_base, ofs) ->
+    try
+      let (symbol, _) = Hashtbl.find symbol_of_locid locid in
+      Some symbol
+    with Not_found ->
+      let cmm =
+        Cop(Caddi, [Cconst_natint
+                       (Nativeint.shift_left (Nativeint.of_int ofs) 10);
+                    Cop (Cload Word, [Cconst_symbol locid_base])])
+      in
+      let symbol = Compilenv.make_symbol
+        (Some (Printf.sprintf "ccall_locid%d" !locid_nums)) in
+      incr locid_nums;
+      Hashtbl.add symbol_of_locid locid (symbol, cmm);
+      Some symbol
+
+let must_get_locid_symbol name locid_o =
+  match locid_o with
+  | None ->
+    Printf.kprintf failwith "must_get_locid_symbol(%s)" name
+  | Some locid -> get_locid_symbol locid
+
+
+let make_alloc_generic locid set_fn tag wordsize args =
   if wordsize <= Config.max_young_wosize then
-    Cop(Calloc, Cconst_blockheader(block_header tag wordsize) :: args)
+    Cop(calloc locid, cconst_header locid (block_header tag wordsize) :: args)
   else begin
     let id = Ident.create "alloc" in
     let rec fill_fields idx = function
       [] -> Cvar id
     | e1::el -> Csequence(set_fn (Cvar id) (Cconst_int idx) e1,
                           fill_fields (idx + 2) el) in
+    match locid with
+    | LocId (_, locid_base, ofs) ->
+      if Arch.size_int = 8 then
+        let locid = get_locid_symbol locid in
     Clet(id,
-         Cop(Cextcall("caml_alloc", typ_addr, true, Debuginfo.none),
+             Cop(Cextcall("caml_alloc", typ_addr, true, locid, Debuginfo.none),
                  [Cconst_int wordsize; Cconst_int tag]),
          fill_fields 1 args)
+      else
+        Clet(id,
+             Cop(Cextcall("caml_alloc", typ_addr, true, None, Debuginfo.none),
+                 [Cconst_int wordsize; Cconst_int tag]),
+             fill_fields 1 args)
+    | NoAlloc -> assert false
+
   end
 
-let make_alloc tag args =
-  make_alloc_generic addr_array_set tag (List.length args) args
-let make_float_alloc tag args =
-  make_alloc_generic float_array_set tag
+let make_alloc locid tag args =
+  make_alloc_generic locid addr_array_set tag (List.length args) args
+let make_float_alloc locid tag args =
+  make_alloc_generic locid float_array_set tag
                      (List.length args * size_float / size_addr) args
 
 (* Bounds checking *)
@@ -622,29 +729,29 @@ let fundecls_size fundecls =
   !sz
 
 type rhs_kind =
-  | RHS_block of int
-  | RHS_floatblock of int
+  | RHS_block of int * locid
+  | RHS_floatblock of int * locid
   | RHS_nonrec
 ;;
 let rec expr_size env = function
   | Uvar id ->
       begin try Ident.find_same id env with Not_found -> RHS_nonrec end
-  | Uclosure(fundecls, clos_vars) ->
-      RHS_block (fundecls_size fundecls + List.length clos_vars)
-  | Ulet(id, exp, body) ->
+  | Uclosure(fundecls, clos_vars, locid) ->
+      RHS_block (fundecls_size fundecls + List.length clos_vars, locid)
+  | Ulet(id, _, exp, body) ->
       expr_size (Ident.add id (expr_size env exp) env) body
   | Uletrec(bindings, body) ->
       expr_size env body
-  | Uprim(Pmakeblock(tag, mut), args, _) ->
-      RHS_block (List.length args)
-  | Uprim(Pmakearray(Paddrarray | Pintarray), args, _) ->
-      RHS_block (List.length args)
-  | Uprim(Pmakearray(Pfloatarray), args, _) ->
-      RHS_floatblock (List.length args)
-  | Uprim (Pduprecord (Record_regular, sz), _, _) ->
-      RHS_block sz
-  | Uprim (Pduprecord (Record_float, sz), _, _) ->
-      RHS_floatblock sz
+  | Uprim(Pmakeblock(tag, mut, locid), args, _) ->
+      RHS_block (List.length args, locid)
+  | Uprim(Pmakearray((Paddrarray | Pintarray), locid), args, _) ->
+      RHS_block (List.length args, locid)
+  | Uprim(Pmakearray(Pfloatarray, locid), args, _) ->
+      RHS_floatblock (List.length args, locid)
+  | Uprim (Pduprecord (Record_regular, sz, locid), _, _) ->
+      RHS_block (sz, locid)
+  | Uprim (Pduprecord (Record_float, sz, locid), _, _) ->
+      RHS_floatblock (sz, locid)
   | Usequence(exp, exp') ->
       expr_size env exp'
   | _ -> RHS_nonrec
@@ -705,13 +812,13 @@ let operations_boxed_int bi =
   | Pint32 -> "caml_int32_ops"
   | Pint64 -> "caml_int64_ops"
 
-let alloc_header_boxed_int bi =
+let alloc_header_boxed_int locid bi =
   match bi with
-    Pnativeint -> alloc_boxedintnat_header
-  | Pint32 -> alloc_boxedint32_header
-  | Pint64 -> alloc_boxedint64_header
+    Pnativeint -> alloc_boxedintnat_header locid ()
+  | Pint32 -> alloc_boxedint32_header locid ()
+  | Pint64 -> alloc_boxedint64_header locid ()
 
-let box_int bi arg =
+let box_int bi locid arg =
   match arg with
     Cconst_int n ->
       transl_structured_constant (box_int_constant bi (Nativeint.of_int n))
@@ -722,21 +829,21 @@ let box_int bi arg =
         if bi = Pint32 && size_int = 8 && big_endian
         then Cop(Clsl, [arg; Cconst_int 32])
         else arg in
-      Cop(Calloc, [alloc_header_boxed_int bi;
+      Cop(calloc locid, [alloc_header_boxed_int locid bi;
                    Cconst_symbol(operations_boxed_int bi);
                    arg'])
 
 let rec unbox_int bi arg =
   match arg with
-    Cop(Calloc, [hdr; ops; Cop(Clsl, [contents; Cconst_int 32])])
+    Cop(Calloc _, [hdr; ops; Cop(Clsl, [contents; Cconst_int 32])])
     when bi = Pint32 && size_int = 8 && big_endian ->
       (* Force sign-extension of low 32 bits *)
       Cop(Casr, [Cop(Clsl, [contents; Cconst_int 32]); Cconst_int 32])
-  | Cop(Calloc, [hdr; ops; contents])
+  | Cop(Calloc _, [hdr; ops; contents])
     when bi = Pint32 && size_int = 8 && not big_endian ->
       (* Force sign-extension of low 32 bits *)
       Cop(Casr, [Cop(Clsl, [contents; Cconst_int 32]); Cconst_int 32])
-  | Cop(Calloc, [hdr; ops; contents]) ->
+  | Cop(Calloc _, [hdr; ops; contents]) ->
       contents
   | Clet(id, exp, body) -> Clet(id, exp, unbox_int bi body)
   | Cifthenelse(cond, e1, e2) ->
@@ -753,6 +860,7 @@ let make_unsigned_int bi arg =
   if bi = Pint32 && size_int = 8
   then Cop(Cand, [arg; Cconst_natint 0xFFFFFFFFn])
   else arg
+
 
 (* Big arrays *)
 
@@ -818,7 +926,7 @@ let bigarray_word_kind = function
   | Pbigarray_complex32 -> Single
   | Pbigarray_complex64 -> Double
 
-let bigarray_get unsafe elt_kind layout b args dbg =
+let bigarray_get loc unsafe elt_kind layout b args dbg =
   bind "ba" b (fun b ->
     match elt_kind with
       Pbigarray_complex32 | Pbigarray_complex64 ->
@@ -826,7 +934,7 @@ let bigarray_get unsafe elt_kind layout b args dbg =
         let sz = bigarray_elt_size elt_kind / 2 in
         bind "addr" (bigarray_indexing unsafe elt_kind layout b args dbg)
           (fun addr ->
-          box_complex
+          box_complex loc
             (Cop(Cload kind, [addr]))
             (Cop(Cload kind, [Cop(Cadda, [addr; Cconst_int sz])])))
     | _ ->
@@ -1019,59 +1127,76 @@ let check_bound unsafe dbg a1 a2 k =
 (* Simplification of some primitives into C calls *)
 
 let default_prim name =
-  { prim_name = name; prim_arity = 0 (*ignored*);
+  { prim_name = name; prim_arity = 0 (*ignored*); prim_memprof = false;
     prim_alloc = true; prim_native_name = ""; prim_native_float = false }
 
-let simplif_primitive_32bits = function
-    Pbintofint Pint64 -> Pccall (default_prim "caml_int64_of_int")
-  | Pintofbint Pint64 -> Pccall (default_prim "caml_int64_to_int")
-  | Pcvtbint(Pint32, Pint64) -> Pccall (default_prim "caml_int64_of_int32")
-  | Pcvtbint(Pint64, Pint32) -> Pccall (default_prim "caml_int64_to_int32")
-  | Pcvtbint(Pnativeint, Pint64) ->
-      Pccall (default_prim "caml_int64_of_nativeint")
-  | Pcvtbint(Pint64, Pnativeint) ->
-      Pccall (default_prim "caml_int64_to_nativeint")
-  | Pnegbint Pint64 -> Pccall (default_prim "caml_int64_neg")
-  | Paddbint Pint64 -> Pccall (default_prim "caml_int64_add")
-  | Psubbint Pint64 -> Pccall (default_prim "caml_int64_sub")
-  | Pmulbint Pint64 -> Pccall (default_prim "caml_int64_mul")
-  | Pdivbint Pint64 -> Pccall (default_prim "caml_int64_div")
-  | Pmodbint Pint64 -> Pccall (default_prim "caml_int64_mod")
-  | Pandbint Pint64 -> Pccall (default_prim "caml_int64_and")
-  | Porbint Pint64 ->  Pccall (default_prim "caml_int64_or")
-  | Pxorbint Pint64 -> Pccall (default_prim "caml_int64_xor")
-  | Plslbint Pint64 -> Pccall (default_prim "caml_int64_shift_left")
-  | Plsrbint Pint64 -> Pccall (default_prim "caml_int64_shift_right_unsigned")
-  | Pasrbint Pint64 -> Pccall (default_prim "caml_int64_shift_right")
-  | Pbintcomp(Pint64, Lambda.Ceq) -> Pccall (default_prim "caml_equal")
-  | Pbintcomp(Pint64, Lambda.Cneq) -> Pccall (default_prim "caml_notequal")
-  | Pbintcomp(Pint64, Lambda.Clt) -> Pccall (default_prim "caml_lessthan")
-  | Pbintcomp(Pint64, Lambda.Cgt) -> Pccall (default_prim "caml_greaterthan")
-  | Pbintcomp(Pint64, Lambda.Cle) -> Pccall (default_prim "caml_lessequal")
-  | Pbintcomp(Pint64, Lambda.Cge) -> Pccall (default_prim "caml_greaterequal")
-  | Pbigarrayref(unsafe, n, Pbigarray_int64, layout) ->
-      Pccall (default_prim ("caml_ba_get_" ^ string_of_int n))
+let noalloc_prim name =
+  { prim_name = name; prim_arity = 0 (*ignored*); prim_memprof = false;
+    prim_alloc = false; prim_native_name = ""; prim_native_float = false }
+
+let simplif_primitive_32bits p =
+  match (p : Clambda.locid Lambda.raw_primitive) with
+    Pbintofint (Pint64, locid) -> Pccall (default_prim "caml_int64_of_int", Some locid)
+  | Pintofbint Pint64 -> Pccall (noalloc_prim "caml_int64_to_int", None)
+  | Pcvtbint(Pint32, Pint64, locid) ->
+      Pccall (default_prim "caml_int64_of_int32", Some locid)
+  | Pcvtbint(Pint64, Pint32, locid) ->
+      Pccall (default_prim "caml_int64_to_int32", Some locid)
+  | Pcvtbint(Pnativeint, Pint64, locid) ->
+      Pccall (default_prim "caml_int64_of_nativeint", Some locid)
+  | Pcvtbint(Pint64, Pnativeint, locid) ->
+      Pccall (default_prim "caml_int64_to_nativeint", Some locid)
+  | Pnegbint (Pint64, locid) -> Pccall (default_prim "caml_int64_neg", Some locid)
+  | Paddbint (Pint64, locid) -> Pccall (default_prim "caml_int64_add", Some locid)
+  | Psubbint (Pint64, locid) -> Pccall (default_prim "caml_int64_sub", Some locid)
+  | Pmulbint (Pint64, locid) -> Pccall (default_prim "caml_int64_mul", Some locid)
+  | Pdivbint (Pint64, locid) -> Pccall (default_prim "caml_int64_div", Some locid)
+  | Pmodbint (Pint64, locid) -> Pccall (default_prim "caml_int64_mod", Some locid)
+  | Pandbint (Pint64, locid) -> Pccall (default_prim "caml_int64_and", Some locid)
+  | Porbint (Pint64, locid) ->  Pccall (default_prim "caml_int64_or", Some locid)
+  | Pxorbint (Pint64, locid) -> Pccall (default_prim "caml_int64_xor", Some locid)
+  | Plslbint (Pint64, locid) ->
+      Pccall (default_prim "caml_int64_shift_left", Some locid)
+  | Plsrbint (Pint64, locid) ->
+      Pccall (default_prim "caml_int64_shift_right_unsigned", Some locid)
+  | Pasrbint (Pint64, locid) ->
+      Pccall (default_prim "caml_int64_shift_right", Some locid)
+  | Pbintcomp(Pint64, Lambda.Ceq) -> Pccall (noalloc_prim "caml_equal", None)
+  | Pbintcomp(Pint64, Lambda.Cneq) -> Pccall (noalloc_prim "caml_notequal", None)
+  | Pbintcomp(Pint64, Lambda.Clt) -> Pccall (noalloc_prim "caml_lessthan", None)
+  | Pbintcomp(Pint64, Lambda.Cgt) -> Pccall (noalloc_prim "caml_greaterthan", None)
+  | Pbintcomp(Pint64, Lambda.Cle) -> Pccall (noalloc_prim "caml_lessequal", None)
+  | Pbintcomp(Pint64, Lambda.Cge) -> Pccall (noalloc_prim "caml_greaterequal", None)
+  | Pbigarrayref(unsafe, n, Pbigarray_int64, layout, loc) ->
+    Pccall (default_prim ("caml_ba_get_" ^ string_of_int n),
+            Some (prof_int64 loc))
   | Pbigarrayset(unsafe, n, Pbigarray_int64, layout) ->
-      Pccall (default_prim ("caml_ba_set_" ^ string_of_int n))
-  | Pstring_load_64(_) -> Pccall (default_prim "caml_string_get64")
-  | Pstring_set_64(_) -> Pccall (default_prim "caml_string_set64")
-  | Pbigstring_load_64(_) -> Pccall (default_prim "caml_ba_uint8_get64")
-  | Pbigstring_set_64(_) -> Pccall (default_prim "caml_ba_uint8_set64")
-  | Pbbswap Pint64 -> Pccall (default_prim "caml_int64_bswap")
+      Pccall (noalloc_prim ("caml_ba_set_" ^ string_of_int n), None)
+  | Pstring_load_64(_,loc) ->
+    Pccall (default_prim "caml_string_get64", (Some (prof_int64 loc)))
+  | Pstring_set_64(_x) -> Pccall (noalloc_prim "caml_string_set64", None)
+  | Pbigstring_load_64(_,loc) ->
+    Pccall (default_prim "caml_ba_uint8_get64", Some (prof_int64 loc))
+  | Pbigstring_set_64(_x) -> Pccall (noalloc_prim "caml_ba_uint8_set64", None)
+  | Pbbswap (Pint64, locid) -> Pccall (default_prim "caml_int64_bswap", Some locid)
   | p -> p
 
 let simplif_primitive p =
   match p with
-  | Pduprecord _ ->
-      Pccall (default_prim "caml_obj_dup")
-  | Pbigarrayref(unsafe, n, Pbigarray_unknown, layout) ->
-      Pccall (default_prim ("caml_ba_get_" ^ string_of_int n))
+  | Pduprecord (_,_,locid) ->
+      Pccall (default_prim "caml_obj_dup", Some locid)
+  | Pbigarrayref(unsafe, n, Pbigarray_unknown, layout, loc) ->
+    let name = "caml_ba_get_" ^ string_of_int n in
+    let locid = prof (Memprof.cprim loc.l loc.p name) in
+      Pccall (default_prim (name), Some locid)
   | Pbigarrayset(unsafe, n, Pbigarray_unknown, layout) ->
-      Pccall (default_prim ("caml_ba_set_" ^ string_of_int n))
-  | Pbigarrayref(unsafe, n, kind, Pbigarray_unknown_layout) ->
-      Pccall (default_prim ("caml_ba_get_" ^ string_of_int n))
+      Pccall (noalloc_prim ("caml_ba_set_" ^ string_of_int n), None)
+  | Pbigarrayref(unsafe, n, kind, Pbigarray_unknown_layout, loc) ->
+    let name = "caml_ba_get_" ^ string_of_int n in
+    let locid = prof (Memprof.cprim loc.l loc.p name) in
+      Pccall (default_prim (name), Some locid)
   | Pbigarrayset(unsafe, n, kind, Pbigarray_unknown_layout) ->
-      Pccall (default_prim ("caml_ba_set_" ^ string_of_int n))
+      Pccall (noalloc_prim ("caml_ba_set_" ^ string_of_int n), None)
   | p ->
       if size_int = 8 then p else simplif_primitive_32bits p
 
@@ -1084,6 +1209,7 @@ let transl_isout h arg = tag_int (Cop(Ccmpa Clt, [h ; arg]))
 module SArgBlocks =
 struct
   type primitive = operation
+  type location = unit
 
   let eqint = Ccmpi Ceq
   let neint = Ccmpi Cne
@@ -1102,7 +1228,7 @@ struct
   let make_isin h arg =  Cop (Ccmpa Cge, [h ; arg])
   let make_if cond ifso ifnot = Cifthenelse (cond, ifso, ifnot)
   let make_switch arg cases actions = Cswitch (arg,cases,actions)
-  let bind arg body = bind "switcher" arg body
+  let bind () arg body = bind "switcher" arg body
 
   let make_catch handler = match handler with
   | Cexit (i,[]) -> i,fun e -> e
@@ -1120,7 +1246,7 @@ struct
           else body
       | _ ->  Ccatch (i,[],body,handler))
 
-  let make_exit i = Cexit (i,[])
+  let make_exit _loc i = Cexit (i,[])
 
 end
 
@@ -1180,7 +1306,7 @@ let transl_int_switch arg low high cases default = match cases with
         else inters low (k0-1) 0 cases in
     bind "switcher" arg
       (fun a ->
-        SwitcherBlocks.zyva
+        SwitcherBlocks.zyva ()
           (low,high)
           a
           (Array.of_list inters) store)
@@ -1199,44 +1325,45 @@ let rec is_unboxed_number = function
       Boxed_float
   | Uprim(p, _, _) ->
       begin match simplif_primitive p with
-          Pccall p -> if p.prim_native_float then Boxed_float else No_unboxing
+          Pccall (p,_) ->
+             if p.prim_native_float then Boxed_float else No_unboxing
         | Pfloatfield _ -> Boxed_float
-        | Pfloatofint -> Boxed_float
-        | Pnegfloat -> Boxed_float
-        | Pabsfloat -> Boxed_float
-        | Paddfloat -> Boxed_float
-        | Psubfloat -> Boxed_float
-        | Pmulfloat -> Boxed_float
-        | Pdivfloat -> Boxed_float
-        | Parrayrefu Pfloatarray -> Boxed_float
-        | Parrayrefs Pfloatarray -> Boxed_float
-        | Pbintofint bi -> Boxed_integer bi
-        | Pcvtbint(src, dst) -> Boxed_integer dst
-        | Pnegbint bi -> Boxed_integer bi
-        | Paddbint bi -> Boxed_integer bi
-        | Psubbint bi -> Boxed_integer bi
-        | Pmulbint bi -> Boxed_integer bi
-        | Pdivbint bi -> Boxed_integer bi
-        | Pmodbint bi -> Boxed_integer bi
-        | Pandbint bi -> Boxed_integer bi
-        | Porbint bi -> Boxed_integer bi
-        | Pxorbint bi -> Boxed_integer bi
-        | Plslbint bi -> Boxed_integer bi
-        | Plsrbint bi -> Boxed_integer bi
-        | Pasrbint bi -> Boxed_integer bi
-        | Pbigarrayref(_, _, (Pbigarray_float32 | Pbigarray_float64), _) ->
+        | Pfloatofint _ -> Boxed_float
+        | Pnegfloat _ -> Boxed_float
+        | Pabsfloat _ -> Boxed_float
+        | Paddfloat _ -> Boxed_float
+        | Psubfloat _ -> Boxed_float
+        | Pmulfloat _ -> Boxed_float
+        | Pdivfloat _ -> Boxed_float
+        | Parrayrefu (Pfloatarray,_) -> Boxed_float
+        | Parrayrefs (Pfloatarray,_) -> Boxed_float
+        | Pbintofint (bi,_) -> Boxed_integer bi
+        | Pcvtbint(src, dst, _) -> Boxed_integer dst
+        | Pnegbint (bi,_) -> Boxed_integer bi
+        | Paddbint (bi,_) -> Boxed_integer bi
+        | Psubbint (bi,_) -> Boxed_integer bi
+        | Pmulbint (bi,_) -> Boxed_integer bi
+        | Pdivbint (bi,_) -> Boxed_integer bi
+        | Pmodbint (bi,_) -> Boxed_integer bi
+        | Pandbint (bi,_) -> Boxed_integer bi
+        | Porbint (bi,_) -> Boxed_integer bi
+        | Pxorbint (bi,_) -> Boxed_integer bi
+        | Plslbint (bi,_) -> Boxed_integer bi
+        | Plsrbint (bi,_) -> Boxed_integer bi
+        | Pasrbint (bi,_) -> Boxed_integer bi
+        | Pbigarrayref(_, _, (Pbigarray_float32 | Pbigarray_float64), _, _) ->
             Boxed_float
-        | Pbigarrayref(_, _, Pbigarray_int32, _) -> Boxed_integer Pint32
-        | Pbigarrayref(_, _, Pbigarray_int64, _) -> Boxed_integer Pint64
-        | Pbigarrayref(_, _, Pbigarray_native_int,_) -> Boxed_integer Pnativeint
-        | Pstring_load_32(_) -> Boxed_integer Pint32
-        | Pstring_load_64(_) -> Boxed_integer Pint64
-        | Pbigstring_load_32(_) -> Boxed_integer Pint32
-        | Pbigstring_load_64(_) -> Boxed_integer Pint64
-        | Pbbswap bi -> Boxed_integer bi
+        | Pbigarrayref(_, _, Pbigarray_int32, _, _) -> Boxed_integer Pint32
+        | Pbigarrayref(_, _, Pbigarray_int64, _, _) -> Boxed_integer Pint64
+        | Pbigarrayref(_, _, Pbigarray_native_int,_, _) -> Boxed_integer Pnativeint
+        | Pstring_load_32(_,_) -> Boxed_integer Pint32
+        | Pstring_load_64(_,_) -> Boxed_integer Pint64
+        | Pbigstring_load_32(_,_) -> Boxed_integer Pint32
+        | Pbigstring_load_64(_,_) -> Boxed_integer Pint64
+        | Pbbswap (bi,_) -> Boxed_integer bi
         | _ -> No_unboxing
       end
-  | Ulet (_, _, e) | Usequence (_, e) -> is_unboxed_number e
+  | Ulet (_, _, _, e) | Usequence (_, e) -> is_unboxed_number e
   | _ -> No_unboxing
 
 let subst_boxed_number unbox_fn boxed_id unboxed_id box_chunk box_offset exp =
@@ -1292,12 +1419,12 @@ let rec transl = function
       Cvar id
   | Uconst sc ->
       transl_constant sc
-  | Uclosure(fundecls, []) ->
+  | Uclosure(fundecls, [], _) ->
       let lbl = Compilenv.new_const_symbol() in
       constant_closures := (lbl, fundecls) :: !constant_closures;
       List.iter (fun f -> Queue.add f functions) fundecls;
       Cconst_symbol lbl
-  | Uclosure(fundecls, clos_vars) ->
+  | Uclosure(fundecls, clos_vars, locid) ->
       let block_size =
         fundecls_size fundecls + List.length clos_vars in
       let rec transl_fundecls pos = function
@@ -1307,8 +1434,8 @@ let rec transl = function
             Queue.add f functions;
             let header =
               if pos = 0
-              then alloc_closure_header block_size
-              else alloc_infix_header pos in
+              then alloc_closure_header locid block_size
+              else alloc_infix_header locid pos in
             if f.arity = 1 then
               header ::
               Cconst_symbol f.label ::
@@ -1320,7 +1447,7 @@ let rec transl = function
               int_const f.arity ::
               Cconst_symbol f.label ::
               transl_fundecls (pos + 4) rem in
-      Cop(Calloc, transl_fundecls 0 fundecls)
+      Cop(calloc locid, transl_fundecls 0 fundecls)
   | Uoffset(arg, offset) ->
       field_address (transl arg) offset
   | Udirect_apply(lbl, args, dbg) ->
@@ -1352,16 +1479,29 @@ let rec transl = function
               (List.map transl args) dbg
         | _ ->
             bind "met" (lookup_tag obj (transl met)) (call_met obj args))
-  | Ulet(id, exp, body) ->
+  | Ulet(id, loc, exp, body) ->
       begin match is_unboxed_number exp with
         No_unboxing ->
           Clet(id, transl exp, transl body)
       | Boxed_float ->
-          transl_unbox_let box_float unbox_float transl_unbox_float
+          let locid =
+            (* let loc_path = Compilenv.current_unit_path () in *)
+              Compilenv.wrap_locid
+               (Memprof.locid loc.l loc.p Predef.type_float) in
+          transl_unbox_let (box_float locid) unbox_float transl_unbox_float
                            Double_u 0
                            id exp body
       | Boxed_integer bi ->
-          transl_unbox_let (box_int bi) (unbox_int bi) (transl_unbox_int bi)
+           let ty =
+             match bi with
+             | Pnativeint -> Predef.type_nativeint
+             | Pint32 -> Predef.type_int32
+             | Pint64 -> Predef.type_int64
+           in
+          let locid =
+              (* let loc_path = Compilenv.current_unit_path () in *)
+              Compilenv.wrap_locid (Memprof.locid loc.l loc.p ty) in
+          transl_unbox_let (box_int bi locid) (unbox_int bi) (transl_unbox_int bi)
                            (if bi = Pint32 then Thirtytwo_signed else Word)
                            size_addr
                            id exp body
@@ -1374,42 +1514,49 @@ let rec transl = function
       begin match (simplif_primitive prim, args) with
         (Pgetglobal id, []) ->
           Cconst_symbol (Ident.name id)
-      | (Pmakeblock(tag, mut), []) ->
+      | (Pmakeblock(tag, mut, _locid), []) ->
           assert false
-      | (Pmakeblock(tag, mut), args) ->
-          make_alloc tag (List.map transl args)
-      | (Pccall prim, args) ->
+      | (Pmakeblock(tag, mut, locid), args) ->
+          make_alloc locid tag (List.map transl args)
+      | (Pccall (prim, locid_o), args) ->
           if prim.prim_native_float then
-            box_float
-              (Cop(Cextcall(prim.prim_native_name, typ_float, false, dbg),
+            let locid = match locid_o with
+                None -> NoAlloc | Some locid -> locid in
+            box_float locid
+              (Cop(Cextcall(prim.prim_native_name, typ_float, false, None, dbg),
                    List.map transl_unbox_float args))
           else
-            Cop(Cextcall(Primitive.native_name prim, typ_addr, prim.prim_alloc,
-                         dbg),
-                List.map transl args)
-      | (Pmakearray kind, []) ->
+            if prim.prim_alloc then
+              Cop(Cextcall(Primitive.native_name prim, typ_addr, true,
+                           must_get_locid_symbol prim.prim_name locid_o, dbg),
+                  List.map transl args)
+            else
+              Cop(Cextcall(Primitive.native_name prim, typ_addr, false, None, dbg),
+              List.map transl args)
+      | (Pmakearray (kind, _locid), []) ->
           transl_structured_constant (Uconst_block(0, []))
-      | (Pmakearray kind, args) ->
+      | (Pmakearray (kind, locid), args) ->
           begin match kind with
             Pgenarray ->
-              Cop(Cextcall("caml_make_array", typ_addr, true, Debuginfo.none),
-                  [make_alloc 0 (List.map transl args)])
+              Cop(Cextcall("caml_make_array", typ_addr, true,
+                           get_locid_symbol locid, Debuginfo.none),
+                  [make_alloc locid 0 (List.map transl args)])
           | Paddrarray | Pintarray ->
-              make_alloc 0 (List.map transl args)
+              make_alloc locid 0 (List.map transl args)
           | Pfloatarray ->
-              make_float_alloc Obj.double_array_tag
+              make_float_alloc locid Obj.double_array_tag
                               (List.map transl_unbox_float args)
           end
-      | (Pbigarrayref(unsafe, num_dims, elt_kind, layout), arg1 :: argl) ->
+      | (Pbigarrayref(unsafe, num_dims, elt_kind, layout, loc), arg1 :: argl) ->
           let elt =
-            bigarray_get unsafe elt_kind layout
+            bigarray_get loc unsafe elt_kind layout
               (transl arg1) (List.map transl argl) dbg in
           begin match elt_kind with
-            Pbigarray_float32 | Pbigarray_float64 -> box_float elt
+            Pbigarray_float32 | Pbigarray_float64 -> box_float (locid_float loc) elt
           | Pbigarray_complex32 | Pbigarray_complex64 -> elt
-          | Pbigarray_int32 -> box_int Pint32 elt
-          | Pbigarray_int64 -> box_int Pint64 elt
-          | Pbigarray_native_int -> box_int Pnativeint elt
+          | Pbigarray_int32 -> box_int Pint32 (locid_int32 loc) elt
+          | Pbigarray_int64 -> box_int Pint64 (locid_int64 loc) elt
+          | Pbigarray_native_int -> box_int Pnativeint (locid_nat loc) elt
           | Pbigarray_caml_int -> force_tag_int elt
           | _ -> tag_int elt
           end
@@ -1551,10 +1698,10 @@ and transl_prim_1 p arg dbg =
   (* Heap operations *)
   | Pfield n ->
       get_field (transl arg) n
-  | Pfloatfield n ->
+  | Pfloatfield (n, locid) ->
       let ptr = transl arg in
-      box_float(
-        Cop(Cload Double_u,
+      box_float locid
+        (Cop(Cload Double_u,
             [if n = 0 then ptr
                        else Cop(Cadda, [ptr; Cconst_int(n * size_float)])]))
   | Pint_as_pointer ->
@@ -1571,9 +1718,9 @@ and transl_prim_1 p arg dbg =
         match c with
         | Big_endian -> const_of_bool Arch.big_endian
         | Word_size -> tag_int (Cconst_int (8*Arch.size_int))
-        | Ostype_unix -> const_of_bool (Sys.os_type = "Unix")
-        | Ostype_win32 -> const_of_bool (Sys.os_type = "Win32")
-        | Ostype_cygwin -> const_of_bool (Sys.os_type = "Cygwin")
+        | Ostype_unix -> const_of_bool (Config.os_type = "Unix")
+        | Ostype_win32 -> const_of_bool (Config.os_type = "Win32")
+        | Ostype_cygwin -> const_of_bool (Config.os_type = "Cygwin")
       end
   | Poffsetint n ->
       if no_overflow_lsl n then
@@ -1587,14 +1734,14 @@ and transl_prim_1 p arg dbg =
           Cop(Cstore Word,
               [arg; add_const (Cop(Cload Word, [arg])) (n lsl 1)])))
   (* Floating-point operations *)
-  | Pfloatofint ->
-      box_float(Cop(Cfloatofint, [untag_int(transl arg)]))
+  | Pfloatofint locid ->
+      box_float locid (Cop(Cfloatofint, [untag_int(transl arg)]))
   | Pintoffloat ->
      tag_int(Cop(Cintoffloat, [transl_unbox_float arg]))
-  | Pnegfloat ->
-      box_float(Cop(Cnegf, [transl_unbox_float arg]))
-  | Pabsfloat ->
-      box_float(Cop(Cabsf, [transl_unbox_float arg]))
+  | Pnegfloat locid ->
+      box_float locid (Cop(Cnegf, [transl_unbox_float arg]))
+  | Pabsfloat locid ->
+      box_float locid (Cop(Cabsf, [transl_unbox_float arg]))
   (* String operations *)
   | Pstringlength ->
       tag_int(string_length (transl arg))
@@ -1604,12 +1751,12 @@ and transl_prim_1 p arg dbg =
         Pgenarray ->
           let len =
             if wordsize_shift = numfloat_shift then
-              Cop(Clsr, [header(transl arg); Cconst_int wordsize_shift])
+              addr_array_length (header(transl arg))
             else
               bind "header" (header(transl arg)) (fun hdr ->
                 Cifthenelse(is_addr_array_hdr hdr,
-                            Cop(Clsr, [hdr; Cconst_int wordsize_shift]),
-                            Cop(Clsr, [hdr; Cconst_int numfloat_shift]))) in
+                            addr_array_length (header(transl arg)),
+                            float_array_length (header(transl arg)))) in
           Cop(Cor, [len; Cconst_int 1])
       | Paddrarray | Pintarray ->
           Cop(Cor, [addr_array_length(header(transl arg)); Cconst_int 1])
@@ -1623,24 +1770,25 @@ and transl_prim_1 p arg dbg =
   | Pisint ->
       tag_int(Cop(Cand, [transl arg; Cconst_int 1]))
   (* Boxed integers *)
-  | Pbintofint bi ->
-      box_int bi (untag_int (transl arg))
+  | Pbintofint (bi, locid) ->
+      box_int bi locid (untag_int (transl arg))
   | Pintofbint bi ->
       force_tag_int (transl_unbox_int bi arg)
-  | Pcvtbint(bi1, bi2) ->
-      box_int bi2 (transl_unbox_int bi1 arg)
-  | Pnegbint bi ->
-      box_int bi (Cop(Csubi, [Cconst_int 0; transl_unbox_int bi arg]))
-  | Pbbswap bi ->
+  | Pcvtbint(bi1, bi2, locid) ->
+      box_int bi2 locid (transl_unbox_int bi1 arg)
+  | Pnegbint (bi, locid) ->
+      box_int bi locid (Cop(Csubi, [Cconst_int 0; transl_unbox_int bi arg]))
+  | Pbbswap (bi, locid) ->
       let prim = match bi with
         | Pnativeint -> "nativeint"
         | Pint32 -> "int32"
         | Pint64 -> "int64" in
-      box_int bi (Cop(Cextcall(Printf.sprintf "caml_%s_direct_bswap" prim,
-                               typ_int, false, Debuginfo.none),
+      box_int bi locid
+        (Cop(Cextcall(Printf.sprintf "caml_%s_direct_bswap" prim,
+                      typ_int, false, None, Debuginfo.none),
                       [transl_unbox_int bi arg]))
   | Pbswap16 ->
-      tag_int (Cop(Cextcall("caml_bswap16_direct", typ_int, false,
+      tag_int (Cop(Cextcall("caml_bswap16_direct", typ_int, false, None,
                             Debuginfo.none),
                    [untag_int (transl arg)]))
   | _ ->
@@ -1651,7 +1799,7 @@ and transl_prim_2 p arg1 arg2 dbg =
   (* Heap operations *)
     Psetfield(n, ptr) ->
       if ptr then
-        return_unit(Cop(Cextcall("caml_modify", typ_void, false,Debuginfo.none),
+        return_unit(Cop(Cextcall("caml_modify", typ_void, false, None, Debuginfo.none),
                         [field_address (transl arg1) n; transl arg2]))
       else
         return_unit(set_field (transl arg1) n (transl arg2))
@@ -1704,18 +1852,18 @@ and transl_prim_2 p arg1 arg2 dbg =
   | Pisout ->
       transl_isout (transl arg1) (transl arg2)
   (* Float operations *)
-  | Paddfloat ->
-      box_float(Cop(Caddf,
-                    [transl_unbox_float arg1; transl_unbox_float arg2]))
-  | Psubfloat ->
-      box_float(Cop(Csubf,
-                    [transl_unbox_float arg1; transl_unbox_float arg2]))
-  | Pmulfloat ->
-      box_float(Cop(Cmulf,
-                    [transl_unbox_float arg1; transl_unbox_float arg2]))
-  | Pdivfloat ->
-      box_float(Cop(Cdivf,
-                    [transl_unbox_float arg1; transl_unbox_float arg2]))
+  | Paddfloat locid ->
+      box_float locid
+        (Cop(Caddf, [transl_unbox_float arg1; transl_unbox_float arg2]))
+  | Psubfloat locid ->
+      box_float locid
+        (Cop(Csubf, [transl_unbox_float arg1; transl_unbox_float arg2]))
+  | Pmulfloat locid ->
+      box_float locid
+        (Cop(Cmulf, [transl_unbox_float arg1; transl_unbox_float arg2]))
+  | Pdivfloat locid ->
+      box_float locid
+        (Cop(Cdivf, [transl_unbox_float arg1; transl_unbox_float arg2]))
   | Pfloatcomp cmp ->
       tag_int(Cop(Ccmpf(transl_comparison cmp),
                   [transl_unbox_float arg1; transl_unbox_float arg2]))
@@ -1748,15 +1896,15 @@ and transl_prim_2 p arg1 arg2 dbg =
                                           (Cconst_int 1)) idx
                       (unaligned_load_16 ba_data idx)))))
 
-  | Pstring_load_32(unsafe) ->
-     box_int Pint32
+  | Pstring_load_32(unsafe, loc) ->
+     box_int Pint32 (locid_int32 loc)
        (bind "str" (transl arg1) (fun str ->
         bind "index" (untag_int (transl arg2)) (fun idx ->
           check_bound unsafe dbg (sub_int (string_length str) (Cconst_int 3))
                       idx (unaligned_load_32 str idx))))
 
-  | Pbigstring_load_32(unsafe) ->
-     box_int Pint32
+  | Pbigstring_load_32(unsafe, loc) ->
+     box_int Pint32 (locid_int32 loc)
        (bind "ba" (transl arg1) (fun ba ->
         bind "index" (untag_int (transl arg2)) (fun idx ->
         bind "ba_data" (Cop(Cload Word, [field_address ba 1])) (fun ba_data ->
@@ -1764,15 +1912,15 @@ and transl_prim_2 p arg1 arg2 dbg =
                                           (Cconst_int 3)) idx
                       (unaligned_load_32 ba_data idx)))))
 
-  | Pstring_load_64(unsafe) ->
-     box_int Pint64
+  | Pstring_load_64(unsafe, loc) ->
+     box_int Pint64 (locid_int64 loc)
        (bind "str" (transl arg1) (fun str ->
         bind "index" (untag_int (transl arg2)) (fun idx ->
           check_bound unsafe dbg (sub_int (string_length str) (Cconst_int 7))
                       idx (unaligned_load_64 str idx))))
 
-  | Pbigstring_load_64(unsafe) ->
-     box_int Pint64
+  | Pbigstring_load_64(unsafe,loc) ->
+     box_int Pint64 (locid_int64 loc)
        (bind "ba" (transl arg1) (fun ba ->
         bind "index" (untag_int (transl arg2)) (fun idx ->
         bind "ba_data" (Cop(Cload Word, [field_address ba 1])) (fun ba_data ->
@@ -1781,20 +1929,20 @@ and transl_prim_2 p arg1 arg2 dbg =
                       (unaligned_load_64 ba_data idx)))))
 
   (* Array operations *)
-  | Parrayrefu kind ->
+  | Parrayrefu (kind, locid) ->
       begin match kind with
         Pgenarray ->
           bind "arr" (transl arg1) (fun arr ->
             bind "index" (transl arg2) (fun idx ->
               Cifthenelse(is_addr_array_ptr arr,
                           addr_array_ref arr idx,
-                          float_array_ref arr idx)))
+                          float_array_ref locid arr idx)))
       | Paddrarray | Pintarray ->
           addr_array_ref (transl arg1) (transl arg2)
       | Pfloatarray ->
-          float_array_ref (transl arg1) (transl arg2)
+          float_array_ref locid (transl arg1) (transl arg2)
       end
-  | Parrayrefs kind ->
+  | Parrayrefs (kind, locid) ->
       begin match kind with
       | Pgenarray ->
           bind "index" (transl arg2) (fun idx ->
@@ -1804,21 +1952,21 @@ and transl_prim_2 p arg1 arg2 dbg =
               Csequence(make_checkbound dbg [addr_array_length hdr; idx],
                         Cifthenelse(is_addr_array_hdr hdr,
                                     addr_array_ref arr idx,
-                                    float_array_ref arr idx))
+                                    float_array_ref locid arr idx))
             else
               Cifthenelse(is_addr_array_hdr hdr,
                 Csequence(make_checkbound dbg [addr_array_length hdr; idx],
                           addr_array_ref arr idx),
                 Csequence(make_checkbound dbg [float_array_length hdr; idx],
-                          float_array_ref arr idx)))))
+                          float_array_ref locid arr idx)))))
       | Paddrarray | Pintarray ->
           bind "index" (transl arg2) (fun idx ->
           bind "arr" (transl arg1) (fun arr ->
             Csequence(make_checkbound dbg [addr_array_length(header arr); idx],
                       addr_array_ref arr idx)))
       | Pfloatarray ->
-          box_float(
-            bind "index" (transl arg2) (fun idx ->
+          box_float locid
+            (bind "index" (transl arg2) (fun idx ->
             bind "arr" (transl arg1) (fun arr ->
               Csequence(make_checkbound dbg
                                         [float_array_length(header arr); idx],
@@ -1836,42 +1984,42 @@ and transl_prim_2 p arg1 arg2 dbg =
                      Cconst_int 1])))
 
   (* Boxed integers *)
-  | Paddbint bi ->
-      box_int bi (Cop(Caddi,
-                      [transl_unbox_int bi arg1; transl_unbox_int bi arg2]))
-  | Psubbint bi ->
-      box_int bi (Cop(Csubi,
-                      [transl_unbox_int bi arg1; transl_unbox_int bi arg2]))
-  | Pmulbint bi ->
-      box_int bi (Cop(Cmuli,
-                      [transl_unbox_int bi arg1; transl_unbox_int bi arg2]))
-  | Pdivbint bi ->
-      box_int bi (safe_div_bi
-                      (transl_unbox_int bi arg1) (transl_unbox_int bi arg2)
+  | Paddbint (bi, locid) ->
+      box_int bi locid
+        (Cop(Caddi, [transl_unbox_int bi arg1; transl_unbox_int bi arg2]))
+  | Psubbint (bi, locid) ->
+      box_int bi locid
+        (Cop(Csubi, [transl_unbox_int bi arg1; transl_unbox_int bi arg2]))
+  | Pmulbint (bi, locid) ->
+      box_int bi locid
+        (Cop(Cmuli, [transl_unbox_int bi arg1; transl_unbox_int bi arg2]))
+  | Pdivbint (bi, locid) ->
+      box_int bi locid
+        (safe_div_bi (transl_unbox_int bi arg1) (transl_unbox_int bi arg2)
                       bi dbg)
-  | Pmodbint bi ->
-      box_int bi (safe_mod_bi
-                      (transl_unbox_int bi arg1) (transl_unbox_int bi arg2)
+  | Pmodbint (bi, locid) ->
+      box_int bi locid
+        (safe_mod_bi (transl_unbox_int bi arg1) (transl_unbox_int bi arg2)
                       bi dbg)
-  | Pandbint bi ->
-      box_int bi (Cop(Cand,
-                     [transl_unbox_int bi arg1; transl_unbox_int bi arg2]))
-  | Porbint bi ->
-      box_int bi (Cop(Cor,
-                     [transl_unbox_int bi arg1; transl_unbox_int bi arg2]))
-  | Pxorbint bi ->
-      box_int bi (Cop(Cxor,
-                     [transl_unbox_int bi arg1; transl_unbox_int bi arg2]))
-  | Plslbint bi ->
-      box_int bi (Cop(Clsl,
-                     [transl_unbox_int bi arg1; untag_int(transl arg2)]))
-  | Plsrbint bi ->
-      box_int bi (Cop(Clsr,
-                     [make_unsigned_int bi (transl_unbox_int bi arg1);
+  | Pandbint (bi, locid) ->
+      box_int bi locid
+        (Cop(Cand, [transl_unbox_int bi arg1; transl_unbox_int bi arg2]))
+  | Porbint (bi, locid) ->
+      box_int bi locid
+        (Cop(Cor, [transl_unbox_int bi arg1; transl_unbox_int bi arg2]))
+  | Pxorbint (bi, locid) ->
+      box_int bi locid
+        (Cop(Cxor, [transl_unbox_int bi arg1; transl_unbox_int bi arg2]))
+  | Plslbint (bi, locid) ->
+      box_int bi locid
+        (Cop(Clsl, [transl_unbox_int bi arg1; untag_int(transl arg2)]))
+  | Plsrbint (bi, locid) ->
+      box_int bi locid
+        (Cop(Clsr, [make_unsigned_int bi (transl_unbox_int bi arg1);
                       untag_int(transl arg2)]))
-  | Pasrbint bi ->
-      box_int bi (Cop(Casr,
-                     [transl_unbox_int bi arg1; untag_int(transl arg2)]))
+  | Pasrbint (bi, locid) ->
+      box_int bi locid
+        (Cop(Casr, [transl_unbox_int bi arg1; untag_int(transl arg2)]))
   | Pbintcomp(bi, cmp) ->
       tag_int (Cop(Ccmpi(transl_comparison cmp),
                      [transl_unbox_int bi arg1; transl_unbox_int bi arg2]))
@@ -2019,7 +2167,7 @@ and transl_unbox_int bi = function
       Cconst_natint n
   | Uconst(Uconst_ref(_, Uconst_int64 n)) ->
       assert (size_int = 8); Cconst_natint (Int64.to_nativeint n)
-  | Uprim(Pbintofint bi',[Uconst(Uconst_int i)],_) when bi = bi' ->
+  | Uprim(Pbintofint (bi', _locid),[Uconst(Uconst_int i)],_) when bi = bi' ->
       Cconst_int i
   | exp -> unbox_int bi (transl exp)
 
@@ -2143,7 +2291,7 @@ and transl_switch arg index cases = match Array.length cases with
     | inters ->
         bind "switcher" arg
           (fun a ->
-            SwitcherBlocks.zyva
+            SwitcherBlocks.zyva ()
               (0,n_index-1)
               a
               (Array.of_list inters) store)
@@ -2151,14 +2299,17 @@ and transl_switch arg index cases = match Array.length cases with
 and transl_letrec bindings cont =
   let bsz =
     List.map (fun (id, exp) -> (id, exp, expr_size Ident.empty exp)) bindings in
-  let op_alloc prim sz =
-    Cop(Cextcall(prim, typ_addr, true, Debuginfo.none), [int_const sz]) in
+  let op_alloc locid prim sz =
+    Cop(Cextcall(prim, typ_addr, true, get_locid_symbol locid,
+        Debuginfo.none), [int_const sz]) in
   let rec init_blocks = function
     | [] -> fill_nonrec bsz
-    | (id, exp, RHS_block sz) :: rem ->
-        Clet(id, op_alloc "caml_alloc_dummy" sz, init_blocks rem)
-    | (id, exp, RHS_floatblock sz) :: rem ->
-        Clet(id, op_alloc "caml_alloc_dummy_float" sz, init_blocks rem)
+    | (id, exp, RHS_block (sz, locid)) :: rem ->
+        Clet(id, op_alloc locid "caml_alloc_dummy" sz,
+              init_blocks rem)
+    | (id, exp, RHS_floatblock (sz, locid)) :: rem ->
+        Clet(id, op_alloc locid "caml_alloc_dummy_float" sz,
+              init_blocks rem)
     | (id, exp, RHS_nonrec) :: rem ->
         Clet (id, Cconst_int 0, init_blocks rem)
   and fill_nonrec = function
@@ -2171,7 +2322,7 @@ and transl_letrec bindings cont =
     | [] -> cont
     | (id, exp, (RHS_block _ | RHS_floatblock _)) :: rem ->
         let op =
-          Cop(Cextcall("caml_update_dummy", typ_void, false, Debuginfo.none),
+          Cop(Cextcall("caml_update_dummy", typ_void, false, None, Debuginfo.none),
               [Cvar id; transl exp]) in
         Csequence(op, fill_blocks rem)
     | (id, exp, RHS_nonrec) :: rem ->
@@ -2326,15 +2477,77 @@ let emit_all_constants cont =
 
 (* Translate a compilation unit *)
 
-let compunit size ulam =
+let init_location_table ?outputprefix init_code =
+  let filename =
+    match outputprefix with
+    | None -> None
+    | Some prefix  -> Some (prefix ^ ".cmgx") in
+  let locid_base = Compilenv.make_symbol (Some "locid_base") in
+  let table, table_size = Memprof.dump_location_table ?filename locid_base in
+  if table_size = 0 then
+    ([], init_code)
+  else
+    let location_table = Compilenv.make_symbol (Some "location_table") in
+    let module_name = Compilenv.make_symbol (Some "ui_name") in
+    let location_table_size = Compilenv.make_symbol (Some "location_table_size") in
+    let table_data =
+      Cglobal_symbol locid_base ::
+      Cdefine_symbol locid_base ::
+      Cskip size_int ::
+      Cglobal_symbol location_table_size ::
+      Cdefine_symbol location_table_size ::
+      Cint (Nativeint.of_int ((table_size lsl 1) + 1)) ::
+      Cglobal_symbol location_table ::
+      emit_structured_constant location_table
+        (Uconst_string table)
+        (Cglobal_symbol module_name ::
+           emit_structured_constant module_name
+           (Uconst_string (Compilenv.current_unit_name())) []) in
+    let table_data =
+      Hashtbl.fold (fun _ (symbol, cmm) data ->
+        Cglobal_symbol symbol ::
+        Cdefine_symbol symbol ::
+        Cskip size_int ::
+        data
+      ) symbol_of_locid table_data in
+    let register_code =
+      Cop(Cstore Word,
+           [Cconst_symbol locid_base;
+            Cop(Clsl,
+                [Cop(Clsr,
+                    [Cop(Cextcall ("caml_memprof_register_table", typ_int,
+                         true,
+                         Some "caml_memprof_locid_location_table_locid",
+                         Debuginfo.none),
+                         [Cconst_symbol location_table;
+                          Cop(Cload Word, [Cconst_symbol location_table_size]);
+                          Cconst_symbol module_name;
+                         ]);
+                       Cconst_int 1;
+                     ]);
+                  Cconst_int 10;
+               ])
+           ]) in
+    let register_code =
+      Hashtbl.fold (fun _ (symbol, cmm) code ->
+        Csequence(code,
+          Cop(Cstore Word,
+            [Cconst_symbol symbol;
+             cmm]))) symbol_of_locid register_code in
+    (table_data, Csequence (register_code, init_code))
+
+let compunit ?outputprefix size ulam =
+  clear_locids ();
   let glob = Compilenv.make_symbol None in
   let init_code = transl ulam in
-  let c1 = [Cfunction {fun_name = Compilenv.make_symbol (Some "entry");
+  let c1 = transl_all_functions StringSet.empty [] in
+  let table_data, init_code = init_location_table ?outputprefix init_code in
+  let c2 = Cfunction {fun_name = Compilenv.make_symbol (Some "entry");
                        fun_args = [];
                        fun_body = init_code; fun_fast = false;
-                       fun_dbg  = Debuginfo.none }] in
-  let c2 = transl_all_functions StringSet.empty c1 in
+                      fun_dbg  = Debuginfo.none } :: c1 in
   let c3 = emit_all_constants c2 in
+  Cdata table_data ::
   let space =
     (* These words will be registered as roots and as such must contain
        valid values, in case we are in no-naked-pointers mode.  Likewise
@@ -2573,15 +2786,15 @@ let rec intermediate_curry_functions arity num =
       fun_args = [arg, typ_addr; clos, typ_addr];
       fun_body =
          if arity - num > 2 && arity <= max_arity_optimized then
-           Cop(Calloc,
-               [alloc_closure_header 5;
+           Cop(Calloc Debuginfo.none,
+               [alloc_closure_header_noalloc 5;
                 Cconst_symbol(name1 ^ "_" ^ string_of_int (num+1));
                 int_const (arity - num - 1);
                 Cconst_symbol(name1 ^ "_" ^ string_of_int (num+1) ^ "_app");
                 Cvar arg; Cvar clos])
          else
-           Cop(Calloc,
-                     [alloc_closure_header 4;
+           Cop(Calloc Debuginfo.none,
+                     [alloc_closure_header_noalloc 4;
                       Cconst_symbol(name1 ^ "_" ^ string_of_int (num+1));
                       int_const 1; Cvar arg; Cvar clos]);
       fun_fast = true;

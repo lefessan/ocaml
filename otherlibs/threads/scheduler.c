@@ -22,7 +22,7 @@
 #include "callback.h"
 #include "config.h"
 #include "fail.h"
-#include "io.h"
+#include "camlio.h"
 #include "memory.h"
 #include "misc.h"
 #include "mlvalues.h"

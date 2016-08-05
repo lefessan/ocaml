@@ -47,6 +47,7 @@ let char_hex n =
   Char.unsafe_chr (n + if n < 10 then Char.code '0' else (Char.code 'a' - 10))
 
 let to_hex d =
+  if String.length d <> 16 then invalid_arg "Digest.to_hex";
   let result = Bytes.create 32 in
   for i = 0 to 15 do
     let x = Char.code d.[i] in

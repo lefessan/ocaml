@@ -14,6 +14,19 @@
 
 open Asttypes
 
+type alloc = Memprof.alloc =
+  | NoAlloc
+  | LocId of int
+
+type delayed_alloc = Memprof.delayed_alloc
+type location = Memprof.location = { l:Location.t; p: Path.t }
+type locid = Memprof.locid = { loc: location; id:delayed_alloc ref }
+val newl : location -> Location.t -> location
+val newp : location -> Path.t -> location
+val lp : Location.t -> Path.t -> location
+val unitlp : string -> location
+(* val prof : locid -> alloc *)
+
 type compile_time_constant =
   | Big_endian
   | Word_size
@@ -28,26 +41,27 @@ type loc_kind =
   | Loc_LOC
   | Loc_POS
 
-type primitive =
+type 'a raw_primitive =
     Pidentity
   | Pignore
-  | Prevapply of Location.t
-  | Pdirapply of Location.t
+ (* Memprof: Prevapply and Pdirapply may allocate partial functions *)
+  | Prevapply of location
+  | Pdirapply of location
   | Ploc of loc_kind
     (* Globals *)
   | Pgetglobal of Ident.t
   | Psetglobal of Ident.t
   (* Operations on heap blocks *)
-  | Pmakeblock of int * mutable_flag
+  | Pmakeblock of int * mutable_flag * 'a
   | Pfield of int
   | Psetfield of int * bool
-  | Pfloatfield of int
+  | Pfloatfield of int * 'a
   | Psetfloatfield of int
-  | Pduprecord of Types.record_representation * int
+  | Pduprecord of Types.record_representation * int * 'a
   (* Force lazy values *)
   | Plazyforce
   (* External call *)
-  | Pccall of Primitive.description
+  | Pccall of Primitive.description * 'a option
   (* Exceptions *)
   | Praise of raise_kind
   (* Boolean operations *)
@@ -60,18 +74,19 @@ type primitive =
   | Poffsetint of int
   | Poffsetref of int
   (* Float operations *)
-  | Pintoffloat | Pfloatofint
-  | Pnegfloat | Pabsfloat
-  | Paddfloat | Psubfloat | Pmulfloat | Pdivfloat
+  | Pintoffloat | Pfloatofint of 'a
+  | Pnegfloat of 'a | Pabsfloat of 'a
+  | Paddfloat of 'a | Psubfloat of 'a
+  | Pmulfloat of 'a | Pdivfloat of 'a
   | Pfloatcomp of comparison
   (* String operations *)
   | Pstringlength | Pstringrefu | Pstringsetu | Pstringrefs | Pstringsets
   (* Array operations *)
-  | Pmakearray of array_kind
+  | Pmakearray of array_kind * 'a
   | Parraylength of array_kind
-  | Parrayrefu of array_kind
+  | Parrayrefu of array_kind * 'a (* assert (LocId only for floats ) *)
   | Parraysetu of array_kind
-  | Parrayrefs of array_kind
+  | Parrayrefs of array_kind * 'a
   | Parraysets of array_kind
   (* Test if the argument is a block or an immediate integer *)
   | Pisint
@@ -80,39 +95,39 @@ type primitive =
   (* Bitvect operations *)
   | Pbittest
   (* Operations on boxed integers (Nativeint.t, Int32.t, Int64.t) *)
-  | Pbintofint of boxed_integer
+  | Pbintofint of (boxed_integer * 'a)
   | Pintofbint of boxed_integer
-  | Pcvtbint of boxed_integer (*source*) * boxed_integer (*destination*)
-  | Pnegbint of boxed_integer
-  | Paddbint of boxed_integer
-  | Psubbint of boxed_integer
-  | Pmulbint of boxed_integer
-  | Pdivbint of boxed_integer
-  | Pmodbint of boxed_integer
-  | Pandbint of boxed_integer
-  | Porbint of boxed_integer
-  | Pxorbint of boxed_integer
-  | Plslbint of boxed_integer
-  | Plsrbint of boxed_integer
-  | Pasrbint of boxed_integer
+  | Pcvtbint of boxed_integer (*source*) * boxed_integer * 'a (*destination*)
+  | Pnegbint of (boxed_integer * 'a)
+  | Paddbint of (boxed_integer * 'a)
+  | Psubbint of (boxed_integer * 'a)
+  | Pmulbint of (boxed_integer * 'a)
+  | Pdivbint of (boxed_integer * 'a)
+  | Pmodbint of (boxed_integer * 'a)
+  | Pandbint of (boxed_integer * 'a)
+  | Porbint of (boxed_integer * 'a)
+  | Pxorbint of (boxed_integer * 'a)
+  | Plslbint of (boxed_integer * 'a)
+  | Plsrbint of (boxed_integer * 'a)
+  | Pasrbint of (boxed_integer * 'a)
   | Pbintcomp of boxed_integer * comparison
   (* Operations on big arrays: (unsafe, #dimensions, kind, layout) *)
-  | Pbigarrayref of bool * int * bigarray_kind * bigarray_layout
+  | Pbigarrayref of bool * int * bigarray_kind * bigarray_layout * location
   | Pbigarrayset of bool * int * bigarray_kind * bigarray_layout
   (* size of the nth dimension of a big array *)
   | Pbigarraydim of int
   (* load/set 16,32,64 bits from a string: (unsafe)*)
   | Pstring_load_16 of bool
-  | Pstring_load_32 of bool
-  | Pstring_load_64 of bool
+  | Pstring_load_32 of bool * location
+  | Pstring_load_64 of bool * location
   | Pstring_set_16 of bool
   | Pstring_set_32 of bool
   | Pstring_set_64 of bool
   (* load/set 16,32,64 bits from a
      (char, int8_unsigned_elt, c_layout) Bigarray.Array1.t : (unsafe) *)
   | Pbigstring_load_16 of bool
-  | Pbigstring_load_32 of bool
-  | Pbigstring_load_64 of bool
+  | Pbigstring_load_32 of bool * location
+  | Pbigstring_load_64 of bool * location
   | Pbigstring_set_16 of bool
   | Pbigstring_set_32 of bool
   | Pbigstring_set_64 of bool
@@ -120,9 +135,11 @@ type primitive =
   | Pctconst of compile_time_constant
   (* byte swap *)
   | Pbswap16
-  | Pbbswap of boxed_integer
+  | Pbbswap of (boxed_integer * 'a)
   (* Integer to external pointer *)
   | Pint_as_pointer
+
+and primitive = locid raw_primitive
 
 and comparison =
     Ceq | Cneq | Clt | Cgt | Cle | Cge
@@ -179,16 +196,17 @@ type shared_code = (int * int) list     (* stack size -> code label *)
 type lambda =
     Lvar of Ident.t
   | Lconst of structured_constant
-  | Lapply of lambda * lambda list * Location.t
-  | Lfunction of function_kind * Ident.t list * lambda
-  | Llet of let_kind * Ident.t * lambda * lambda
-  | Lletrec of (Ident.t * lambda) list * lambda
+  | Lapply of lambda * lambda list * location
+  (* Memprof: Lfunction may allocate a closure *)
+  | Lfunction of function_kind * Ident.t list * lambda * locid
+  | Llet of let_kind * Ident.t * location * lambda * lambda
+  | Lletrec of (Ident.t * lambda) list * lambda * locid
   | Lprim of primitive * lambda list
   | Lswitch of lambda * lambda_switch
 (* switch on strings, clauses are sorted by string order,
    strings are pairwise distinct *)
-  | Lstringswitch of lambda * (string * lambda) list * lambda option
-  | Lstaticraise of int * lambda list
+  | Lstringswitch of lambda * (string * lambda) list * lambda option * location
+  | Lstaticraise of location * int * lambda list
   | Lstaticcatch of lambda * (int * Ident.t list) * lambda
   | Ltrywith of lambda * Ident.t * lambda
   | Lifthenelse of lambda * lambda * lambda
@@ -196,7 +214,7 @@ type lambda =
   | Lwhile of lambda * lambda
   | Lfor of Ident.t * lambda * lambda * direction_flag * lambda
   | Lassign of Ident.t * lambda
-  | Lsend of meth_kind * lambda * lambda * lambda list * Location.t
+  | Lsend of meth_kind * lambda * lambda * lambda list * location
   | Levent of lambda * lambda_event
   | Lifused of Ident.t * lambda
 
@@ -222,8 +240,8 @@ val make_key: lambda -> lambda option
 
 val const_unit: structured_constant
 val lambda_unit: lambda
-val name_lambda: let_kind -> lambda -> (Ident.t -> lambda) -> lambda
-val name_lambda_list: lambda list -> (lambda list -> lambda) -> lambda
+val name_lambda: location -> let_kind -> lambda -> (Ident.t -> lambda) -> lambda
+val name_lambda_list: location -> lambda list -> (lambda list -> lambda) -> lambda
 
 val iter: (lambda -> unit) -> lambda -> unit
 module IdentSet: Set.S with type elt = Ident.t
@@ -235,7 +253,7 @@ val transl_path: ?loc:Location.t -> Env.t -> Path.t -> lambda
 val make_sequence: ('a -> lambda) -> 'a list -> lambda
 
 val subst_lambda: lambda Ident.tbl -> lambda -> lambda
-val bind : let_kind -> Ident.t -> lambda -> lambda -> lambda
+val bind : location -> let_kind -> Ident.t -> lambda -> lambda -> lambda
 
 val commute_comparison : comparison -> comparison
 val negate_comparison : comparison -> comparison
@@ -252,11 +270,13 @@ val next_negative_raise_count : unit -> int
      performed by the Simplif module that assume that static raises
      are in tail position in their handler. *)
 
-val staticfail : lambda (* Anticipated static failure *)
+val staticfail : location -> lambda (* Anticipated static failure *)
 
 (* Check anticipated failure, substitute its final value *)
 val is_guarded: lambda -> bool
 val patch_guarded : lambda -> lambda -> lambda
+
+val lam_of_loc : loc_kind -> Location.t -> lambda
 
 val raise_kind: raise_kind -> string
 val lam_of_loc : loc_kind -> Location.t -> lambda

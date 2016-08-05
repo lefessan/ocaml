@@ -46,7 +46,12 @@ stdlib.p.cmxa: $(OBJS:.cmo=.p.cmx)
 	$(CAMLOPT) -a -o stdlib.p.cmxa $(OBJS:.cmo=.p.cmx)
 
 camlheader camlheaderd camlheader_ur: header.c ../config/Makefile
-	if $(SHARPBANGSCRIPTS); then \
+	if $(OCP_RELOCATABLE); then \
+	  cp ../boot/ocamlrun camlheader && \
+	  ( [ ! -f ../byterun/ocamlrund ] || \
+		cp ../byterun/ocamlrund camlheaderd ) && \
+	  echo '#!' | tr -d '\012' > camlheader_ur; \
+	elif $(SHARPBANGSCRIPTS); then \
 	  echo '#!$(BINDIR)/ocamlrun' > camlheader && \
 	  echo '#!$(BINDIR)/ocamlrund' > camlheaderd && \
 	  echo '#!' | tr -d '\012' > camlheader_ur; \

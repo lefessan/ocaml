@@ -13,6 +13,12 @@
 
 /* Signal handling, code common to the bytecode and native systems */
 
+/* ocpwin: need _POSIX to have SIGHUP under Mingw */
+#ifdef _WIN32
+#define _POSIX
+#endif
+
+
 #include <signal.h>
 #include <errno.h>
 #include "alloc.h"
@@ -27,14 +33,10 @@
 #include "signals_machdep.h"
 #include "sys.h"
 
-#ifndef NSIG
-#define NSIG 64
-#endif
-
 /* The set of pending signals (received but not yet processed) */
 
 CAMLexport intnat volatile caml_signals_are_pending = 0;
-CAMLexport intnat volatile caml_pending_signals[NSIG];
+CAMLexport intnat volatile caml_pending_signals[CAML_NSIG];
 
 /* Execute all pending signals */
 
@@ -44,7 +46,7 @@ void caml_process_pending_signals(void)
 
   if (caml_signals_are_pending) {
     caml_signals_are_pending = 0;
-    for (i = 0; i < NSIG; i++) {
+    for (i = 0; i < CAML_NSIG; i++) {
       if (caml_pending_signals[i]) {
         caml_pending_signals[i] = 0;
         caml_execute_signal(i, 0);
@@ -127,10 +129,12 @@ CAMLexport void caml_leave_blocking_section(void)
 /* Execute a signal handler immediately */
 
 static value caml_signal_handlers = 0;
+int caml_hooked_signal = 0;
+int (*caml_execute_signal_hook)(int) = NULL;
 
 void caml_execute_signal(int signal_number, int in_signal_handler)
 {
-  value res;
+  value res, handler;
 #ifdef POSIX_SIGNALS
   sigset_t sigs;
   /* Block the signal before executing the handler, and record in sigs
@@ -139,9 +143,19 @@ void caml_execute_signal(int signal_number, int in_signal_handler)
   sigaddset(&sigs, signal_number);
   sigprocmask(SIG_BLOCK, &sigs, &sigs);
 #endif
-  res = caml_callback_exn(
-           Field(caml_signal_handlers, signal_number),
-           Val_int(caml_rev_convert_signal_number(signal_number)));
+  handler =
+    caml_signal_handlers == 0 ? Val_unit :
+    Field(caml_signal_handlers, signal_number);
+
+  if (caml_execute_signal_hook && signal_number == caml_hooked_signal)
+    (*caml_execute_signal_hook)(signal_number);
+  if (handler == Val_unit) {
+    res = Val_unit;
+  } else {
+    value signal_value =
+      Val_int(caml_rev_convert_signal_number(signal_number));
+    res = caml_callback_exn(handler, signal_value);
+  }
 #ifdef POSIX_SIGNALS
   if (! in_signal_handler) {
     /* Restore the original signal mask */
@@ -268,9 +282,10 @@ CAMLprim value caml_install_signal_handler(value signal_number, value action)
   CAMLparam2 (signal_number, action);
   CAMLlocal1 (res);
   int sig, act, oldact;
+  value handler;
 
   sig = caml_convert_signal_number(Int_val(signal_number));
-  if (sig < 0 || sig >= NSIG)
+  if (sig < 0 || sig >= CAML_NSIG)
     caml_invalid_argument("Sys.signal: unavailable signal");
   switch(action) {
   case Val_int(0):              /* Signal_default */
@@ -292,18 +307,27 @@ CAMLprim value caml_install_signal_handler(value signal_number, value action)
     res = Val_int(1);
     break;
   case 2:                       /* was Signal_handle */
+    handler = Field(caml_signal_handlers, sig);
+    if (handler == Val_unit) {
+      res = Val_int(0);
+    } else {
     res = caml_alloc_small (1, 0);
-    Field(res, 0) = Field(caml_signal_handlers, sig);
+      Field(res, 0) = handler;
+    }
     break;
   default:                      /* error in caml_set_signal_action */
     caml_sys_error(NO_ARG);
   }
   if (Is_block(action)) {
     if (caml_signal_handlers == 0) {
-      caml_signal_handlers = caml_alloc(NSIG, 0);
+      caml_signal_handlers =
+        caml_alloc(CAML_NSIG, 0);
       caml_register_global_root(&caml_signal_handlers);
     }
     caml_modify(&Field(caml_signal_handlers, sig), Field(action, 0));
+  } else {
+    if (caml_signal_handlers != 0)
+      caml_modify(&Field(caml_signal_handlers, sig), Val_unit);
   }
   caml_process_pending_signals();
   CAMLreturn (res);

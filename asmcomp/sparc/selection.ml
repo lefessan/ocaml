@@ -42,11 +42,11 @@ method! select_operation op args =
      For SPARC V8 and V9, use hardware multiplication and division,
      but C library routine for modulus. *)
     (Cmuli, _) when !arch_version = SPARC_V7 ->
-      (Iextcall(".umul", false), args)
+      (Iextcall(".umul", false,None), args)
   | (Cdivi, _) when !arch_version = SPARC_V7 ->
-      (Iextcall(".div", false), args)
+      (Iextcall(".div", false, None), args)
   | (Cmodi, _) ->
-      (Iextcall(".rem", false), args)
+      (Iextcall(".rem", false, None), args)
   | _ ->
       super#select_operation op args
 

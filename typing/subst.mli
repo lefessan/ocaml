@@ -50,6 +50,8 @@ val cltype_declaration: t -> class_type_declaration -> class_type_declaration
 val modtype: t -> module_type -> module_type
 val signature: t -> signature -> signature
 val modtype_declaration: t -> modtype_declaration -> modtype_declaration
+val typexp : t -> Types.type_expr -> Types.type_expr
+val class_signature: t -> class_signature -> class_signature
 val module_declaration: t -> module_declaration -> module_declaration
 
 (* Composition of substitutions:

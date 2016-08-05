@@ -63,6 +63,7 @@ module Options = Main_args.Make_optcomp_options (struct
   let _intf_suffix s = option_with_arg "-intf-suffix" s
   let _keep_locs = option "-keep-locs"
   let _labels = option "-labels"
+  let _error_size s = option_with_int "-error-size" s
   let _linkall = option "-linkall"
   let _no_alias_deps = option "-no-alias-deps"
   let _no_app_funct = option "-no-app-funct"
@@ -72,6 +73,7 @@ module Options = Main_args.Make_optcomp_options (struct
   let _nodynlink = option "-nodynlink"
   let _nolabels = option "-nolabels"
   let _nostdlib = option "-nostdlib"
+  let _nowatcher = option "-nowatcher"
   let _o s = option_with_arg "-o" s
   let _open s = option_with_arg "-open" s
   let _output_obj = option "-output-obj"
@@ -122,9 +124,12 @@ module Options = Main_args.Make_optcomp_options (struct
   let _dlinear = option "-dlinear"
   let _dstartup = option "-dstartup"
   let _opaque = option "-opaque"
-
   let anonymous = process_file
 end);;
+
+let _ =
+  Ocpstd.Arg.default_arglist :=
+    (Main_args.mk_make (option_with_arg "-make")) :: !Ocpstd.Arg.default_arglist
 
 let add_profarg s =
   profargs := (Filename.quote s) :: "-m" :: !profargs

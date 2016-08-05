@@ -1,0 +1,34 @@
+(* Il faut une version d'OCaml +ocp1 pour avoir les macros #if
+   Il faut aussi la version 4.01.0 pour l'instant pour les fichiers
+   dépendant de compiler-libs. *)
+
+begin library "ocpwin-nsis-common"
+    requires = [ "unix" "compiler-libs.common" "compiler-libs.bytecomp" ]
+    files = [
+      "cmaFile.ml"  "byteMisc.ml"  "byteFile.ml"
+   "installMisc.ml" "installPre.ml" "installPost.ml"
+    "installWorker.ml"
+    ]
+end
+
+(* Appeler avec la commande :
+$ ./cross/ocpwin-nsis/ocpwin-nsis-pre -fake -src cross/local -nsis cross/nsis
+avant l'appel à makensis.
+
+L'utilisation de "-fake" qui supprime toute compression provient probablement
+du fait qu'aujourd'hui, ce travail est fait par Makefile.camlp4 qui ne recopie
+que les fichiers .cmo nécessaire au build des fichiers .cma.
+*)
+
+begin program "ocpwin-nsis-pre"
+    requires = [ "ocpwin-nsis-common" ]
+    files = [ "nsiPrepare.ml" ]
+end
+
+(* Ce programme n'est plus utilisé. Il était prévu qu'il tourne après
+l'installation, par exemple pour remplacer ce que fait aujourd'hui
+   build-camlp4.bat. *)
+begin program "ocpwin-nsis-post"
+  requires = [ "ocpwin-nsis-common" ]
+    files = [ "installMain.ml" ]
+end

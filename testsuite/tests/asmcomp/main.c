@@ -15,6 +15,12 @@
 #include <stdlib.h>
 #include <time.h>
 
+void caml_raise_exn(void)
+{
+  fprintf(stderr, "Error: caml_raise_exn\n");
+  exit(2);
+}
+
 void caml_ml_array_bound_error(void)
 {
   fprintf(stderr, "Fatal error: out-of-bound access in array or string\n");

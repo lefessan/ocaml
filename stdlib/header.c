@@ -177,7 +177,7 @@ int main(int argc, char ** argv)
   fd = open(truename, O_RDONLY | O_BINARY);
   if (fd == -1 || (runtime_path = read_runtime_path(fd)) == NULL) {
     errwrite(truename);
-    errwrite(" not found or is not a bytecode executable file\n");
+    errwrite(" not found or is not a bytecode executable file (Unix header)\n");
     return 2;
   }
   argv[0] = truename;

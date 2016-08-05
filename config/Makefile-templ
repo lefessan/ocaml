@@ -226,3 +226,5 @@ BNG_ASM_LEVEL=1
 #X11_LINK=-lX11
 # For SunOS with OpenLook:
 #X11_LINK=-L$(X11_LIB) -lX11
+
+OCP_RELOCATABLE=true

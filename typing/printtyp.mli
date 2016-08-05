@@ -79,5 +79,9 @@ val report_ambiguous_type_error:
     formatter -> Env.t -> (Path.t * Path.t) -> (Path.t * Path.t) list ->
     (formatter -> unit) -> (formatter -> unit) -> (formatter -> unit) -> unit
 
+
+val mark_expanded_loops: type_expr -> unit
+val expanded_type_expr: formatter -> type_expr -> unit
+
 (* for toploop *)
 val hide_rec_items: signature_item list -> unit

@@ -11,6 +11,7 @@
 #########################################################################
 
 include ../config/Makefile
+include ../$(TOP_OCAML_DIR)/ocamlpro/Makefile.tools
 
 ROOTDIR=..
 CAMLC=$(ROOTDIR)/boot/ocamlrun $(ROOTDIR)/ocamlc -nostdlib -I $(ROOTDIR)/stdlib
@@ -26,11 +27,12 @@ INSTALL_BINDIR=$(DESTDIR)$(BINDIR)
 
 INCLUDES=\
   -I ../utils -I ../parsing -I ../typing -I ../bytecomp -I ../toplevel \
-  -I $(UNIXDIR)
+  -I $(UNIXDIR) $(OCP_INCLUDES)
 
 OTHEROBJS=\
   $(UNIXDIR)/unix.cma \
   ../utils/misc.cmo ../utils/config.cmo ../utils/tbl.cmo \
+  $(OCP_UTILS) \
   ../utils/clflags.cmo ../utils/consistbl.cmo ../utils/warnings.cmo \
   ../parsing/location.cmo ../parsing/longident.cmo \
   ../parsing/ast_helper.cmo ../parsing/ast_mapper.cmo \

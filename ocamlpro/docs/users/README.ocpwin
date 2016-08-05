@@ -1,0 +1,3 @@
+
+The choice of the configuration is defined in $OCAMLLIB/ocaml.config, and
+  can be overriden using the variable OCPCOMP_FILE.

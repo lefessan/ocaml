@@ -184,8 +184,8 @@ let destroyed_at_c_call = (* %l0-%l4, %i0-%i5 preserved *)
      108; 109; 110; 111; 112; 113; 114])
 
 let destroyed_at_oper = function
-    Iop(Icall_ind | Icall_imm _ | Iextcall(_, true)) -> all_phys_regs
-  | Iop(Iextcall(_, false)) -> destroyed_at_c_call
+    Iop(Icall_ind | Icall_imm _ | Iextcall(_, true, _)) -> all_phys_regs
+  | Iop(Iextcall(_, false, _)) -> destroyed_at_c_call
   | _ -> [||]
 
 let destroyed_at_raise = all_phys_regs
@@ -193,11 +193,11 @@ let destroyed_at_raise = all_phys_regs
 (* Maximal register pressure *)
 
 let safe_register_pressure = function
-    Iextcall(_, _) -> 0
+    Iextcall(_, _, _) -> 0
   | _ -> 15
 
 let max_register_pressure = function
-    Iextcall(_, _) -> [| 11; 0 |]
+    Iextcall(_, _, _) -> [| 11; 0 |]
   | _ -> [| 19; 15 |]
 
 (* Pure operations (without any side effect besides updating their result

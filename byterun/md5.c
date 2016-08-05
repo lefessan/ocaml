@@ -17,7 +17,7 @@
 #include "md5.h"
 #include "memory.h"
 #include "mlvalues.h"
-#include "io.h"
+#include "camlio.h"
 #include "reverse.h"
 
 /* MD5 message digest */
@@ -33,18 +33,16 @@ CAMLprim value caml_md5_string(value str, value ofs, value len)
   return res;
 }
 
-CAMLprim value caml_md5_chan(value vchan, value len)
+CAMLextern value caml_md5_channel(struct channel * chan, intnat toread)
 {
-  CAMLparam2 (vchan, len);
-  struct channel * chan = Channel(vchan);
+  CAMLparam0 ();
   struct MD5Context ctx;
   value res;
-  intnat toread, read;
-  char buffer[4096];
+  intnat read;
+  OCP_DECLARE_BUFFER(buffer,4096);
 
   Lock(chan);
   caml_MD5Init(&ctx);
-  toread = Long_val(len);
   if (toread < 0){
     while (1){
       read = caml_getblock (chan, buffer, sizeof(buffer));
@@ -55,7 +53,10 @@ CAMLprim value caml_md5_chan(value vchan, value len)
     while (toread > 0) {
       read = caml_getblock(chan, buffer,
                            toread > sizeof(buffer) ? sizeof(buffer) : toread);
-      if (read == 0) caml_raise_end_of_file();
+      if (read == 0) {
+        OCP_FREE_BUFFER(buffer);
+        caml_raise_end_of_file();
+      }
       caml_MD5Update(&ctx, (unsigned char *) buffer, read);
       toread -= read;
     }
@@ -63,7 +64,14 @@ CAMLprim value caml_md5_chan(value vchan, value len)
   res = caml_alloc_string(16);
   caml_MD5Final(&Byte_u(res, 0), &ctx);
   Unlock(chan);
+  OCP_FREE_BUFFER(buffer);
   CAMLreturn (res);
+}
+
+CAMLprim value caml_md5_chan(value vchan, value len)
+{
+  CAMLparam2 (vchan, len);
+  CAMLreturn (caml_md5_channel(Channel(vchan), Long_val(len)));
 }
 
 CAMLexport void caml_md5_block(unsigned char digest[16],

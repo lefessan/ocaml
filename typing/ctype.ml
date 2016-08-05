@@ -4257,7 +4257,7 @@ let rec nondep_type_rec env id ty =
                  (recursive type), so one cannot just take its
                  description.
                *)
-            with Cannot_expand | Unify _ ->
+              with Cannot_expand | Unify _ ->
               raise Not_found
             end
           else
@@ -4304,9 +4304,9 @@ let nondep_type env id ty =
     let ty' = nondep_type_rec env id ty in
     clear_hash ();
     ty'
-  with Not_found ->
+  with Not_found as exn ->
     clear_hash ();
-    raise Not_found
+    raise exn
 
 let () = nondep_type' := nondep_type
 

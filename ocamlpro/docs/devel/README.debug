@@ -1,0 +1,6 @@
+The environment variable OCP_COMPILER_DEBUG allows to selectivly
+activate some debug information in the OCaml compiler.
+
+It expects a comma-separated list of identifiers, amongsts:
+
+- dconcrete: display the concrete typing environment to be dumped in 'process_info'.

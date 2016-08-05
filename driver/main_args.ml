@@ -10,6 +10,21 @@
 (*                                                                     *)
 (***********************************************************************)
 
+(* If you add an option here for ocp, you should also modify:
+   * For bytecode:
+     * driver/main.ml
+     * tools/ocamlcp.ml
+   * For native-code:
+     * driver/optmain.ml
+     * tools/ocamloptp.ml
+   * For toplevel:
+     * toplevel/topmain.ml
+     * toplevel/opttopmain.ml
+*)
+
+let mk_make s =
+  "-make", Ocpstd.Arg.String s, " <filename> : build an executable from <filename>"
+
 let mk_a f =
   "-a", Arg.Unit f, " Build a library"
 ;;
@@ -113,6 +128,10 @@ let mk_inline f =
   "-inline", Arg.Int f, "<n>  Set aggressiveness of inlining to <n>"
 ;;
 
+let mk_error_size f =
+  "-error-size", Arg.Int f, "<n>  Set optimal length of error messages to <n>"
+;;
+
 let mk_intf f =
   "-intf", Arg.String f, "<file>  Compile <file> as a .mli file"
 ;;
@@ -204,6 +223,11 @@ let mk_nopromptcont f =
 let mk_nostdlib f =
   "-nostdlib", Arg.Unit f,
   " Do not add default directory to the list of include directories"
+;;
+
+let mk_nowatcher f =
+  "-nowatcher", Arg.Unit f,
+  " Do not record compilation with ocp-watcher"
 ;;
 
 let mk_o f =
@@ -519,6 +543,7 @@ module type Compiler_options = sig
   val _keep_locs : unit -> unit
   val _linkall : unit -> unit
   val _noautolink : unit -> unit
+  val _nowatcher : unit -> unit
   val _o : string -> unit
   val _output_obj : unit -> unit
   val _pack : unit -> unit
@@ -532,6 +557,8 @@ module type Compiler_options = sig
   val _v : unit -> unit
   val _verbose : unit -> unit
   val _where : unit -> unit
+  val _error_size : int -> unit
+
   val _nopervasives : unit -> unit
 end
 ;;
@@ -566,6 +593,7 @@ end;;
 module type Optcommon_options = sig
   val _compact : unit -> unit
   val _inline : int -> unit
+  val _error_size : int -> unit
 
   val _dclambda : unit -> unit
   val _dcmm : unit -> unit
@@ -655,6 +683,7 @@ struct
     mk_intf_suffix_2 F._intf_suffix;
     mk_keep_locs F._keep_locs;
     mk_labels F._labels;
+    mk_error_size F._error_size;
     mk_linkall F._linkall;
     mk_make_runtime F._make_runtime;
     mk_make_runtime_2 F._make_runtime;
@@ -665,6 +694,7 @@ struct
     mk_noautolink_byt F._noautolink;
     mk_nolabels F._nolabels;
     mk_nostdlib F._nostdlib;
+    mk_nowatcher F._nowatcher;
     mk_o F._o;
     mk_open F._open;
     mk_output_obj F._output_obj;
@@ -771,6 +801,7 @@ struct
     mk_intf_suffix F._intf_suffix;
     mk_keep_locs F._keep_locs;
     mk_labels F._labels;
+    mk_error_size F._error_size;
     mk_linkall F._linkall;
     mk_no_alias_deps F._no_alias_deps;
     mk_no_app_funct F._no_app_funct;
@@ -780,6 +811,7 @@ struct
     mk_nodynlink F._nodynlink;
     mk_nolabels F._nolabels;
     mk_nostdlib F._nostdlib;
+    mk_nowatcher F._nowatcher;
     mk_o F._o;
     mk_open F._open;
     mk_output_obj F._output_obj;

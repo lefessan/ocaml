@@ -1,0 +1,12 @@
+OCPWIN_TOOL_DIR=../../../ocpwin/ocpwin-tool
+
+include $(OCPWIN_TOOL_DIR)/Makefile
+
+FILES= $(BUILD_SOURCES) bytecode.ml wrapper.c
+
+$(FILES): %: $(OCPWIN_TOOL_DIR)/%
+	rm -f $*
+	ln -s $(OCPWIN_TOOL_DIR)/$* $*
+
+clean::
+	rm -f $(FILES)

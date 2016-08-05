@@ -175,3 +175,9 @@ CYGPATH=cygpath -m
 DIFF=diff -q --strip-trailing-cr
 CANKILL=false
 SET_LD_PATH=PATH="$(PATH):$(LD_PATH)"
+
+OCAMLLIBDIR=lib
+MKLIB1=$(TOOLPREF)ar rc\ 
+MKLIB2=$(RANLIB)
+WIN32_PREFIX=win32
+OCP_RELOCATABLE=true

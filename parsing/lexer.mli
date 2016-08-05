@@ -59,3 +59,13 @@ val set_preprocessor :
   (unit -> unit) ->
   ((Lexing.lexbuf -> Parser.token) -> Lexing.lexbuf -> Parser.token) ->
   unit
+
+(* Same as [token], without calling the preprocessor *)
+val raw_lexer : Lexing.lexbuf -> Parser.token
+
+(* [check_spaces] contains a function that is called everytime a problem
+  with spaces is found by the lexer. *)
+val check_spaces : (Location.t -> string -> unit) option ref
+
+(* A lexer for what is in #begin_pp ... #end_pp *)
+val pp_lexer : Lexing.lexbuf -> Parser.token

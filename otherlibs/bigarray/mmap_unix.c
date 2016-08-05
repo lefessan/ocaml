@@ -20,7 +20,7 @@
 #include "bigarray.h"
 #include "custom.h"
 #include "fail.h"
-#include "io.h"
+#include "camlio.h"
 #include "mlvalues.h"
 #include "sys.h"
 #include "signals.h"

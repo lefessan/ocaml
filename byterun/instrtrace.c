@@ -39,7 +39,7 @@ void caml_disasm_instr(pc)
 {
   int instr = *pc;
   printf("%6ld  %s", (long) (pc - caml_start_code),
-         instr < 0 || instr > STOP ? "???" : names_of_instructions[instr]);
+         instr < 0 || instr >= FIRST_UNIMPLEMENTED_OP ? "???" : names_of_instructions[instr]);
   pc++;
   switch(instr) {
     /* Instructions with one integer operand */
@@ -70,6 +70,38 @@ void caml_disasm_instr(pc)
     else
       printf(" %s\n", (char *) caml_prim_name_table.contents[pc[0]]);
     break;
+
+
+    /* Instructions with LOCIDs */
+  case GRAB_WITH_LOCID:
+  case MAKEBLOCK_WITH_LOCID:
+      case MAKEBLOCK1_WITH_LOCID:
+      case MAKEBLOCK2_WITH_LOCID:
+      case MAKEBLOCK3_WITH_LOCID:
+      case MAKEFLOATBLOCK_WITH_LOCID:
+      case GETFLOATFIELD_WITH_LOCID:
+    printf(" [locid=%d] %d\n", pc[0], pc[1]); break;
+
+  case C_CALL1_WITH_LOCID: 
+  case C_CALL2_WITH_LOCID: 
+  case C_CALL3_WITH_LOCID: 
+  case C_CALL4_WITH_LOCID: 
+  case C_CALL5_WITH_LOCID:
+   if (pc[1] < 0 || pc[1] >= caml_prim_name_table.size)
+      printf(" unknown primitive %d\n", pc[1]);
+    else
+      printf(" [locid=%d] %s\n", pc[0], 
+	     (char *) caml_prim_name_table.contents[pc[1]]);
+    break;
+
+  case C_CALLN_WITH_LOCID:
+   if (pc[2] < 0 || pc[2] >= caml_prim_name_table.size)
+      printf(" unknown primitive %d\n", pc[2]);
+    else
+      printf(" [locid=%d] %d, %s\n", pc[0], pc[1],
+	     (char *) caml_prim_name_table.contents[pc[2]]);
+    break;
+
   default:
     printf("\n");
   }
@@ -83,7 +115,7 @@ char * caml_instr_string (code_t pc)
   int instr = *pc;
   char *nam;
 
-  nam = (instr < 0 || instr > STOP)
+  nam = (instr < 0 || instr >= FIRST_UNIMPLEMENTED_OP)
     ? (snprintf (nambuf, sizeof(nambuf), "???%d", instr), nambuf)
     : names_of_instructions[instr];
   pc++;
@@ -165,6 +197,39 @@ char * caml_instr_string (code_t pc)
       snprintf(buf, sizeof(buf), "%s %s",
                nam, (char *) caml_prim_name_table.contents[pc[0]]);
     break;
+
+
+    /* Instructions with LOCIDs */
+  case GRAB_WITH_LOCID:
+  case MAKEBLOCK_WITH_LOCID:
+      case MAKEBLOCK1_WITH_LOCID:
+      case MAKEBLOCK2_WITH_LOCID:
+      case MAKEBLOCK3_WITH_LOCID:
+      case MAKEFLOATBLOCK_WITH_LOCID:
+      case GETFLOATFIELD_WITH_LOCID:
+    sprintf(buf, "%s [locid=%d] %d\n", nam, pc[0], pc[1]); break;
+
+  case C_CALL1_WITH_LOCID: 
+  case C_CALL2_WITH_LOCID: 
+  case C_CALL3_WITH_LOCID: 
+  case C_CALL4_WITH_LOCID: 
+  case C_CALL5_WITH_LOCID:
+   if (pc[1] < 0 || pc[1] >= caml_prim_name_table.size)
+     sprintf(buf, "%s unknown primitive %d\n", nam, pc[1]);
+    else
+      sprintf(buf, "%s [locid=%d] %s\n", nam, pc[0], 
+	     (char *) caml_prim_name_table.contents[pc[1]]);
+    break;
+
+  case C_CALLN_WITH_LOCID:
+   if (pc[2] < 0 || pc[2] >= caml_prim_name_table.size)
+     sprintf(buf, "%s unknown primitive %d\n", nam, pc[2]);
+    else
+      sprintf(buf, "%s [locid=%d] %d, %s\n", nam, pc[0], pc[1],
+	     (char *) caml_prim_name_table.contents[pc[2]]);
+    break;
+
+
   default:
     snprintf(buf, sizeof(buf), "%s", nam);
     break;

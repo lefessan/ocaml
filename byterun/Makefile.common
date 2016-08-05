@@ -22,18 +22,18 @@ COMMONOBJS=\
   compare.o ints.o floats.o str.o array.o io.o extern.o intern.o \
   hash.o sys.o meta.o parsing.o gc_ctrl.o terminfo.o md5.o obj.o \
   lexing.o callback.o debugger.o weak.o compact.o finalise.o custom.o \
-  dynlink.o
+  dynlink.o ocpwin.o memprof.o
 
 PRIMS=\
   alloc.c array.c compare.c extern.c floats.c gc_ctrl.c hash.c \
   intern.c interp.c ints.c io.c lexing.c md5.c meta.c obj.c parsing.c \
   signals.c str.c sys.c terminfo.c callback.c weak.c finalise.c stacks.c \
-  dynlink.c backtrace.c
+  dynlink.c backtrace.c ocpwin.c memprof.c
 
 PUBLIC_INCLUDES=\
   alloc.h callback.h config.h custom.h fail.h hash.h intext.h \
   memory.h misc.h mlvalues.h printexc.h signals.h compatibility.h \
-  version.h
+  version.h minor_gc.h memprof.h gc.h
 
 
 all:: ocamlrun$(EXE) ld.conf libcamlrun.$(A) all-$(RUNTIMED)
@@ -45,9 +45,16 @@ all-noruntimed:
 all-runtimed: ocamlrund$(EXE) libcamlrund.$(A)
 .PHONY: all-runtimed
 
+ifeq (${OCP_RELOCATABLE},true)
+# + is relative to OCAMLLIB, not PREFIX
+ld.conf: ../config/Makefile
+	echo "+stublibs" > ld.conf
+	echo "+" >> ld.conf
+else
 ld.conf: ../config/Makefile
 	echo "$(STUBLIBDIR)" > ld.conf
 	echo "$(LIBDIR)" >> ld.conf
+endif
 
 # Installation
 
@@ -64,6 +71,10 @@ install::
 	for i in $(PUBLIC_INCLUDES); do \
 	  sed -f ../tools/cleanup-header $$i > $(INSTALL_LIBDIR)/caml/$$i; \
 	done
+	if test -d $(LIBDIR)/caml/internals; then : ; else mkdir $(LIBDIR)/caml/internals; fi
+	cp -f *.h  $(LIBDIR)/caml/internals/
+	if test -d $(LIBDIR)/caml/config; then : ; else mkdir $(LIBDIR)/caml/config; fi
+	cp -f ../config/*.h  $(LIBDIR)/caml/config/
 	cp ld.conf $(INSTALL_LIBDIR)/ld.conf
 .PHONY: install
 
@@ -124,5 +135,22 @@ version.h : ../VERSION ../tools/make-version-header.sh
 clean ::
 	rm -f ocamlrun$(EXE) ocamlrund$(EXE) *.$(O) *.$(A) *.$(SO)
 	rm -f primitives prims.c opnames.h jumptbl.h ld.conf
-	rm -f version.h
+	rm -f version.h commit.h COMMIT DATE
 .PHONY: clean
+
+# HACK: If COMMIT is not up-to-date, force its recompilation...
+ifneq ($(shell cat COMMIT 2>/dev/null),$(shell git rev-parse --short HEAD))
+.PHONY: COMMIT
+endif
+
+
+COMMIT:
+	git rev-parse --short HEAD > COMMIT || cp ../VERSION COMMIT
+	date +"%Y%m%d-%H%M" > DATE
+
+commit.h: COMMIT
+	echo '#define OCAML_COMMIT "'$(shell cat COMMIT)'"' > commit.h
+	echo '#define OCAML_DATE "'$(shell cat DATE)'"' >> commit.h
+
+
+memprof.$(O): commit.h

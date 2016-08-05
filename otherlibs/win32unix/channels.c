@@ -13,7 +13,7 @@
 
 #include <mlvalues.h>
 #include <alloc.h>
-#include <io.h>
+#include <camlio.h>
 #include <memory.h>
 #include "unixsupport.h"
 #include <fcntl.h>

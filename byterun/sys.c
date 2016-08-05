@@ -96,6 +96,7 @@ CAMLprim value caml_sys_exit(value retcode)
 #ifndef NATIVE_CODE
   caml_debugger(PROGRAM_EXIT);
 #endif
+  MEMPROF_EXIT();
   exit(Int_val(retcode));
   return Val_unit;
 }
@@ -249,13 +250,22 @@ CAMLprim value caml_sys_chdir(value dirname)
 
 CAMLprim value caml_sys_getcwd(value unit)
 {
-  char buff[4096];
+  value res;
+  OCP_DECLARE_BUFFER(buff,4096);
 #ifdef HAS_GETCWD
-  if (getcwd(buff, sizeof(buff)) == 0) caml_sys_error(NO_ARG);
+  if (getcwd(buff, 4096) == 0){
+    OCP_FREE_BUFFER(buff);
+    caml_sys_error(NO_ARG);
+  }
 #else
-  if (getwd(buff) == 0) caml_sys_error(NO_ARG);
+  if (getwd(buff) == 0){
+    OCP_FREE_BUFFER(buff);
+    caml_sys_error(NO_ARG);
+  }
 #endif /* HAS_GETCWD */
-  return caml_copy_string(buff);
+  res = caml_copy_string(buff);
+  OCP_FREE_BUFFER(buff);
+  return res;
 }
 
 CAMLprim value caml_sys_getenv(value var)
@@ -268,7 +278,7 @@ CAMLprim value caml_sys_getenv(value var)
 }
 
 char * caml_exe_name;
-static char ** caml_main_argv;
+char ** caml_main_argv;
 
 CAMLprim value caml_sys_get_argv(value unit)
 {

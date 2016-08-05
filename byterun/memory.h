@@ -32,8 +32,9 @@
 extern "C" {
 #endif
 
-
+CAMLextern value caml_make_header(mlsize_t wosize, tag_t tag, int color);
 CAMLextern value caml_alloc_shr (mlsize_t, tag_t);
+CAMLextern value caml_alloc_shr_loc (mlsize_t, tag_t, profiling_t);
 CAMLextern void caml_adjust_gc_speed (mlsize_t, mlsize_t);
 CAMLextern void caml_alloc_dependent_memory (mlsize_t);
 CAMLextern void caml_free_dependent_memory (mlsize_t);
@@ -101,7 +102,36 @@ int caml_page_table_initialize(mlsize_t bytesize);
 #define DEBUG_clear(result, wosize)
 #endif
 
-#define Alloc_small(result, wosize, tag) do{    CAMLassert ((wosize) >= 1); \
+/* Deprecated alias for [caml_modify] */
+
+#define Modify(fp,val) caml_modify((fp), (val))
+
+/* </private> */
+
+#define CAML_HAS_MAKE_HEADER
+#define CAML_HAS_SMALL_ALLOC
+
+/*
+  1/ in native-code, we have to compare [caml_young_ptr] with 
+  [caml_young_limit] instead of formerly [caml_young_start] because it
+  is the correct way to check for signals.
+  2/ in native-code, we should call [caml_garbage_collection] instead
+  of [caml_minor_collection] to check again for signals. 
+  [caml_garbage_collection] will trigger a minor_collection only if
+  needed.
+  3/ in native code, we should not modify [caml_young_ptr] before calling
+  [caml_garbage_collection] because otherwise, it might not detect correctly
+  the need for a minor garbage_collection. As a consequence, the preceeding
+  allocated space is lost if a signal was received.
+  4/ in native code, [caml_garbage_collection] might trigger the execution
+  of a signal handler. Consequently, there might be not enough space in the
+  minor heap for the interrupted allocation, so we need to recheck that
+  [caml_young_ptr] is bigger than [caml_young_limit] (as it is already done
+  in generated code).
+ */
+
+#define Alloc_small_loc(result, wosize, tag, prof) do{			\
+                                                CAMLassert ((wosize) >= 1); \
                                           CAMLassert ((tag_t) (tag) < 256); \
                                  CAMLassert ((wosize) <= Max_young_wosize); \
   caml_young_ptr -= Bhsize_wosize (wosize);                                 \
@@ -112,16 +142,14 @@ int caml_page_table_initialize(mlsize_t bytesize);
     Restore_after_gc;                                                       \
     caml_young_ptr -= Bhsize_wosize (wosize);                               \
   }                                                                         \
-  Hd_hp (caml_young_ptr) = Make_header ((wosize), (tag), Caml_black);       \
+  ALLOCPROF_SMALL_ALLOC(wosize);                                        \
+  Hd_hp (caml_young_ptr) = Make_header_loc((wosize), (tag), Caml_black, prof);  \
   (result) = Val_hp (caml_young_ptr);                                       \
   DEBUG_clear ((result), (wosize));                                         \
 }while(0)
 
-/* Deprecated alias for [caml_modify] */
-
-#define Modify(fp,val) caml_modify((fp), (val))
-
-/* </private> */
+#define Alloc_small(result, wosize, tag) \
+  Alloc_small_loc(result, wosize, tag, caml_memprof_ccall_locid)
 
 struct caml__roots_block {
   struct caml__roots_block *next;

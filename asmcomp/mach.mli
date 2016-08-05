@@ -43,7 +43,9 @@ type operation =
   | Icall_imm of string
   | Itailcall_ind
   | Itailcall_imm of string
-  | Iextcall of string * bool    (* false = noalloc, true = alloc *)
+      (* TODO: we should merge the two arguments, since alloc means
+         that there is a locid *)
+  | Iextcall of string * bool * string option   (* None = noalloc, Some _ = alloc *)
   | Istackoffset of int
   | Iload of Cmm.memory_chunk * Arch.addressing_mode
   | Istore of Cmm.memory_chunk * Arch.addressing_mode * bool

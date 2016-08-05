@@ -1,0 +1,7 @@
+begin
+ dirname += [ "hello_world" ]
+
+ begin program "hello_world"
+   files = [ "hello_world.ml" ]
+ end
+end

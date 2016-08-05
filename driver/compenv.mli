@@ -10,11 +10,12 @@
 (*                                                                     *)
 (***********************************************************************)
 
-(* val check_unit_name : Format.formatter -> string -> string -> unit *)
+val is_unit_name : string -> bool
+val check_unit_name : Format.formatter -> string -> string -> unit
 val module_of_filename : Format.formatter -> string -> string -> string
 
 val output_prefix : string -> string
-val extract_output : string option -> string
+val extract_output : ?ext:string -> string option -> string
 val default_output : string option -> string
 
 val print_version_and_library : string -> 'a

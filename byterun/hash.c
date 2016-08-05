@@ -252,7 +252,13 @@ CAMLprim value caml_hash(value count, value limit, value seed, value obj)
         break;
       default:
         /* Mix in the tag and size, but do not count this towards [num] */
-        h = caml_hash_mix_uint32(h, Whitehd_hd(Hd_val(v)));
+
+	/* Memprof: (wosize << 32) | (locid << 10) | (color << 8)  | tag
+	   Orig: (wosize << 10) | (color << 8) | tag */
+
+        h = caml_hash_mix_uint32(h, (Wosize_val(v) << 10) | Tag_val(v));
+	/* was: h = caml_hash_mix_uint32(h, Whitehd_hd(Hd_val(v))); */
+
         /* Copy fields into queue, not exceeding the total size [sz] */
         for (i = 0, len = Wosize_val(v); i < len; i++) {
           if (wr >= sz) break;

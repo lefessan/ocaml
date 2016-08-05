@@ -22,6 +22,8 @@ open Types
 open Btype
 open Outcometree
 
+let expand = false
+
 (* Print a long identifier *)
 
 let rec longident ppf = function
@@ -251,6 +253,8 @@ let rec normalize_type_path ?(cache=false) env p =
     let params = List.map repr params in
     match repr ty with
       {desc = Tconstr (p1, tyl, _)} ->
+        if Path.same p1 p then (p, Id)
+        else
         let tyl = List.map repr tyl in
         if List.length params = List.length tyl
         && List.for_all2 (==) params tyl
@@ -451,7 +455,7 @@ let namable_row row =
     row.row_fields
 
 let rec mark_loops_rec visited ty =
-  let ty = repr ty in
+  let ty = if expand then expand_head !printing_env ty else repr ty in
   let px = proxy ty in
   if List.memq px visited && aliasable ty then add_alias px else
     let visited = px :: visited in
@@ -528,7 +532,7 @@ let print_label ppf l =
   if !print_labels && l <> "" || is_optional l then fprintf ppf "%s:" l
 
 let rec tree_of_typexp sch ty =
-  let ty = repr ty in
+  let ty = if expand then expand_head !printing_env ty else repr ty in
   let px = proxy ty in
   if List.mem_assq px !names && not (List.memq px !delayed) then
    let mark = is_non_gen sch ty in
@@ -704,6 +708,13 @@ let type_expr ppf ty = typexp false 0 ppf ty
 and type_sch ppf ty = typexp true 0 ppf ty
 
 and type_scheme ppf ty = reset_and_mark_loops ty; typexp true 0 ppf ty
+
+let expanded_type_expr ppf ty =
+  let expand = true in typexp false 0 ppf ty
+
+let mark_expanded_loops ty =
+  let expand = true in
+  normalize_type Env.empty ty; mark_loops_rec [] ty;;
 
 (* Maxence *)
 let type_scheme_max ?(b_reset_names=true) ppf ty =

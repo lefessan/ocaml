@@ -21,6 +21,7 @@ open Types
 open Typedtree
 open Outcometree
 
+
 type res = Ok of Obj.t | Err of string
 type evaluation_outcome = Result of Obj.t | Exception of exn
 
@@ -74,6 +75,9 @@ let rec eval_path = function
   | Papply(p1, p2) ->
       fatal_error "Toploop.eval_path"
 
+let eval_path env path =
+  eval_path (Env.normalize_path (Some Location.none) env path)
+
 (* To print values *)
 
 module EvalPath = struct
@@ -82,6 +86,7 @@ module EvalPath = struct
   let eval_path p = try eval_path p with _ -> raise Error
   let same_value v1 v2 = (v1 == v2)
 end
+
 
 module Printer = Genprintval.Make(Obj)(EvalPath)
 
@@ -175,8 +180,8 @@ let rec pr_item env = function
   | Sig_typext(id, ext, es) :: rem ->
       let tree = Printtyp.tree_of_extension_constructor id ext es in
       Some (tree, None, rem)
-  | Sig_module(id, mty, rs) :: rem ->
-      let tree = Printtyp.tree_of_module id mty rs in
+  | Sig_module(id, md, rs) :: rem ->
+      let tree = Printtyp.tree_of_module id md.md_type rs in
       Some (tree, None, rem)
   | Sig_modtype(id, decl) :: rem ->
       let tree = Printtyp.tree_of_modtype_declaration id decl in
@@ -240,7 +245,7 @@ let execute_phrase print_outcome ppf phr =
               Compilenv.record_global_approx_toplevel ();
               if print_outcome then
                 match str.str_items with
-                | [ {str_desc = Tstr_eval exp} ] ->
+                | [ {str_desc = Tstr_eval (exp, _attrs)} ] ->
                     let outv = outval_of_value newenv v exp.exp_type in
                     let ty = Printtyp.tree_of_type_scheme exp.exp_type in
                     Ophr_eval (outv, ty)
@@ -346,7 +351,7 @@ let read_input_default prompt buffer len =
     while true do
       if !i >= len then raise Exit;
       let c = input_char stdin in
-      buffer.[!i] <- c;
+      Bytes.set buffer !i c;
       incr i;
       if c = '\n' then raise Exit;
     done;

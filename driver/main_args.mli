@@ -10,6 +10,9 @@
 (*                                                                     *)
 (***********************************************************************)
 
+(* Describe the -make argument *)
+val mk_make : (string -> unit) -> string * Ocpstd.Arg.spec * string
+
 (* ATTENTION ! When you add or modify a parsing or typing option, do not forget
   to update ocamldoc options too, in odoc_args.ml. *)
 
@@ -65,6 +68,7 @@ module type Compiler_options =  sig
   val _keep_locs : unit -> unit
   val _linkall : unit -> unit
   val _noautolink : unit -> unit
+  val _nowatcher : unit -> unit
   val _o : string -> unit
   val _output_obj : unit -> unit
   val _pack : unit -> unit
@@ -78,6 +82,7 @@ module type Compiler_options =  sig
   val _v : unit -> unit
   val _verbose : unit -> unit
   val _where : unit -> unit
+  val _error_size : int -> unit
 
   val _nopervasives : unit -> unit
 end
@@ -113,6 +118,7 @@ end;;
 module type Optcommon_options = sig
   val _compact : unit -> unit
   val _inline : int -> unit
+  val _error_size : int -> unit
 
   val _dclambda : unit -> unit
   val _dcmm : unit -> unit

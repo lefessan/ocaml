@@ -1,0 +1,13 @@
+
+2015-10-26:
+ * The "OCPWIN_MSVC" variable can be set to "no-auto" to disable auto-detection
+    of MSVC (currently, only for "Windows SDKs and .Net Framework 3.5").
+    Setting it to "auto" re-trigger auto-detection. If MSVC is not
+    auto-detected, the env variables are assumed to be correctly configured
+    by the user.
+
+2015-10-24:
+ * Fix empty MSVC files
+ 
+2015-10-14:
+ * Fix PATH bug by configuring NSIS for long strings

@@ -25,7 +25,7 @@
 
 #include "mlvalues.h"
 #include "alloc.h"
-#include "io.h"
+#include "camlio.h"
 #include "instruct.h"
 #include "intext.h"
 #include "exec.h"
@@ -325,8 +325,20 @@ static void read_debug_info(void)
 static intnat event_for_location(code_t pc)
 {
   uintnat low = 0, high = n_events;
+  value pos;
+  
   Assert(pc >= caml_start_code && pc < caml_start_code + caml_code_size);
-  Assert(events != NULL);
+
+  /* if we updated the instruction for memory profiling, we need to
+     change the PC ! */
+  pos = (char *) pc - (char *) caml_start_code;
+  if( caml_memprof_translation_table != NULL ){
+    pos -= sizeof(opcode_t) * 
+      caml_memprof_translation_table[pos / sizeof(opcode_t)];
+  }
+  pc = (code_t) ((char *) caml_start_code + pos);
+
+ Assert(events != NULL);
   while(low+1 < high) {
     uintnat m = (low+high)/2;
     if(pc < events[m].ev_pc) high = m;

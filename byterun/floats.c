@@ -133,6 +133,11 @@ CAMLprim value caml_float_of_string(value vs)
   mlsize_t len;
   double d;
 
+#ifdef _WIN32
+#undef strtod
+#endif
+
+
   len = caml_string_length(vs);
   buf = len < sizeof(parse_buffer) ? parse_buffer : caml_stat_alloc(len + 1);
   src = String_val(vs);

@@ -1,0 +1,7 @@
+# From 4.02, Camlp4 is not part of OCaml anymore.
+
+install:
+	touch $(DESTDIR)/build-camlp4.cmd
+
+clean:
+	echo Cleaned

@@ -25,6 +25,7 @@
 #include "roots.h"
 #include "signals.h"
 #include "weak.h"
+#include "compact.h"
 
 asize_t caml_minor_heap_size;
 static void *caml_young_base = NULL;
@@ -80,7 +81,10 @@ void caml_set_minor_heap_size (asize_t size)
   Assert (size >= Bsize_wsize(Minor_heap_min));
   Assert (size <= Bsize_wsize(Minor_heap_max));
   Assert (size % sizeof (value) == 0);
-  if (caml_young_ptr != caml_young_end) caml_minor_collection ();
+
+  if (caml_young_ptr != caml_young_end) {
+    caml_minor_collection ();
+  }
                                     Assert (caml_young_ptr == caml_young_end);
   new_heap = caml_aligned_malloc(size, 0, &new_heap_base);
   if (new_heap == NULL) caml_raise_out_of_memory();
@@ -95,6 +99,9 @@ void caml_set_minor_heap_size (asize_t size)
   caml_young_start = new_heap;
   caml_young_end = new_heap + size;
   caml_young_limit = caml_young_start;
+  GCPROF_PREPARE_MINOR();
+  ALLOCPROF_SET_YOUNG_LIMIT();
+
   caml_young_ptr = caml_young_end;
   caml_minor_heap_size = size;
 
@@ -113,6 +120,7 @@ void caml_oldify_one (value v, value *p)
   header_t hd;
   mlsize_t sz, i;
   tag_t tag;
+  profiling_t id;
 
  tail_call:
   if (Is_block (v) && Is_young (v)){
@@ -122,11 +130,13 @@ void caml_oldify_one (value v, value *p)
       *p = Field (v, 0);  /*  then forward pointer is first field. */
     }else{
       tag = Tag_hd (hd);
+      id = Locid_hd(hd);
       if (tag < Infix_tag){
         value field0;
 
         sz = Wosize_hd (hd);
-        result = caml_alloc_shr (sz, tag);
+        result = caml_alloc_shr_loc (sz, tag, id);
+	GCPROF_HEADER(hd, MINOR_PROMOTE);
         *p = result;
         field0 = Field (v, 0);
         Hd_val (v) = 0;            /* Set forward flag */
@@ -143,7 +153,8 @@ void caml_oldify_one (value v, value *p)
         }
       }else if (tag >= No_scan_tag){
         sz = Wosize_hd (hd);
-        result = caml_alloc_shr (sz, tag);
+        result = caml_alloc_shr_loc (sz, tag, id);
+	GCPROF_HEADER(hd, MINOR_PROMOTE);
         for (i = 0; i < sz; i++) Field (result, i) = Field (v, i);
         Hd_val (v) = 0;            /* Set forward flag */
         Field (v, 0) = result;     /*  and forward pointer. */
@@ -172,7 +183,8 @@ void caml_oldify_one (value v, value *p)
         if (!vv || ft == Forward_tag || ft == Lazy_tag || ft == Double_tag){
           /* Do not short-circuit the pointer.  Copy as a normal block. */
           Assert (Wosize_hd (hd) == 1);
-          result = caml_alloc_shr (1, Forward_tag);
+          result = caml_alloc_shr_loc (1, Forward_tag, id);
+	  GCPROF_HEADER(hd, MINOR_PROMOTE);
           *p = result;
           Hd_val (v) = 0;             /* Set (GC) forward flag */
           Field (v, 0) = result;      /*  and forward pointer. */
@@ -228,7 +240,9 @@ void caml_empty_minor_heap (void)
   value **r;
 
   if (caml_young_ptr != caml_young_end){
+    GCPROF_GCTIME(GCPROF_GCTIME_MINOR_BEGIN);
     caml_in_minor_collection = 1;
+    GCPROF_MINOR_SCAN();
     caml_gc_message (0x02, "<", 0);
     caml_oldify_local_roots();
     for (r = caml_ref_table.base; r < caml_ref_table.ptr; r++){
@@ -248,10 +262,16 @@ void caml_empty_minor_heap (void)
     caml_stat_minor_words += Wsize_bsize (caml_young_end - caml_young_ptr);
     caml_young_ptr = caml_young_end;
     caml_young_limit = caml_young_start;
+
+    GCPROF_PREPARE_MINOR();
+    ALLOCPROF_SET_YOUNG_LIMIT();
+
     clear_table (&caml_ref_table);
     clear_table (&caml_weak_ref_table);
     caml_gc_message (0x02, ">", 0);
     caml_in_minor_collection = 0;
+    GCPROF_GC_PHASE(Phase_minor, Subphase_final);
+    GCPROF_GCTIME(GCPROF_GCTIME_MINOR_END);
   }
   caml_final_empty_young ();
 #ifdef DEBUG
@@ -273,6 +293,8 @@ CAMLexport void caml_minor_collection (void)
 {
   intnat prev_alloc_words = caml_allocated_words;
 
+  ALLOCPROF_MINOR_COLLECTION();
+
   caml_empty_minor_heap ();
 
   caml_stat_promoted_words += caml_allocated_words - prev_alloc_words;
@@ -283,6 +305,19 @@ CAMLexport void caml_minor_collection (void)
   caml_final_do_calls ();
 
   caml_empty_minor_heap ();
+  {
+    int trigger_gc = ocp_monitor_update_gc_stats();
+    if( trigger_gc > 0 ){
+        caml_finish_major_cycle ();
+        caml_final_do_calls ();
+        caml_empty_minor_heap ();
+        caml_finish_major_cycle ();
+        if( trigger_gc > 1){
+          caml_compact_heap ();
+        }
+        caml_final_do_calls ();
+    }
+  }
 }
 
 CAMLexport value caml_check_urgent_gc (value extra_root)

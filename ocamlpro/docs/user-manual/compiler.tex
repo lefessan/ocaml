@@ -1,0 +1,102 @@
+
+\chapter{Compiler Extensions}
+
+The compiler contains several extensions:
+\begin{itemize}
+\item \emph{Testing Features} are features that have reached a good
+  level of maturity and that are likely to remain in the compiler
+\item \emph{Experimental Features} are features that are still being
+  tested. They will probably change in future version, or get removed
+  from the compiler.
+\end{itemize}
+
+\section{Testing Features}
+
+\subsection{OCPP Line Preprocessor}
+
+\subsection{Internal Builder}
+
+In OCPWin, ocamlc and ocamlopt accept a new argument -make to build an executable, given the main module of the program.
+
+\subsubsection{Building an executable}
+
+For example, for alt-ergo, to build the native version, we use:
+
+\begin{lstlisting}[style=Bash]
+ocamlopt -I ..\..\_obuild\graph -I -- -I main -I structures -I util -I sat -I preprocess -I theories -I instances -I parsing unix.cmxa nums.cmxa graph.cmxa -o alt-ergo.exe  -make main/main_text.ml
+\end{lstlisting}
+
+and to build the bytecode version, we use:
+
+\begin{lstlisting}[style=Bash]
+ocamlc -I ..\..\_obuild\graph -I -- -custom -I main -I structures -I util -I sat -I preprocess -I theories -I instances -I parsing unix.cma nums.cma graph.cma -o alt-ergo.byte.exe  -make main/main_text.ml
+\end{lstlisting}
+
+The compiler will search the include directories (-I option) to find the sources and compile them, calling ocamllex and ocamlyacc when needed.
+
+In this example, ocamlgraph had been compiled previously using ocp-build (in the\lstinline[style=Bash]{..\..\_obuild\graph} directory), so it won't be recompiled.
+
+The -make option takes the filename of the main module of the executable as an argument. It MUST be the last argument of the compiler (in particular, the -o option must be used before).
+
+\subsubsection{Building a library}
+
+After -make, you can provide a file with extension .mllib, containing a list of module names. The compiler will compile and link all the modules into a library.
+
+\subsubsection{Packing a file}
+
+After -make, you can provide a file with extension .mlpack, containing a list of module names. The compiler will compile and pack all the modules into a single module.
+
+\subsubsection{Limiting what is going to be compiled}
+
+By default, with -make, all modules found in a directory in the path will be compiled if their sources are available. This behavior might trigger unwanted compilation of modules that have been installed with their sources. In this case, you can use -I -- to specify that all the preceeding directories in the path should not be recompiled. For example:
+
+\begin{lstlisting}[style=Bash]
+ocamlc -I stdlib -I -- -I project -make project.mllib
+\end{lstlisting}
+
+Here, sources found in stdlib will not be compiled, while sources found in project are going to be compiled.
+
+\subsection{Non-tailrec Detection}
+
+When the environment variable {\sf OCP\_CHECKTAIL} is defined, the
+compiler will print a warning whenever it compiles a recursive
+function that is not tail-recursive.
+
+The analysis is performed on the parsetree.
+
+\subsection{Multi-function Native Compiler}
+
+The native compiler, {\sf ocamlopt}, contains all the following tools~:
+\begin{itemize}
+\item {\sf ocaml} (only in bytecode)
+\item {\sf ocamlc}
+\item {\sf ocamldep}
+\end{itemize}
+
+When renamed under one of these names, {\sf ocamlopt} will perform as
+if the corresponding tool had been called.
+
+\section{Experimental Features}
+
+\subsection{Detection of Direct-Return Opportunities}
+
+When the environment variable {\sf OCP\_CHECKHCONS} is defined, the
+compiler will check for opportunities for direct-return: a direct
+return is when a value is built that probably already exists at the
+current point (and so, the existing value could be reused to avoid a
+new allocation).
+
+Such opportunities are detected when a combination of the following
+properties is found:
+\begin{itemize}
+\item A {\sf match} expression where the match-cases return a value
+  with the same type as the matched value, and
+\item In at least one match-case of that match, a constructor is
+  matched, and the same constructor is built and returned in one of
+  the direct paths of the handler expression.
+\end{itemize}
+
+This detection is an heuristic, and will of course not detect ALL the
+possible opportunities for hash consing.
+
+\subsection{OCPP Line Preprocessor}

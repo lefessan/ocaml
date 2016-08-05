@@ -12,14 +12,16 @@
 
 # The main Makefile
 
+include Makefile.ocp
 include config/Makefile
 include stdlib/StdlibModules
+include $(TOP_OCAML_DIR)/ocamlpro/Makefile.variables
 
 CAMLC=boot/ocamlrun boot/ocamlc -nostdlib -I boot
-CAMLOPT=boot/ocamlrun ./ocamlopt -nostdlib -I stdlib -I otherlibs/dynlink
+CAMLOPT=boot/ocamlrun ./ocamlopt -nostdlib -I stdlib -I otherlibs/dynlink 
 COMPFLAGS=-strict-sequence -w +33..39+48 -warn-error A -bin-annot \
-          -safe-string $(INCLUDES)
-LINKFLAGS=
+          -safe-string $(INCLUDES) -g
+LINKFLAGS= -g
 
 CAMLYACC=boot/ocamlyacc
 YACCFLAGS=-v
@@ -36,18 +38,19 @@ OCAMLBUILDNATIVE=$(WITH_OCAMLBUILD:=.native)
 OCAMLDOC_OPT=$(WITH_OCAMLDOC:=.opt)
 
 INCLUDES=-I utils -I parsing -I typing -I bytecomp -I asmcomp -I driver \
-	 -I toplevel
+	 -I toplevel -I tools $(OCPBWINCLUDES)
 
 UTILS=utils/misc.cmo utils/tbl.cmo utils/config.cmo \
-  utils/clflags.cmo utils/terminfo.cmo utils/ccomp.cmo utils/warnings.cmo \
-  utils/consistbl.cmo
+  utils/clflags.cmo $(OCP_MSVC) utils/terminfo.cmo utils/ccomp.cmo utils/warnings.cmo \
+  utils/consistbl.cmo $(OCPUTILS)
 
 PARSING=parsing/location.cmo parsing/longident.cmo \
   parsing/ast_helper.cmo \
   parsing/syntaxerr.cmo parsing/parser.cmo \
   parsing/lexer.cmo parsing/parse.cmo parsing/printast.cmo \
   parsing/pprintast.cmo \
-  parsing/ast_mapper.cmo
+  parsing/ast_mapper.cmo driver/pparse.cmo \
+  $(OCPPARSING) $(OCPP)
 
 TYPING=typing/ident.cmo typing/path.cmo \
   typing/primitive.cmo typing/types.cmo \
@@ -63,13 +66,13 @@ TYPING=typing/ident.cmo typing/path.cmo \
   typing/typedecl.cmo typing/typeclass.cmo \
   typing/typemod.cmo
 
-COMP=bytecomp/lambda.cmo bytecomp/printlambda.cmo \
+COMP=bytecomp/lambda.cmo $(OCP_COMMON)  bytecomp/printlambda.cmo \
   bytecomp/typeopt.cmo bytecomp/switch.cmo bytecomp/matching.cmo \
   bytecomp/translobj.cmo bytecomp/translcore.cmo \
   bytecomp/translclass.cmo bytecomp/translmod.cmo \
   bytecomp/simplif.cmo bytecomp/runtimedef.cmo \
-  driver/pparse.cmo driver/main_args.cmo \
-  driver/compenv.cmo driver/compmisc.cmo
+  driver/main_args.cmo \
+  driver/compenv.cmo driver/compmisc.cmo 
 
 COMMON=$(UTILS) $(PARSING) $(TYPING) $(COMP)
 
@@ -79,7 +82,7 @@ BYTECOMP=bytecomp/meta.cmo bytecomp/instruct.cmo bytecomp/bytegen.cmo \
   bytecomp/bytelink.cmo bytecomp/bytelibrarian.cmo bytecomp/bytepackager.cmo \
   driver/errors.cmo driver/compile.cmo
 
-ASMCOMP=asmcomp/arch.cmo asmcomp/debuginfo.cmo \
+ASMCOMP=$(INTEL_ASM) asmcomp/arch.cmo asmcomp/debuginfo.cmo \
   asmcomp/cmm.cmo asmcomp/printcmm.cmo \
   asmcomp/reg.cmo asmcomp/mach.cmo asmcomp/proc.cmo \
   asmcomp/clambda.cmo asmcomp/printclambda.cmo asmcomp/compilenv.cmo \
@@ -101,15 +104,17 @@ ASMCOMP=asmcomp/arch.cmo asmcomp/debuginfo.cmo \
 TOPLEVEL=toplevel/genprintval.cmo toplevel/toploop.cmo \
   toplevel/trace.cmo toplevel/topdirs.cmo toplevel/topmain.cmo
 
-BYTESTART=driver/main.cmo
+NATTOPLEVEL= toplevel/genprintval.cmo toplevel/opttoploop.cmo	\
+   toplevel/opttopdirs.cmo toplevel/opttopmain.cmo
 
-OPTSTART=driver/optmain.cmo
+BYTESTART= $(OCPMAIN) driver/main.cmo
+
+OPTSTART= $(OCPMAIN) $(INTEL_MAIN) driver/optmain.cmo
 
 TOPLEVELSTART=toplevel/topstart.cmo
 
 NATTOPOBJS=$(UTILS) $(PARSING) $(TYPING) $(COMP) $(ASMCOMP) \
-  toplevel/genprintval.cmo toplevel/opttoploop.cmo toplevel/opttopdirs.cmo \
-  toplevel/opttopmain.cmo toplevel/opttopstart.cmo
+  $(NATTOPLEVEL)  toplevel/opttopstart.cmo
 
 PERVASIVES=$(STDLIB_MODULES) outcometree topdirs toploop
 
@@ -127,7 +132,7 @@ all:
 	$(MAKE) runtime
 	$(MAKE) coreall
 	$(MAKE) ocaml
-	$(MAKE) otherlibraries $(OCAMLBUILDBYTE) $(WITH_DEBUGGER) \
+	$(MAKE) otherlibraries $(OCB)$(OCAMLBUILDBYTE) $(WITH_DEBUGGER) \
 	  $(WITH_OCAMLDOC)
 
 # Compile everything the first time
@@ -182,12 +187,12 @@ bootstrap:
 LIBFILES=stdlib.cma std_exit.cmo *.cmi camlheader
 
 # Start up the system from the distribution compiler
-coldstart:
-	cd byterun; $(MAKE) all
+coldstart: sources
+	cd byterun; $(MAKE) $(MAKEFILE) all
 	cp byterun/ocamlrun$(EXE) boot/ocamlrun$(EXE)
-	cd yacc; $(MAKE) all
+	cd yacc; $(MAKE) $(MAKEFILE) all
 	cp yacc/ocamlyacc$(EXE) boot/ocamlyacc$(EXE)
-	cd stdlib; $(MAKE) COMPILER=../boot/ocamlc all
+	cd stdlib; $(MAKE) $(MAKEFILE) COMPILER=../boot/ocamlc all
 	cd stdlib; cp $(LIBFILES) ../boot
 	if test -f boot/libcamlrun.a; then :; else \
 	  ln -s ../byterun/libcamlrun.a boot/libcamlrun.a; fi
@@ -259,31 +264,33 @@ opt:
 	$(MAKE) runtimeopt
 	$(MAKE) ocamlopt
 	$(MAKE) libraryopt
-	$(MAKE) otherlibrariesopt ocamltoolsopt $(OCAMLBUILDNATIVE)
+	$(MAKE) otherlibrariesopt ocamltoolsopt $(OCB)$(OCAMLBUILDNATIVE)
 
 # Native-code versions of the tools
 opt.opt:
-	$(MAKE) checkstack
+	$(MAKE) $(OCB)checkstack
 	$(MAKE) runtime
 	$(MAKE) core
 	$(MAKE) ocaml
 	$(MAKE) opt-core
 	$(MAKE) ocamlc.opt
 	$(MAKE) otherlibraries $(WITH_DEBUGGER) $(WITH_OCAMLDOC) \
-	        $(OCAMLBUILDBYTE)
+	        $(OCB)$(OCAMLBUILDBYTE)
+	if test "$(OCPBW)" = "true"; then $(MAKE) ocp-watcher; else :; fi
 	$(MAKE) ocamlopt.opt
 	$(MAKE) otherlibrariesopt
+	if test "$(OCPBW)" = "true"; then $(MAKE) ocp-watcher.opt; else :; fi
 	$(MAKE) ocamllex.opt ocamltoolsopt ocamltoolsopt.opt $(OCAMLDOC_OPT) \
-	        $(OCAMLBUILDNATIVE)
+	        $(OCB)$(OCAMLBUILDNATIVE)
 
 base.opt:
-	$(MAKE) checkstack
+	$(MAKE) $(OCB)checkstack
 	$(MAKE) runtime
 	$(MAKE) core
 	$(MAKE) ocaml
 	$(MAKE) opt-core
 	$(MAKE) ocamlc.opt
-	$(MAKE) otherlibraries $(OCAMLBUILDBYTE) $(WITH_DEBUGGER) \
+	$(MAKE) otherlibraries $(OCB)$(OCAMLBUILDBYTE) $(WITH_DEBUGGER) \
 	  $(WITH_OCAMLDOC)
 	$(MAKE) ocamlopt.opt
 	$(MAKE) otherlibrariesopt
@@ -319,7 +326,7 @@ install:
 	cp lex/ocamllex $(INSTALL_BINDIR)/ocamllex$(EXE)
 	cp yacc/ocamlyacc$(EXE) $(INSTALL_BINDIR)/ocamlyacc$(EXE)
 	cp utils/*.cmi parsing/*.cmi typing/*.cmi bytecomp/*.cmi driver/*.cmi \
-	   toplevel/*.cmi $(INSTALL_COMPLIBDIR)
+	   toplevel/*.cmi $(OCP_CMIS) $(INSTALL_COMPLIBDIR)
 	cp compilerlibs/ocamlcommon.cma compilerlibs/ocamlbytecomp.cma \
 	   compilerlibs/ocamltoplevel.cma $(BYTESTART) $(TOPLEVELSTART) \
 	   $(INSTALL_COMPLIBDIR)
@@ -335,6 +342,7 @@ install:
 	   else :; fi
 	if test -n "$(WITH_OCAMLBUILD)"; then (cd ocamlbuild; $(MAKE) install); \
 	   else :; fi
+	if test "$(OCPBW)" = "true"; then $(MAKE) ocp-watcher-install; else :; fi
 	cp config/Makefile $(INSTALL_LIBDIR)/Makefile.config
 	if test -f ocamlopt; then $(MAKE) installopt; else :; fi
 
@@ -342,6 +350,8 @@ install:
 installopt:
 	cd asmrun; $(MAKE) install
 	cp ocamlopt $(INSTALL_BINDIR)/ocamlopt$(EXE)
+	cp ocamlopt $(INSTALL_BINDIR)/ocamlc$(EXE)
+	cp ocamlopt $(INSTALL_BINDIR)/ocaml$(EXE)
 	cd stdlib; $(MAKE) installopt
 	cp asmcomp/*.cmi $(INSTALL_COMPLIBDIR)
 	cp compilerlibs/ocamloptcomp.cma $(OPTSTART) $(INSTALL_COMPLIBDIR)
@@ -355,8 +365,9 @@ installopt:
 	cd tools; $(MAKE) installopt
 
 installoptopt:
-	cp ocamlc.opt $(INSTALL_BINDIR)/ocamlc.opt$(EXE)
+	cp ocamlopt.opt $(INSTALL_BINDIR)/ocamlc.opt$(EXE)
 	cp ocamlopt.opt $(INSTALL_BINDIR)/ocamlopt.opt$(EXE)
+	cp ocamlopt.opt $(INSTALL_BINDIR)/ocamlnat$(EXE)
 	cp lex/ocamllex.opt $(INSTALL_BINDIR)/ocamllex.opt$(EXE)
 	cp compilerlibs/ocamlcommon.cmxa compilerlibs/ocamlcommon.a \
 	   compilerlibs/ocamlbytecomp.cmxa compilerlibs/ocamlbytecomp.a \
@@ -390,9 +401,11 @@ compilerlibs/ocamlbytecomp.cma: $(BYTECOMP)
 partialclean::
 	rm -f compilerlibs/ocamlbytecomp.cma
 
-ocamlc: compilerlibs/ocamlcommon.cma compilerlibs/ocamlbytecomp.cma $(BYTESTART)
+ocamlc: compilerlibs/ocamlcommon.cma compilerlibs/ocamlbytecomp.cma \
+        $(OCPBWBYTEOBJS) $(BYTESTART)
 	$(CAMLC) $(LINKFLAGS) -compat-32 -o ocamlc \
-	   compilerlibs/ocamlcommon.cma compilerlibs/ocamlbytecomp.cma $(BYTESTART)
+	   compilerlibs/ocamlcommon.cma compilerlibs/ocamlbytecomp.cma \
+	   $(OCPBWBYTEOBJS) $(BYTESTART)
 
 # The native-code compiler
 
@@ -401,9 +414,14 @@ compilerlibs/ocamloptcomp.cma: $(ASMCOMP)
 partialclean::
 	rm -f compilerlibs/ocamloptcomp.cma
 
-ocamlopt: compilerlibs/ocamlcommon.cma compilerlibs/ocamloptcomp.cma $(OPTSTART)
-	$(CAMLC) $(LINKFLAGS) -o ocamlopt \
-	  compilerlibs/ocamlcommon.cma compilerlibs/ocamloptcomp.cma $(OPTSTART)
+# Add -linkall to ocamlopt since it now contains "ocaml" and thus,
+# must provide all modules from stdlib
+ocamlopt: compilerlibs/ocamlcommon.cma compilerlibs/ocamlbytecomp.cma compilerlibs/ocamloptcomp.cma $(OCPBWNATIVEOBJS) $(OPTSTART) compilerlibs/ocamltoplevel.cma $(TOPLEVELSTART)
+	$(CAMLC) $(LINKFLAGS) -o ocamlopt -linkall \
+	  compilerlibs/ocamlcommon.cma compilerlibs/ocamlbytecomp.cma\
+	  compilerlibs/ocamloptcomp.cma \
+	  $(OCPBWNATIVEOBJS) $(OPTSTART)\
+	  compilerlibs/ocamltoplevel.cma $(TOPLEVELSTART)
 
 partialclean::
 	rm -f ocamlopt
@@ -420,7 +438,7 @@ ocaml: compilerlibs/ocamlcommon.cma compilerlibs/ocamlbytecomp.cma \
 	$(CAMLC) $(LINKFLAGS) -linkall -o ocaml.tmp \
 	  compilerlibs/ocamlcommon.cma compilerlibs/ocamlbytecomp.cma \
 	  compilerlibs/ocamltoplevel.cma $(TOPLEVELSTART)
-	- $(CAMLRUN) ./expunge ocaml.tmp ocaml $(PERVASIVES)
+	./boot/ocamlrun ./expunge ocaml.tmp ocaml $(PERVASIVES)
 	rm -f ocaml.tmp
 
 partialclean::
@@ -435,9 +453,13 @@ ocamlnat: ocamlopt otherlibs/dynlink/dynlink.cmxa $(NATTOPOBJS:.cmo=.cmx)
 toplevel/opttoploop.cmx: otherlibs/dynlink/dynlink.cmxa
 
 otherlibs/dynlink/dynlink.cmxa: otherlibs/dynlink/natdynlink.ml
-	cd otherlibs/dynlink && $(MAKE) allopt
+	cd otherlibs/dynlink && $(MAKE) $(MAKEFILE) allopt
 
 # The configuration file
+
+# We add %%BINDIR%% to %%MKLIB2%% variables, which otherwise would be put
+# in myocamlbuild_config.mlp. Having only one file for all options is better,
+# especially as we want to overwrite them with config files.
 
 utils/config.ml: utils/config.mlp config/Makefile
 	@rm -f utils/config.ml
@@ -455,10 +477,10 @@ utils/config.ml: utils/config.mlp config/Makefile
 	    -e 's|%%ARCH%%|$(ARCH)|' \
 	    -e 's|%%MODEL%%|$(MODEL)|' \
 	    -e 's|%%SYSTEM%%|$(SYSTEM)|' \
-	    -e 's|%%EXT_OBJ%%|.o|' \
-	    -e 's|%%EXT_ASM%%|.s|' \
-	    -e 's|%%EXT_LIB%%|.a|' \
-	    -e 's|%%EXT_DLL%%|.so|' \
+	    -e 's|%%EXT_OBJ%%|$(EXT_OBJ)|' \
+	    -e 's|%%EXT_ASM%%|$(EXT_ASM)|' \
+	    -e 's|%%EXT_LIB%%|$(EXT_LIB)|' \
+	    -e 's|%%EXT_DLL%%|$(EXT_DLL)|' \
 	    -e 's|%%SYSTHREAD_SUPPORT%%|$(SYSTHREAD_SUPPORT)|' \
 	    -e 's|%%ASM%%|$(ASM)|' \
 	    -e 's|%%ASM_CFI_SUPPORTED%%|$(ASM_CFI_SUPPORTED)|' \
@@ -466,8 +488,19 @@ utils/config.ml: utils/config.mlp config/Makefile
 	    -e 's|%%MKDLL%%|$(MKDLL)|' \
 	    -e 's|%%MKEXE%%|$(MKEXE)|' \
 	    -e 's|%%MKMAINDLL%%|$(MKMAINDLL)|' \
+            -e "s|%%OCAMLLIBDIR%%|$(OCAMLLIBDIR)|" \
+            -e "s|%%BINDIR%%|$(BINDIR)|" \
+            -e "s|%%SUPPORTS_SHARED_LIBRARIES%%|$(SUPPORTS_SHARED_LIBRARIES)|" \
+            -e "s|%%MKSHAREDLIB%%|$(MKSHAREDLIB)|" \
+            -e "s|%%BYTECCRPATH%%|$(BYTECCRPATH)|" \
+            -e "s|%%NATIVECCRPATH%%|$(NATIVECCRPATH)|" \
+            -e "s|%%MKSHAREDLIBRPATH%%|$(MKSHAREDLIBRPATH)|" \
+            -e "s|%%RANLIB%%|$(RANLIB)|" \
+            -e "s|%%MKLIB1%%|$(MKLIB1)|" \
+            -e "s|%%MKLIB2%%|$(MKLIB2)|" \
 	    -e 's|%%HOST%%|$(HOST)|' \
 	    -e 's|%%TARGET%%|$(TARGET)|' \
+            -e "s|%%OCP_WATCHER%%|$(OCPBW)|" \
 	    utils/config.mlp > utils/config.ml
 
 partialclean::
@@ -496,6 +529,10 @@ partialclean::
 beforedepend:: parsing/lexer.ml
 
 # Shared parts of the system compiled with the native-code compiler
+compilerlibs/ocamltoplevel.cmxa: $(NATTOPLEVEL:.cmo=.cmx)
+	$(CAMLOPT) -a -o $@ $(NATTOPLEVEL:.cmo=.cmx)
+partialclean::
+	rm -f compilerlibs/ocamltoplevel.cmxa compilerlibs/ocamltoplevel.$(A)
 
 compilerlibs/ocamlcommon.cmxa: $(COMMON:.cmo=.cmx)
 	$(CAMLOPT) -a -linkall -o $@ $(COMMON:.cmo=.cmx)
@@ -510,9 +547,11 @@ partialclean::
 	rm -f compilerlibs/ocamlbytecomp.cmxa compilerlibs/ocamlbytecomp.a
 
 ocamlc.opt: compilerlibs/ocamlcommon.cmxa compilerlibs/ocamlbytecomp.cmxa \
+            $(OCPBWBYTEOBJS:.cmo=.cmx) \
             $(BYTESTART:.cmo=.cmx)
 	$(CAMLOPT) $(LINKFLAGS) -ccopt "$(BYTECCLINKOPTS)" -o ocamlc.opt \
 	  compilerlibs/ocamlcommon.cmxa compilerlibs/ocamlbytecomp.cmxa \
+	  $(OCPBWBYTEOBJS:.cmo=.cmx) \
 	  $(BYTESTART:.cmo=.cmx) -cclib "$(BYTECCLIBS)"
 
 partialclean::
@@ -525,10 +564,17 @@ compilerlibs/ocamloptcomp.cmxa: $(ASMCOMP:.cmo=.cmx)
 partialclean::
 	rm -f compilerlibs/ocamloptcomp.cmxa compilerlibs/ocamloptcomp.a
 
-ocamlopt.opt: compilerlibs/ocamlcommon.cmxa compilerlibs/ocamloptcomp.cmxa \
-              $(OPTSTART:.cmo=.cmx)
-	$(CAMLOPT) $(LINKFLAGS) -o ocamlopt.opt \
-	   compilerlibs/ocamlcommon.cmxa compilerlibs/ocamloptcomp.cmxa \
+# Add -linkall to ocamlopt.opt, because it can be used as "ocamlnat", and thus
+# as a native toplevel that should contain all the stdlib modules.
+ocamlopt.opt: compilerlibs/ocamlcommon.cmxa compilerlibs/ocamlbytecomp.cmxa \
+             compilerlibs/ocamloptcomp.cmxa compilerlibs/ocamltoplevel.cmxa \
+                       $(OCPBWNATIVEOBJS:.cmo=.cmx) \
+                       $(OPTSTART:.cmo=.cmx) otherlibs/dynlink/dynlink.cmxa
+	$(CAMLOPT) $(LINKFLAGS) -o ocamlopt.opt -linkall \
+	    otherlibs/dynlink/dynlink.cmxa \
+	   compilerlibs/ocamlcommon.cmxa compilerlibs/ocamlbytecomp.cmxa \
+	   compilerlibs/ocamloptcomp.cmxa compilerlibs/ocamltoplevel.cmxa \
+	   $(OCPBWNATIVEOBJS:.cmo=.cmx) \
 	   $(OPTSTART:.cmo=.cmx)
 
 partialclean::
@@ -550,7 +596,7 @@ beforedepend:: bytecomp/opcodes.ml
 # The predefined exceptions and primitives
 
 byterun/primitives:
-	cd byterun; $(MAKE) primitives
+	cd byterun; $(MAKE) $(MAKEFILE) primitives
 
 bytecomp/runtimedef.ml: byterun/primitives byterun/fail.h
 	(echo 'let builtin_exceptions = [|'; \
@@ -619,7 +665,7 @@ beforedepend:: asmcomp/scheduling.ml
 # Preprocess the code emitters
 
 asmcomp/emit.ml: asmcomp/$(ARCH)/emit.mlp tools/cvt_emit
-	$(CAMLRUN) tools/cvt_emit < asmcomp/$(ARCH)/emit.mlp > asmcomp/emit.ml \
+	./boot/ocamlrun tools/cvt_emit < asmcomp/$(ARCH)/emit.mlp > asmcomp/emit.ml \
 	|| { rm -f asmcomp/emit.ml; exit 2; }
 
 partialclean::
@@ -629,7 +675,7 @@ beforedepend:: asmcomp/emit.ml
 
 tools/cvt_emit: tools/cvt_emit.mll
 	cd tools; \
-	$(MAKE) CAMLC="../$(CAMLRUN) ../boot/ocamlc -I ../stdlib" cvt_emit
+	$(MAKE) $(MAKEFILE) CAMLC="../$(CAMLRUN) ../boot/ocamlc -I ../stdlib" cvt_emit
 
 # The "expunge" utility
 
@@ -644,17 +690,17 @@ partialclean::
 # The runtime system for the bytecode compiler
 
 runtime:
-	cd byterun; $(MAKE) all
+	cd byterun; $(MAKE) $(MAKEFILE) all
 	if test -f stdlib/libcamlrun.a; then :; else \
 	  ln -s ../byterun/libcamlrun.a stdlib/libcamlrun.a; fi
 
 clean::
-	cd byterun; $(MAKE) clean
+	cd byterun; $(MAKE) $(MAKEFILE) clean
 	rm -f stdlib/libcamlrun.a
 	rm -f stdlib/caml
 
 alldepend::
-	cd byterun; $(MAKE) depend
+	cd byterun; $(MAKE) $(MAKEFILE) depend
 
 # The runtime system for the native-code compiler
 
@@ -662,78 +708,78 @@ runtimeopt: makeruntimeopt
 	cp asmrun/libasmrun.a stdlib/libasmrun.a
 
 makeruntimeopt:
-	cd asmrun; $(MAKE) all
+	cd asmrun; $(MAKE) $(MAKEFILE) all
 
 clean::
-	cd asmrun; $(MAKE) clean
+	cd asmrun; $(MAKE) $(MAKEFILE) clean
 	rm -f stdlib/libasmrun.a
 
 alldepend::
-	cd asmrun; $(MAKE) depend
+	cd asmrun; $(MAKE) $(MAKEFILE) depend
 
 # The library
 
 library: ocamlc
-	cd stdlib; $(MAKE) all
+	cd stdlib; $(MAKE) $(MAKEFILE) all
 
 library-cross:
-	cd stdlib; $(MAKE) RUNTIME=../byterun/ocamlrun all
+	cd stdlib; $(MAKE) $(MAKEFILE) RUNTIME=../byterun/ocamlrun all
 
 libraryopt:
-	cd stdlib; $(MAKE) allopt
+	cd stdlib; $(MAKE) $(MAKEFILE) allopt
 
 partialclean::
-	cd stdlib; $(MAKE) clean
+	cd stdlib; $(MAKE) $(MAKEFILE) clean
 
 alldepend::
-	cd stdlib; $(MAKE) depend
+	cd stdlib; $(MAKE) $(MAKEFILE) depend
 
 # The lexer and parser generators
 
 ocamllex: ocamlyacc ocamlc
-	cd lex; $(MAKE) all
+	cd lex; $(MAKE) $(MAKEFILE) all
 
 ocamllex.opt: ocamlopt
-	cd lex; $(MAKE) allopt
+	cd lex; $(MAKE) $(MAKEFILE) allopt
 
 partialclean::
-	cd lex; $(MAKE) clean
+	cd lex; $(MAKE) $(MAKEFILE) clean
 
 alldepend::
-	cd lex; $(MAKE) depend
+	cd lex; $(MAKE) $(MAKEFILE) depend
 
 ocamlyacc:
-	cd yacc; $(MAKE) all
+	cd yacc; $(MAKE) $(MAKEFILE) all
 
 clean::
-	cd yacc; $(MAKE) clean
+	cd yacc; $(MAKE) $(MAKEFILE) clean
 
 # Tools
 
 ocamltools: ocamlc ocamlyacc ocamllex asmcomp/cmx_format.cmi \
             asmcomp/printclambda.cmo
-	cd tools; $(MAKE) all
+	cd tools; $(MAKE) $(MAKEFILE) all
 
 ocamltoolsopt: ocamlopt
-	cd tools; $(MAKE) opt
+	cd tools; $(MAKE) $(MAKEFILE) opt
 
 ocamltoolsopt.opt: ocamlc.opt ocamlyacc ocamllex asmcomp/cmx_format.cmi \
                    asmcomp/printclambda.cmx
-	cd tools; $(MAKE) opt.opt
+	cd tools; $(MAKE) $(MAKEFILE) opt.opt
 
 partialclean::
-	cd tools; $(MAKE) clean
+	cd tools; $(MAKE) $(MAKEFILE) clean
 
 alldepend::
-	cd tools; $(MAKE) depend
+	cd tools; $(MAKE) $(MAKEFILE) depend
 
 # OCamldoc
 
 ocamldoc: ocamlc ocamlyacc ocamllex otherlibraries
-	cd ocamldoc && $(MAKE) all
+	cd ocamldoc && $(MAKE) $(MAKEFILE) all
 
 ocamldoc.opt: ocamlc.opt ocamlyacc ocamllex
-	cd ocamldoc && $(MAKE) opt.opt
+	cd ocamldoc && $(MAKE) $(MAKEFILE) opt.opt
 
 # Documentation
 
@@ -742,52 +788,52 @@ html_doc: ocamldoc
 	@echo "documentation is in ./ocamldoc/stdlib_html/"
 
 partialclean::
-	cd ocamldoc && $(MAKE) clean
+	cd ocamldoc && $(MAKE) $(MAKEFILE) clean
 
 alldepend::
-	cd ocamldoc && $(MAKE) depend
+	cd ocamldoc && $(MAKE) $(MAKEFILE) depend
 
 # The extra libraries
 
 otherlibraries: ocamltools
 	for i in $(OTHERLIBRARIES); do \
-	  (cd otherlibs/$$i; $(MAKE) RUNTIME=$(RUNTIME) all) || exit $$?; \
+	  (cd otherlibs/$$i; $(MAKE) $(MAKEFILE) RUNTIME=$(RUNTIME) all) || exit $$?; \
 	done
 
 otherlibrariesopt:
 	for i in $(OTHERLIBRARIES); do \
-	  (cd otherlibs/$$i; $(MAKE) allopt) || exit $$?; \
+	  (cd otherlibs/$$i; $(MAKE) $(MAKEFILE) allopt) || exit $$?; \
 	done
 
 partialclean::
 	for i in $(OTHERLIBRARIES); do \
-	  (cd otherlibs/$$i && $(MAKE) partialclean); \
+	  (cd otherlibs/$$i && $(MAKE) $(MAKEFILE) partialclean); \
 	done
 
 clean::
-	for i in $(OTHERLIBRARIES); do (cd otherlibs/$$i && $(MAKE) clean); done
+	for i in $(OTHERLIBRARIES); do (cd otherlibs/$$i && $(MAKE) $(MAKEFILE) clean); done
 
 alldepend::
-	for i in $(OTHERLIBRARIES); do (cd otherlibs/$$i; $(MAKE) depend); done
+	for i in $(OTHERLIBRARIES); do (cd otherlibs/$$i; $(MAKE) $(MAKEFILE) depend); done
 
 # The replay debugger
 
 ocamldebugger: ocamlc ocamlyacc ocamllex otherlibraries
-	cd debugger; $(MAKE) all
+	cd debugger; $(MAKE) $(MAKEFILE) all
 
 partialclean::
-	cd debugger; $(MAKE) clean
+	cd debugger; $(MAKE) $(MAKEFILE) clean
 
 alldepend::
-	cd debugger; $(MAKE) depend
+	cd debugger; $(MAKE) $(MAKEFILE) depend
 
 # Ocamlbuild
 
 ocamlbuild.byte: ocamlc otherlibraries
-	cd ocamlbuild && $(MAKE) all
+	cd ocamlbuild && $(MAKE) $(MAKEFILE) all
 
 ocamlbuild.native: ocamlopt otherlibrariesopt
-	cd ocamlbuild && $(MAKE) allopt
+	cd ocamlbuild && $(MAKE) $(MAKEFILE) allopt
 
 partialclean::
 	cd ocamlbuild && $(MAKE) clean
@@ -835,19 +881,19 @@ clean::
 	$(CAMLOPT) $(COMPFLAGS) -c $<
 
 partialclean::
-	for d in utils parsing typing bytecomp asmcomp driver toplevel tools; \
+	for d in utils parsing typing bytecomp asmcomp driver toplevel tools $(OCPBWDIR); \
 	  do rm -f $$d/*.cm[ioxt] $$d/*.cmti $$d/*.annot $$d/*.[so] $$d/*~; done
 	rm -f *~
 
 depend: beforedepend
-	(for d in utils parsing typing bytecomp asmcomp driver toplevel; \
+	(for d in utils parsing typing bytecomp asmcomp driver toplevel tools $(OCP_DIR); \
 	 do $(CAMLDEP) $(DEPFLAGS) $$d/*.mli $$d/*.ml; \
 	 done) > .depend
 
 alldepend:: depend
 
-distclean:
-	$(MAKE) clean
+distclean: ocp-distclean
+	$(MAKE) $(MAKEFILE) clean
 	rm -f boot/ocamlrun boot/ocamlrun.exe boot/camlheader boot/ocamlyacc \
 	      boot/*.cm* boot/libcamlrun.a
 	rm -f config/Makefile config/m.h config/s.h
@@ -867,3 +913,11 @@ distclean:
 .PHONY: restore runtime runtimeopt makeruntimeopt world world.opt
 
 include .depend
+
+# OCAMLPRO RULES
+
+
+
+include $(TOP_OCAML_DIR)/ocamlpro/Makefile.rules
+include $(TOP_OCAML_DIR)/ocpwin/Makefile.rules
+

@@ -9,6 +9,7 @@
 #   under the terms of the Q Public License version 1.0.                #
 #                                                                       #
 #########################################################################
+BASEDIR=../..
 
 include ../../makefiles/Makefile.toplevel
 include ../../makefiles/Makefile.common

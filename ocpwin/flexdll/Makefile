@@ -1,0 +1,268 @@
+# This is a modified version of the previous Makefile
+
+FILES= \
+  cmdline.ml  coff.ml  create_dll.ml  reloc.ml  \
+  flexdll.c  flexdll_initer.c  flexdll_ocaml.c \
+  $(MORE_SOURCES)
+
+
+VERSION = 0.31+ocp1
+all: $(FILES) flexlink support
+
+$(FILES): %: ../../../ocpwin/flexdll/%
+	rm -f $*
+	ln -s ../../../ocpwin/flexdll/$* $*
+
+include ../config/Makefile
+NATDYNLINK=false
+
+MINGW_PREFIX = i686-w64-mingw32
+MINCC = $(MINGW_PREFIX)-gcc
+
+MINGW64_PREFIX = x86_64-w64-mingw32
+MIN64CC = $(MINGW64_PREFIX)-gcc
+
+CYGWIN_PREFIX = i686-pc-cygwin
+CYGCC = $(CYGWIN_PREFIX)-gcc
+
+CYGWIN64_PREFIX = x86_64-pc-cygwin
+CYG64CC = $(CYGWIN64_PREFIX)-gcc
+
+version.ml: Makefile.cross
+	echo "let version = \"$(VERSION)\"" > version.ml
+	echo "let mingw_prefix = \"$(MINGW_PREFIX)\"" >> version.ml
+	echo "let mingw64_prefix = \"$(MINGW64_PREFIX)\"" >> version.ml
+
+# Supported tool-chains
+
+CHAINS = mingw mingw64 
+# cygwin cygwin64 msvc msvc64
+
+# Compilers
+
+# This Makefile assumes the 32-bit version of VS 2008 or Win7 SDK is in the path.
+
+# MSVCC_ROOT = $(shell which cl.exe | cygpath -f - -ad | xargs -d \\n dirname | cygpath -f - -m)
+# MSVC_LIB1 = $(shell dirname $(MSVCC_ROOT))
+# MSVC_LIB2 = $(shell which ResGen.exe | cygpath -f - -ad | xargs -d \\n dirname | xargs -d \\n dirname | cygpath -f - -m)
+# MSVC_LIB = $(MSVC_LIB1)/Lib;$(MSVC_LIB2)/Lib
+# MSVC_INCLUDE = $(MSVC_LIB1)/Include;$(MSVC_LIB2)/Include
+# MSVC_PREFIX=LIB="$(MSVC_LIB)" INCLUDE="$(MSVC_INCLUDE)" 
+
+# MSVC64_LIB = $(MSVC_LIB1)/Lib/amd64;$(MSVC_LIB2)/Lib/x64
+# MSVC64_PREFIX=LIB="$(MSVC64_LIB)" INCLUDE="$(MSVC_INCLUDE)" 
+
+show_root:
+	@echo "$(MSVCC_ROOT)"
+	@echo "$(MSVC_LIB)"
+
+MSVCC = $(MSVCC_ROOT)/cl.exe /nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
+MSVCC64 = $(MSVCC_ROOT)/amd64/cl.exe /nologo /MD -D_CRT_SECURE_NO_DEPRECATE /GS-
+OCAMLC = ../../boot/ocamlrun ../../boot/ocamlc
+#OCAMLOPT = FLEXLINKFLAGS=-real-manifest ocamlopt
+#LINKFLAGS = unix.cmxa
+
+ifeq ($(TOOLCHAIN), msvc)
+RES=version.res
+else
+RES=version_res.o
+endif
+
+ifeq ($(NATDYNLINK), false)
+#when ocaml is not built with flexlink i.e. -no-shared-libs
+LINKFLAGS = -cclib "$(RES)"
+else
+LINKFLAGS = -cclib "-link $(RES)"
+endif
+
+support:
+	for i in $(CHAINS); do $(MAKE) -f Makefile.cross build_$$i; done 
+
+build_gnat: flexdll_gnat.o flexdll_initer_gnat.o flexdll_ocaml_gnat.o
+build_msvc: flexdll_msvc.obj flexdll_initer_msvc.obj flexdll_ocaml_msvc.obj
+build_msvc64: flexdll_msvc64.obj flexdll_initer_msvc64.obj flexdll_ocaml_msvc64.obj
+build_cygwin: flexdll_cygwin.o flexdll_initer_cygwin.o  flexdll_ocaml_cygwin.o
+build_cygwin64: flexdll_cygwin64.o flexdll_initer_cygwin64.o  flexdll_ocaml_cygwin64.o
+build_mingw: flexdll_mingw.o flexdll_initer_mingw.o  flexdll_ocaml_mingw.o
+build_mingw64: flexdll_mingw64.o flexdll_initer_mingw64.o flexdll_ocaml_mingw64.o
+
+OBJS = version.ml coff.ml cmdline.ml create_dll.ml reloc.ml
+
+flexlink: $(OBJS) $(RES)
+	@echo Building flexlink with TOOLCHAIN=$(TOOLCHAIN)
+	rm -f flexlink
+	$(OCAMLC) -cc "$(BYTECC)" -custom -g -w -105 -o flexlink -I ../stdlib -I ../byterun $(LINKFLAGS) $(OBJS) 
+
+flexlink.asm: $(OBJS) $(RES)
+	@echo Building flexlink.asm with TOOLCHAIN=$(TOOLCHAIN)
+	../../boot/ocamlrun ../../ocamlopt -I ../../stdlib -g -w -105 -o flexlink.asm $(LINKFLAGS) $(OBJS)
+
+version.res: version.rc
+	rc version.rc
+
+ifeq ($(ARCH), i386)
+version_res.o: version.rc
+	i686-w64-mingw32-windres version.rc version_res.o
+else
+version_res.o: version.rc
+	x86_64-w64-mingw32-windres version.rc version_res.o
+endif
+
+flexdll_msvc.obj: flexdll.h flexdll.c
+	$(MSVC_PREFIX) $(MSVCC) /DMSVC -c /Fo"flexdll_msvc.obj" flexdll.c
+
+flexdll_msvc64.obj: flexdll.h flexdll.c
+	$(MSVC64_PREFIX) $(MSVCC64) /DMSVC  -c /Fo"flexdll_msvc64.obj" flexdll.c
+
+flexdll_cygwin.o: flexdll.h flexdll.c
+	$(CYGCC) -c -DCYGWIN -o flexdll_cygwin.o flexdll.c
+
+flexdll_cygwin64.o: flexdll.h flexdll.c
+	$(CYG64CC) -c -DCYGWIN -o flexdll_cygwin64.o flexdll.c
+
+flexdll_mingw.o: flexdll.h flexdll.c
+	$(MINCC) -c -DMINGW -o flexdll_mingw.o flexdll.c
+
+flexdll_gnat.o: flexdll.h flexdll.c
+	gcc -c -o flexdll_gnat.o flexdll.c
+
+flexdll_mingw64.o: flexdll.h flexdll.c
+	$(MIN64CC) -c -DMINGW -o flexdll_mingw64.o flexdll.c
+
+flexdll_initer_msvc.obj: flexdll_initer.c
+	$(MSVC_PREFIX) $(MSVCC) -c /Fo"flexdll_initer_msvc.obj" flexdll_initer.c
+
+flexdll_initer_msvc64.obj: flexdll_initer.c
+	$(MSVC64_PREFIX) $(MSVCC64) -c /Fo"flexdll_initer_msvc64.obj" flexdll_initer.c
+
+flexdll_initer_cygwin.o: flexdll_initer.c
+	$(CYGCC) -c -o flexdll_initer_cygwin.o flexdll_initer.c
+
+flexdll_initer_cygwin64.o: flexdll_initer.c
+	$(CYG64CC) -c -o flexdll_initer_cygwin64.o flexdll_initer.c
+
+flexdll_initer_mingw.o: flexdll_initer.c
+	$(MINCC) -c -o flexdll_initer_mingw.o flexdll_initer.c
+
+flexdll_initer_gnat.o: flexdll_initer.c
+	gcc -c -o flexdll_initer_gnat.o flexdll_initer.c
+
+flexdll_initer_mingw64.o: flexdll_initer.c
+	$(MIN64CC) -c -o flexdll_initer_mingw64.o flexdll_initer.c
+
+
+flexdll_ocaml_msvc.obj: flexdll_ocaml.c
+	$(MSVC_PREFIX) $(MSVCC) -c /Fo"flexdll_ocaml_msvc.obj" flexdll_ocaml.c
+
+flexdll_ocaml_msvc64.obj: flexdll_ocaml.c
+	$(MSVC64_PREFIX) $(MSVCC64) -c /Fo"flexdll_ocaml_msvc64.obj" flexdll_ocaml.c
+
+flexdll_ocaml_cygwin.o: flexdll_ocaml.c
+	$(CYGCC) -c -o flexdll_ocaml_cygwin.o flexdll_ocaml.c
+
+flexdll_ocaml_cygwin64.o: flexdll_ocaml.c
+	$(CYG64CC) -c -o flexdll_ocaml_cygwin64.o flexdll_ocaml.c
+
+flexdll_ocaml_mingw.o: flexdll_ocaml.c
+	$(MINCC) -c -o flexdll_ocaml_mingw.o flexdll_ocaml.c
+
+flexdll_ocaml_gnat.o: flexdll_ocaml.c
+	gcc -c -o flexdll_ocaml_gnat.o flexdll_ocaml.c
+
+flexdll_ocaml_mingw64.o: flexdll_ocaml.c
+	$(MIN64CC) -c -o flexdll_ocaml_mingw64.o flexdll_ocaml.c
+
+
+demo_msvc: flexlink.exe flexdll_msvc.obj flexdll_initer_msvc.obj
+	(cd test && $(MSVC_PREFIX) $(MAKE) clean demo CHAIN=msvc CC="$(MSVCC)" O=obj)
+
+demo_cygwin: flexlink.exe flexdll_cygwin.o flexdll_initer_cygwin.o
+	(cd test && $(MAKE) clean demo CHAIN=cygwin CC="$(CYGCC)" O=o)
+
+demo_cygwin64: flexlink.exe flexdll_cygwin64.o flexdll_initer_cygwin64.o
+	(cd test && $(MAKE) clean demo CHAIN=cygwin64 CC="$(CYG64CC)" O=o RUN="PATH=\"/cygdrive/c/cygwin64/bin:$(PATH)\"")
+
+demo_mingw: flexlink.exe flexdll_mingw.o flexdll_initer_mingw.o
+	(cd test && $(MAKE) clean demo CHAIN=mingw CC="$(MINCC)" O=o)
+
+demo_mingw64: flexlink.exe flexdll_mingw64.o flexdll_initer_mingw64.o
+	(cd test && $(MAKE) clean demo CHAIN=mingw64 CC="$(MIN64CC)" O=o)
+
+demo_msvc64:  flexlink.exe flexdll_msvc64.obj flexdll_initer_msvc64.obj
+	(cd test && $(MSVC64_PREFIX) $(MAKE) clean demo CHAIN=msvc64 CC="$(MSVCC64)" O=obj)
+
+clean::
+	rm -f *.obj *.o *.lib *.a *.exe *.cmx *.dll *.exp *.cmi *~ *.cmo
+	rm -f $(FILES)
+#	cd test && $(MAKE) clean
+
+
+## Packaging
+
+COMMON_FILES = LICENSE README CHANGES flexdll.h flexdll.c flexdll_initer.c default.manifest default_amd64.manifest
+URL = frisch@frisch.fr:www/flexdll/
+
+# Source packages
+
+PACKAGE = flexdll-$(VERSION).tar.gz
+
+package_src:
+	rm -Rf flexdll
+	mkdir flexdll
+	mkdir flexdll/test
+	cp -a *.ml Makefile $(COMMON_FILES) version.rc flexdll/
+	cp -aR test/Makefile test/*.c flexdll/test/
+	tar czf $(PACKAGE) flexdll
+	rm -Rf flexdll
+
+upload:
+	rsync $(PACKAGE) CHANGES LICENSE $(URL)
+
+upload_dev:
+	$(MAKE) VERSION=dev upload_src
+
+upload_src: package_src upload
+
+# Binary package
+
+PACKAGE_BIN = flexdll-bin-$(VERSION)$(PACKAGE_BIN_SUFFIX).zip
+INSTALLER = flexdll-$(VERSION)$(PACKAGE_BIN_SUFFIX)-setup.exe
+
+package_bin:
+	$(MAKE) clean all
+	rm -f $(PACKAGE_BIN)
+	zip $(PACKAGE_BIN) $(COMMON_FILES) \
+	    flexlink.exe flexdll_*.obj flexdll_*.o
+
+do_upload_bin:
+	rsync $(PACKAGE_BIN) $(URL)
+
+upload_bin: package_bin do_upload_bin
+
+show_toolchain:
+	@echo Toolchain for the visible ocamlopt: $(TOOLCHAIN)
+
+swap:
+	NOMLFICORE=1 $(OCAMLOPT) -o flexlink-new.exe $(LINKFLAGS) $(OBJS)
+	cp flexlink.exe flexlink.exe.bak
+	cp flexlink-new.exe flexlink.exe
+
+#PREFIX = "C:\Program Files\flexdll"
+#
+#install:
+#	mkdir -p $(PREFIX)
+#	cp $(COMMON_FILES) flexlink.exe flexdll_*.obj flexdll_*.o $(PREFIX)
+
+installer:
+	rm -rf flexdll_install_files
+	mkdir flexdll_install_files
+	(cd flexdll_install_files && unzip ../$(PACKAGE_BIN))
+	/cygdrive/c/Program\ Files\ \(x86\)/NSIS/makensis installer.nsi
+	mv flexdll_setup.exe $(INSTALLER)
+
+upload_installer:
+	rsync $(INSTALLER) $(URL)
+
+
+upload_all:
+	$(MAKE) upload_src upload_bin installer upload_installer

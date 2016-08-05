@@ -326,8 +326,8 @@ let instr_size = function
   | Lop(Icall_imm s) -> 1
   | Lop(Itailcall_ind) -> 5
   | Lop(Itailcall_imm s) -> if s = !function_name then 1 else 4
-  | Lop(Iextcall(s, true)) -> 3
-  | Lop(Iextcall(s, false)) -> if pic_externals then 4 else 1
+  | Lop(Iextcall(s, true, _)) -> 3
+  | Lop(Iextcall(s, false, _)) -> if pic_externals then 4 else 1
   | Lop(Istackoffset n) -> 1
   | Lop(Iload(chunk, addr)) ->
       if chunk = Byte_signed
@@ -508,7 +508,7 @@ let rec emit_instr i dslot =
           end;
           `	b	{emit_symbol s}\n`
         end
-    | Lop(Iextcall(s, alloc)) ->
+    | Lop(Iextcall(s, alloc, _locid)) ->
         if alloc then begin
           if pic_externals then begin
             external_functions := StringSet.add s !external_functions;
@@ -779,7 +779,7 @@ let is_simple_instr i =
     Lop op ->
       begin match op with
         Icall_imm _ | Icall_ind | Itailcall_imm _ | Itailcall_ind |
-        Iextcall(_, _) -> false
+        Iextcall(_, _, _) -> false
       | Ialloc(_) -> false
       | Iintop(Icomp _) -> false
       | Iintop_imm(Iand, _) -> false

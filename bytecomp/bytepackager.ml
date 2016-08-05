@@ -193,11 +193,20 @@ let build_global_target oc target_name members mapping pos coercion =
       components (Ident.create_persistent target_name) coercion in
   if !Clflags.dump_lambda then
     Format.printf "%a@." Printlambda.lambda lam;
-  let instrs =
-    Bytegen.compile_implementation target_name lam in
-  let rel =
-    Emitcode.to_packed_file oc instrs in
-  relocs := List.map (fun (r, ofs) -> (r, pos + ofs)) rel @ !relocs
+  let instrs = Bytegen.compile_implementation target_name lam in
+  let rel, cu_memprof =
+    Emitcode.to_packed_file oc target_name instrs in
+  relocs := List.map (fun (r, ofs) -> (r, pos + ofs)) rel @ !relocs;
+  cu_memprof
+
+let rec package_memprof_infos members =
+  match members with
+  [] -> []
+  | { pm_kind = PM_intf } :: members ->
+    package_memprof_infos members
+  | { pm_kind = PM_impl cu } :: members ->
+    cu.cu_memprof @ (package_memprof_infos members)
+
 
 (* Build the .cmo file obtained by packaging the given .cmo files. *)
 
@@ -220,7 +229,9 @@ let package_object_files ppf files targetfile targetname coercion =
     let pos_code = pos_out oc in
     let ofs = rename_append_bytecode_list ppf targetname oc mapping [] 0
                                           targetname Subst.identity members in
-    build_global_target oc targetname members mapping ofs coercion;
+    let cu_memprof =
+      build_global_target oc targetname members mapping ofs coercion
+    in
     let pos_debug = pos_out oc in
     if !Clflags.debug && !events <> [] then begin
       output_value oc (List.rev !events);
@@ -241,7 +252,9 @@ let package_object_files ppf files targetfile targetname coercion =
         cu_primitives = !primitives;
         cu_force_link = !force_link;
         cu_debug = if pos_final > pos_debug then pos_debug else 0;
-        cu_debugsize = pos_final - pos_debug } in
+        cu_debugsize = pos_final - pos_debug;
+        cu_memprof = (package_memprof_infos members) @ [ cu_memprof];
+      } in
     output_value oc compunit;
     seek_out oc pos_depl;
     output_binary_int oc pos_final;

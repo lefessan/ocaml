@@ -31,7 +31,9 @@ val to_memory: instruction list -> instruction list ->
              size of this block
              relocation information *)
 val to_packed_file:
-  out_channel -> instruction list -> (reloc_info * int) list
+  out_channel -> string -> instruction list ->
+  (reloc_info * int) list
+    * Cmo_format.memprof_info
         (* Arguments:
              channel on output file
              list of instructions to emit

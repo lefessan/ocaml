@@ -13,10 +13,14 @@
 
 include ../config/Makefile
 
+OCP_OBJS=memprof.o ocpwin.o
+OCP_FILES=memprof.c ocpwin.c
+
 CC=$(NATIVECC)
 FLAGS=-I../byterun -DCAML_NAME_SPACE -DNATIVE_CODE \
-      -DTARGET_$(ARCH) -DSYS_$(SYSTEM) $(IFLEXDIR)
-CFLAGS=$(FLAGS) -O $(NATIVECCCOMPOPTS)
+      -DTARGET_$(ARCH) -DSYS_$(SYSTEM) $(IFLEXDIR) \
+      $(OTHER_INC)
+CFLAGS=$(FLAGS) -g -O $(NATIVECCCOMPOPTS)
 DFLAGS=$(FLAGS) -g -DDEBUG $(NATIVECCCOMPOPTS)
 PFLAGS=$(FLAGS) -pg -O -DPROFILING $(NATIVECCPROFOPTS)
 
@@ -25,7 +29,9 @@ COBJS=startup.o main.o fail.o roots.o globroots.o signals.o signals_asm.o \
   floats.o str.o array.o io.o extern.o intern.o hash.o sys.o parsing.o \
   gc_ctrl.o terminfo.o md5.o obj.o lexing.o printexc.o callback.o weak.o \
   compact.o finalise.o custom.o $(UNIX_OR_WIN32).o backtrace.o natdynlink.o\
-  debugger.o meta.o dynlink.o
+  debugger.o meta.o dynlink.o $(OCP_OBJS) $(OTHER_OBJS)
+SHARED_LIBS_TMP=$(SUPPORTS_SHARED_LIBRARIES:%false=)
+#SHARED_LIBS_DEPS=$(SHARED_LIBS_TMP:%true=libasmrun_shared.so)
 
 ASMOBJS=$(ARCH).o
 
@@ -33,12 +39,21 @@ OBJS=$(COBJS) $(ASMOBJS)
 DOBJS=$(COBJS:.o=.d.o) $(ASMOBJS)
 POBJS=$(COBJS:.o=.p.o) $(ASMOBJS:.o=.p.o)
 
-all: libasmrun.a all-$(RUNTIMED) all-$(PROFILING)
+PICOBJS=$(OBJS:.o=.pic.o)
+all: libasmrun.a all-$(RUNTIMED) all-$(PROFILING) $(SHARED_LIBS_DEPS)
 
 libasmrun.a: $(OBJS)
 	rm -f libasmrun.a
 	ar rc libasmrun.a $(OBJS)
 	$(RANLIB) libasmrun.a
+
+libasmrun_shared.so: $(PICOBJS)
+	$(MKDLL) -o libasmrun_shared.so $(PICOBJS)
+
+install::
+	if test -f libasmrun_shared.so; then \
+	  cp libasmrun_shared.so $(LIBDIR)/libasmrun_shared.so; fi
+	cp -f stack.h  $(LIBDIR)/caml/internals/
 
 all-noruntimed:
 .PHONY: all-noruntimed
@@ -62,7 +77,7 @@ libasmrunp.a: $(POBJS)
 
 INSTALL_LIBDIR=$(DESTDIR)$(LIBDIR)
 
-install: install-default install-$(RUNTIMED) install-$(PROFILING)
+install:: install-default install-$(RUNTIMED) install-$(PROFILING)
 
 install-default:
 	cp libasmrun.a $(INSTALL_LIBDIR)/libasmrun.a
@@ -168,12 +183,15 @@ LINKEDFILES=misc.c freelist.c major_gc.c minor_gc.c memory.c alloc.c array.c \
   compare.c ints.c floats.c str.c io.c extern.c intern.c hash.c sys.c \
   parsing.c gc_ctrl.c terminfo.c md5.c obj.c lexing.c printexc.c callback.c \
   weak.c compact.c finalise.c meta.c custom.c main.c globroots.c \
-  $(UNIX_OR_WIN32).c dynlink.c signals.c debugger.c
+  $(UNIX_OR_WIN32).c dynlink.c signals.c debugger.c $(OCP_FILES) $(OTHER_FILES)
+
+$(OCP_FILES): %.c: ../byterun/%.c
+	ln -s ../byterun/$*.c $*.c
 
 clean::
 	rm -f $(LINKEDFILES)
 
-.SUFFIXES: .S .d.o .p.o
+.SUFFIXES: .S .d.o .p.o .pic.o
 
 .S.o:
 	$(ASPP) -DSYS_$(SYSTEM) -DMODEL_$(MODEL) -o $*.o $*.S || \
@@ -181,6 +199,14 @@ clean::
           echo "unhappy with the preprocessor. Check your assembler, or";\
           echo "try producing $*.o by hand.";\
           exit 2; }
+
+.c.pic.o:
+	ln -s -f $*.c $*.pic.c
+	$(CC) -c $(CFLAGS) $(SHAREDCCCOMPOPTS) $*.pic.c
+	rm $*.pic.c
+
+.S.pic.o:
+	$(ASPP) -D__PIC__ -DSYS_$(SYSTEM) $(ASPPPROFFLAGS) -o $*.pic.o $*.S
 
 .S.p.o:
 	$(ASPP) -DSYS_$(SYSTEM) -DMODEL_$(MODEL) $(ASPPPROFFLAGS) -o $*.p.o $*.S

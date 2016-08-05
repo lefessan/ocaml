@@ -15,7 +15,7 @@
 #include <sys/types.h>
 #include <mlvalues.h>
 #include <alloc.h>
-#include <io.h>
+#include <camlio.h>
 #include <signals.h>
 #include "unixsupport.h"
 

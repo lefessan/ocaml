@@ -1,0 +1,654 @@
+byterun_hfiles = [
+    "version.h" "commit.h" (* These two files should be imported from Linux *)
+    "alloc.h"
+    "backtrace.h"
+    "callback.h"
+    "camlio.h"
+    "compact.h"
+    "compare.h"
+    "compatibility.h"
+    "config.h"
+    "custom.h"
+    "debugger.h"
+    "dynlink.h"
+    "exec.h"
+    "fail.h"
+    "finalise.h"
+    "fix_code.h"
+    "freelist.h"
+    "gc.h"
+    "gc_ctrl.h"
+    "globroots.h"
+    "hash.h"
+    "instrtrace.h"
+    "instruct.h"
+    "int64_emul.h"
+    "int64_format.h"
+    "int64_native.h"
+    "interp.h"
+    "intext.h"
+    "major_gc.h"
+    "md5.h"
+    "memory.h"
+    "minor_gc.h"
+    "misc.h"
+    "mlvalues.h"
+    "osdeps.h"
+    "prims.h"
+    "printexc.h"
+    "reverse.h"
+    "roots.h"
+    "signals.h"
+    "signals_machdep.h"
+    "stacks.h"
+    "startup.h"
+    "sys.h"
+    "ui.h"
+    "weak.h"
+];;
+
+
+begin
+  dirname += "byterun";
+
+  begin rules "byterun"
+
+      byterun_cfiles = [
+   "interp.c" "misc.c" "stacks.c" "fix_code.c" "startup.c"
+   "freelist.c" "major_gc.c" "minor_gc.c"
+   "memory.c" "alloc.c" "roots.c"  "globroots.c"
+   "fail.c" "signals.c" "signals_byt.c"  "printexc.c"
+   "backtrace.c" "compare.c" "ints.c"
+   "floats.c" "str.c" "array.c" "io.c" "extern.c"
+   "intern.c" "hash.c" "sys.c" "meta.c" "parsing.c"
+   "gc_ctrl.c" "terminfo.c" "md5.c" "obj.c"
+   "lexing.c" "callback.c" "debugger.c" "weak.c"
+   "compact.c" "finalise.c" "custom.c"
+   "dynlink.c" "win32.c" "main.c"
+      ];
+
+
+    ocamlpro_hfiles = [ "../../ocamlpro/memprof.h" ];
+    ocamlpro_cfiles = [ "memprof.c" "ocpwin.c" ];
+
+(*
+  target_arch = %string ( strings = [ "-DTARGET_" architecture ])
+  sys_system = %string ( strings = [ "-DSYS_" system ])
+*)
+
+  byterun_cobjs = %subst_ext ( files = [ byterun_cfiles ]
+                      from_ext = ".c"
+                      to_file = "%{basename}%.obj"
+                     );
+
+  ocamlpro_cobjs = %subst_ext ( files = [ ocamlpro_cfiles ]
+                      from_ext = ".c"
+                      to_file = "%{basename}%.obj"
+                     );
+
+  cobjs = [ byterun_cobjs ocamlpro_cobjs];
+  includes = [ byterun_hfiles ocamlpro_hfiles ];
+  objs = [ cobjs ];
+
+  bytecomp_c_options = [ "-DOCAML_STDLIB_DIR=\"lib\"" "/Z7" "-DCAML_NAME_SPACE" "-I../../ocamlpro" "-I../../ocpwin/flexdll" "/W3" ];
+
+  build_rules = [
+
+     "libcamlrun.lib" (
+       sources = objs;
+       commands = [ { mklib1 %string( strings = [ "/out:" "libcamlrun.lib"]) objs } ];
+       build_target = true
+     );
+
+     byterun_cobjs (
+       sources = [ includes "%{basename}%.c" ];
+       commands = [
+         {  bytecomp_c_compiler "-c" bytecomp_c_options "/Fo%{basename}%.obj" "%{basename}%.c" }
+       ];
+     );
+
+     ocamlpro_cobjs (
+       sources = [ includes "../../ocamlpro/%{basename}%.c" ];
+       commands = [
+         {  "cp"  "../../ocamlpro/%{basename}%.c" "%{basename}%.c" }
+         {  bytecomp_c_compiler "-c" bytecomp_c_options "/Fo%{basename}%.obj" "%{basename}%.c" }
+	 { "rm" "-f" "%{basename.c}%" }
+       ];
+     );
+
+  ]
+
+  end;
+
+end;;
+
+
+begin
+  dirname += "asmrun";
+
+  begin rules "asmrun"
+
+      asmrun_hfiles = [
+        "signals_osdep.h"  "stack.h"
+      ];
+    asmrun_cfiles = [
+      "backtrace.c"  "fail.c"  "natdynlink.c"  "roots.c"  "signals_asm.c"
+        "startup.c"
+    ];
+
+    byterun_cfiles = [
+      "main.c" "globroots.c" "signals.c"
+        "misc.c" "freelist.c" "major_gc.c" "minor_gc.c"
+        "memory.c" "alloc.c" "compare.c" "ints.c"
+        "floats.c" "str.c" "array.c" "io.c" "extern.c"
+        "intern.c" "hash.c" "sys.c" "parsing.c"
+        "gc_ctrl.c" "terminfo.c" "md5.c" "obj.c"
+        "lexing.c" "printexc.c" "callback.c" "weak.c"
+        "compact.c" "finalise.c" "custom.c" "win32.c" "debugger.c"
+        "meta.c" "dynlink.c"
+    ];
+
+
+    ocamlpro_hfiles = [ "../../ocamlpro/memprof.h" ];
+    ocamlpro_cfiles = [ "memprof.c" "ocpwin.c" ];
+
+    byterun_hfiles = %subst_ext ( files = [ byterun_hfiles ]
+        from_ext = ".h"
+        to_file = "../byterun/%{basename}%.h"
+    );
+
+    target_arch = %string ( strings = [ "-DTARGET_" architecture ]);
+    sys_system = %string ( strings = [ "-DSYS_" system ]);
+
+    byterun_cobjs = %subst_ext ( files = [ byterun_cfiles ]
+        from_ext = ".c"
+        to_file = "%{basename}%.obj"
+    );
+
+    asmrun_cobjs = %subst_ext ( files = [ asmrun_cfiles ]
+        from_ext = ".c"
+        to_file = "%{basename}%.obj"
+    );
+
+    ocamlpro_cobjs = %subst_ext ( files = [ ocamlpro_cfiles ]
+        from_ext = ".c"
+        to_file = "%{basename}%.obj"
+    );
+
+    asmsrc = [ %string( strings = [ architecture "nt.asm" ] ) ];
+    asmobj = [ %string( strings = [ architecture "nt" ext_cc_obj ] ) ];
+    cobjs = [ byterun_cobjs asmrun_cobjs ocamlpro_cobjs];
+    includes = [ byterun_hfiles asmrun_hfiles ocamlpro_hfiles ];
+    objs = [ cobjs asmobj ];
+
+    native_c_options = [ "/Z7" target_arch sys_system  "-DCAML_NAME_SPACE" "-DNATIVE_CODE" "-I../asmrun" "-I../byterun" "-I../../ocamlpro" "-I../../ocpwin/flexdll" "/W3" ];
+
+    build_rules = [
+
+      "libasmrun.lib" (
+        sources = objs;
+        commands = [ { mklib1 %string( strings = [ "/out:" "libasmrun.lib"]) objs } ];
+        build_target = true;
+      );
+
+      asmobj (
+        sources = asmsrc;
+        commands = [ { assembler asmobj asmsrc } ];
+      );
+
+      byterun_cobjs (
+        sources = [ includes "../byterun/%{basename}%.c" ];
+        commands = [
+          {  "cp"  "../byterun/%{basename}%.c" "%{basename}%.c" };
+          {  native_c_compiler "-c" native_c_options "/Fo%{basename}%.obj" "../byterun/%{basename}%.c" };
+	  { "rm" "-f" "%{basename.c}%" }
+        ];
+      );
+
+      asmrun_cobjs (
+        sources = [ includes "%{basename}%.c" ];
+        commands = [
+          {  native_c_compiler "-c" native_c_options "/Fo%{basename}%.obj" "%{basename}%.c" };
+        ]
+      );
+
+     ocamlpro_cobjs (
+       sources = [ includes "../../ocamlpro/%{basename}%.c" ];
+       commands = [
+         {  "cp"  "../../ocamlpro/%{basename}%.c" "%{basename}%.c" };
+         {  native_c_compiler "-c" native_c_options "/Fo%{basename}%.obj" "%{basename}%.c" };
+	 { "rm" "-f" "%{basename.c}%" }
+       ]
+     )
+
+    ]
+
+  end
+
+end;;
+
+
+begin
+  dirname += "otherlibs";
+
+  begin
+    dirname += "win32unix";
+
+    begin rules "win32unix"
+
+        hfiles = [
+          "socketaddr.h" "unixsupport.h" "windbug.h" "winlist.h" "winworker.h"
+        ] ;
+
+      unix_cfiles = [ "access.c" "addrofstr.c" "chdir.c" "chmod.c" "cst2constr.c"
+                        "cstringv.c" "envir.c" "execv.c" "execve.c" "execvp.c"
+                        "exit.c" "getaddrinfo.c" "getcwd.c" "gethost.c" "gethostname.c"
+                        "getnameinfo.c" "getproto.c"
+                        "getserv.c" "gmtime.c" "putenv.c" "rmdir.c"
+                        "socketaddr.c" "strofaddr.c" "time.c" "unlink.c" "utimes.c"
+                    ];
+
+      win32_cfiles = [
+        "accept.c" "bind.c" "channels.c" "close.c"
+          "close_on.c" "connect.c" "createprocess.c" "dup.c" "dup2.c" "errmsg.c"
+          "getpeername.c" "getpid.c" "getsockname.c" "gettimeofday.c"
+          "link.c" "listen.c" "lockf.c" "lseek.c" "nonblock.c"
+          "mkdir.c" "open.c" "pipe.c" "read.c" "rename.c"
+          "select.c" "sendrecv.c" (* "getppid.c"  "kill.c"  "alarm.c" *)
+          "shutdown.c" "sleep.c" "socket.c" "sockopt.c" "startup.c" "stat.c"
+          "system.c" "times.c" "unixsupport.c" "windir.c" "winwait.c" "write.c"
+          "winlist.c" "winworker.c" "windbug.c" (* "isatty.c" *)
+
+      ];
+
+      unix_cobjs = %subst_ext ( files = [ unix_cfiles ]
+          from_ext = ".c"
+          to_file = "%{basename}%.obj"
+      );
+      unix_cfiles = %subst_ext ( files = [ unix_cfiles ]
+          from_ext = ".c"
+          to_file = "%{basename}%.c"
+      );
+
+      win32_cobjs = %subst_ext ( files = [ win32_cfiles ]
+          from_ext = ".c"
+          to_file = "%{basename}%.obj"
+      );
+
+      byterun_hfiles = %subst_ext ( files = [ byterun_hfiles ]
+          from_ext = ".h"
+          to_file = "../../byterun/%{basename}%.h"
+      );
+
+      unix_hfiles = [ "../unix/cst2constr.h" ];
+      includes = [ byterun_hfiles unix_hfiles hfiles ];
+      objs = [ unix_cobjs win32_cobjs ];
+
+      bytecomp_c_options = [ "-DOCAML_STDLIB_DIR='lib'" "/Z7" "-I../../byterun" "-I../../../ocamlpro" "-I../unix" "-I../../../ocpwin/flexdll" "/W3" ];
+
+      build_rules = [
+
+        "libunix.lib" (
+          sources = objs;
+          commands = [ { mklib1 %string( strings = [ "/out:" "libunix.lib"]) objs } ];
+          build_target = true
+        );
+
+        win32_cobjs (
+          sources = [ includes "%{basename}%.c" ];
+          commands = [
+            {  bytecomp_c_compiler "-c" bytecomp_c_options "/Fo%{basename}%.obj" "%{basename}%.c" }
+          ]
+        );
+
+        unix_cobjs (
+          sources = [ includes "../unix/%{basename}%.c" ];
+          commands = [
+            {  "cp" "-f" "../unix/%{basename}%.c" "%{basename}%.c" };
+            {  bytecomp_c_compiler "-c" bytecomp_c_options "/Fo%{basename}%.obj" "%{basename}%.c" };
+            {  "rm" "-f" "%{basename}%.c" };
+          ]
+        )
+      ]
+    end;
+
+  end;
+
+  begin
+    dirname += "win32graph";
+
+    begin rules "win32graph" ;
+
+      hfiles = [
+        "libgraph.h"
+      ];
+
+      graph__cfiles = [
+        "dib.c" "draw.c" "events.c" "open.c"
+      ];
+
+      graph__cobjs = %subst_ext ( files = [ graph__cfiles ]
+          from_ext = ".c"
+          to_file = "%{basename}%.obj"
+      );
+
+      byterun_hfiles = %subst_ext ( files = [ byterun_hfiles ]
+          from_ext = ".h"
+          to_file = "../../byterun/%{basename}%.h"
+      );
+
+      unix_hfiles = [ "../unix/cst2constr.h" ];
+      includes = [ byterun_hfiles hfiles ];
+      objs = [ graph__cobjs ];
+
+      bytecomp_c_options = [ "-DOCAML_STDLIB_DIR='lib'" "/Z7" "-DCAML_NAME_SPACE" "-I../../byterun" "-I../../../ocamlpro" "-I../../../ocpwin/flexdll" "/W3" ];
+
+      build_rules = [
+
+        "libgraphics.lib" (
+          sources = objs;
+          commands = [ { mklib1 %string( strings = [ "/out:" "libgraphics.lib"]) objs } ];
+          build_target = true;
+        );
+
+        graph__cobjs (
+          sources = [ includes "%{basename}%.c" ];
+          commands = [
+            {  bytecomp_c_compiler "-c" bytecomp_c_options "/Fo%{basename}%.obj" "%{basename}%.c" }
+          ];
+        )
+
+      ]
+    end;
+
+  end;
+
+  begin
+    dirname += "str"
+
+      begin rules "win32str";
+
+        library_lib = "libcamlstr.lib";
+        library_options = [  "-I../win32unix" "-DIN_OCAML_STR" ]
+
+          hfiles = [    ] ;
+
+        str_cfiles = [
+          "strstubs.c"
+        ];
+
+        str_cobjs = %subst_ext ( files = [ str_cfiles ]
+            from_ext = ".c"
+            to_file = "%{basename}%.obj"
+        );
+
+        byterun_hfiles = %subst_ext ( files = [ byterun_hfiles ]
+            from_ext = ".h"
+            to_file = "../../byterun/%{basename}%.h"
+        );
+
+        includes = [ byterun_hfiles hfiles ];
+        objs = [ str_cobjs ];
+
+        bytecomp_c_options = [  library_options "/Z7" "-I../../byterun" "-I../../../ocamlpro" "-I../../../ocpwin/flexdll" "/W3" ];
+
+        build_rules = [
+
+
+          library_lib (
+            sources = objs;
+            commands = [ { mklib1 %string( strings = [ "/out:" library_lib]) objs } ];
+              build_target = true;
+          );
+
+          str_cobjs (
+            sources = [ includes "%{basename}%.c" ];
+            commands = [
+              {  bytecomp_c_compiler "-c" bytecomp_c_options "/Fo%{basename}%.obj" "%{basename}%.c" };
+            ]
+          )
+        ]
+      end;
+
+  end;
+
+  begin
+    dirname += "flexdll";
+
+begin rules "win32flexdll"
+
+  compiler = [ "cl" "/nologo" "-D_CRT_SECURE_NO_DEPRECATE" "/Ox" "/MD" "-c" "/Z7" "/GS-" "-DMSVC"  "-I../../../ocpwin/flexdll" ]
+
+  build_rules = [
+
+     "flexdll_msvc64.obj" (
+        source = "../../../ocpwin/flexdll/flexdll.c"
+        sources = [ source ]
+        commands = [
+	   { "cp" "-f" source "%{basename}%.c" }
+	   { compiler "/Fo%{basename}%.obj" "%{basename}%.c" }
+	   { "rm" "-f" "%{basename}%.c" }
+
+	]
+	build_target = true
+     )
+
+     "flexdll_initer_msvc64.obj" (
+        source = "../../../ocpwin/flexdll/flexdll_initer.c"
+        sources = [ source ]
+        commands = [
+	   { "cp" "-f" source "%{basename}%.c" }
+	   { compiler "/Fo%{basename}%.obj" "%{basename}%.c" }
+	   { "rm" "-f" "%{basename}%.c" }
+	]
+	build_target = true
+     )
+
+     "flexdll_ocaml_msvc64.obj" (
+        source = "../../../ocpwin/flexdll/flexdll_ocaml.c"
+        sources = [ source ]
+        commands = [
+	   { "cp" "-f" source "%{basename}%.c" }
+	   { compiler "/Fo%{basename}%.obj" "%{basename}%.c" }
+	   { "rm" "-f" "%{basename}%.c" }
+	]
+	build_target = true
+     )
+
+  ]
+
+
+end
+
+  end;
+
+  begin
+    dirname += "systhreads";
+
+begin
+  byterun_hfiles = %subst_ext ( files = [ byterun_hfiles ]
+                      from_ext = ".h"
+                      to_file = "../../byterun/%{basename}%.h"
+                     )
+  hfiles = [   "st_win32.h" "threads.h" ]
+  includes = [ byterun_hfiles hfiles ]
+
+  begin rules "win32threads"
+
+    library_lib = "libthreads.lib"
+    library_options = [  ]
+
+    threads_cfiles = [ "st_stubs.c"   ]
+    threads_cobjs = [ "st_stubs_b.obj" ]
+    objs = [ threads_cobjs ]
+
+    bytecomp_c_options = [  library_options "/Z7" "-I../../byterun" "-I../../../ocamlpro" "-I../../../ocpwin/flexdll" "/W3" ]
+
+    build_rules = [
+      library_lib (
+        sources = objs
+        commands = [ { mklib1 %string( strings = [ "/out:" library_lib]) objs } ]
+        build_target = true
+     )
+
+     "st_stubs_b.obj" (
+       sources = [ includes "st_stubs.c" ]
+       commands = [
+         { "cp" "st_stubs.c" "st_stubs_b.c" }
+         {  bytecomp_c_compiler "-c" bytecomp_c_options "/Fo%{basename}%.obj" "%{basename}%.c" }
+         { "rm" "-f" "st_stubs_b.c" }
+       ]
+     )
+   ]
+end
+
+  begin rules "win32threadsnat"
+
+    library_lib = "libthreadsnat.lib"
+    target_arch = %string ( strings = [ "-DTARGET_" architecture ])
+    sys_system = %string ( strings = [ "-DSYS_" system ])
+    library_options = [  "-DNATIVE_CODE" "-I../../asmrun" target_arch sys_system ]
+
+    threads_cfiles = [ "st_stubs.c"   ]
+    threads_cobjs = [ "st_stubs_n.obj" ]
+    objs = [ threads_cobjs ]
+
+    native_c_options = [  library_options "/Z7"  "-I../../byterun" "-I../../../ocamlpro" "-I../../../ocpwin/flexdll" "/W3" ]
+
+    build_rules = [
+      library_lib (
+        sources = objs
+        commands = [ { mklib1 %string( strings = [ "/out:" library_lib]) objs } ]
+        build_target = true
+     )
+
+     "st_stubs_n.obj" (
+       sources = [ includes "st_stubs.c" ]
+       commands = [
+         { "cp" "st_stubs.c" "st_stubs_n.c" }
+         {  native_c_compiler "-c" native_c_options "/Fo%{basename}%.obj" "%{basename}%.c" }
+         { "rm" "-f" "st_stubs_n.c" }
+       ]
+     )
+   ]
+end
+
+
+end
+
+  end;
+
+  begin
+    dirname += "num";
+
+
+(*
+cl /nologo -D_CRT_SECURE_NO_DEPRECATE /Ox /MD -I../../byterun  -DBNG_ARCH_generic -DBNG_ASM_LEVEL=0 -c bng.c
+
+cl /nologo -D_CRT_SECURE_NO_DEPRECATE /Ox /MD -I../../byterun   -c nat_stubs.c
+
+*)
+
+  begin rules "win32num"
+
+    hfiles = [
+    "bng.h" "nat.h"
+    ]
+
+    num_cfiles = [
+    "bng.c" "nat_stubs.c"
+   ]
+
+   num_cobjs = %subst_ext ( files = [ num_cfiles ]
+                      from_ext = ".c"
+                      to_file = "%{basename}%.obj"
+                     )
+
+  byterun_hfiles = %subst_ext ( files = [ byterun_hfiles ]
+                      from_ext = ".h"
+                      to_file = "../../byterun/%{basename}%.h"
+                     )
+
+  unix_hfiles = [ "../unix/cst2constr.h" ]
+  includes = [ byterun_hfiles hfiles ]
+  objs = [ num_cobjs ]
+
+  bytecomp_c_options = [ "-DBNG_ARCH_generic" "-DBNG_ASM_LEVEL=0" "/Z7" "-DCAML_NAME_SPACE" "-I../../byterun" "-I../../../ocamlpro" "-I../../../ocpwin/flexdll" "/W3" ]
+
+   build_rules = [
+
+     "libnum.lib" (
+       sources = objs
+       commands = [ { mklib1 %string( strings = [ "/out:" "libnum.lib"]) objs } ]
+       build_target = true
+     )
+
+     num_cobjs (
+       sources = [ includes "%{basename}%.c" ]
+       commands = [
+         {  bytecomp_c_compiler "-c" bytecomp_c_options "/Fo%{basename}%.obj" "%{basename}%.c" }
+       ]
+     )
+
+
+     ]
+end
+
+
+  end;
+
+  begin
+    dirname += "bigarray"
+
+
+  begin rules "win32bigarray"
+
+    library_options = [  "-I../win32unix" "-DIN_OCAML_BIGARRAY" ]
+
+    hfiles = [
+      "bigarray.h"
+    ]
+
+    bigarray_cfiles = [
+      "bigarray_stubs.c" "mmap_win32.c"
+   ]
+
+   bigarray_cobjs = %subst_ext ( files = [ bigarray_cfiles ]
+                      from_ext = ".c"
+                      to_file = "%{basename}%.obj"
+                     )
+
+  byterun_hfiles = %subst_ext ( files = [ byterun_hfiles ]
+                      from_ext = ".h"
+                      to_file = "../../byterun/%{basename}%.h"
+                     )
+
+  unix_hfiles = [ "../unix/cst2constr.h" ]
+  includes = [ byterun_hfiles hfiles ]
+  objs = [ bigarray_cobjs ]
+
+  bytecomp_c_options = [  library_options "/Z7" "-I../../byterun" "-I../../../ocamlpro" "-I../../../ocpwin/flexdll" "/W3" ]
+
+   build_rules = [
+
+     "libbigarray.lib" (
+       sources = objs
+       commands = [ { mklib1 %string( strings = [ "/out:" "libbigarray.lib"]) objs } ]
+       build_target = true
+     )
+
+     bigarray_cobjs (
+       sources = [ includes "%{basename}%.c" ]
+       commands = [
+         {  bytecomp_c_compiler "-c" bytecomp_c_options "/Fo%{basename}%.obj" "%{basename}%.c" }
+       ]
+     )
+
+
+     ]
+end
+
+
+  end;
+
+end

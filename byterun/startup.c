@@ -24,6 +24,7 @@
 #ifdef _WIN32
 #include <process.h>
 #endif
+#include <signal.h>
 #include "alloc.h"
 #include "backtrace.h"
 #include "callback.h"
@@ -38,7 +39,7 @@
 #include "instrtrace.h"
 #include "interp.h"
 #include "intext.h"
-#include "io.h"
+#include "camlio.h"
 #include "memory.h"
 #include "minor_gc.h"
 #include "misc.h"
@@ -95,7 +96,6 @@ static int read_trailer(int fd, struct exec_trailer *trail)
   fixup_endianness_trailer(&trail->num_sections);
   if (strncmp(trail->magic, EXEC_MAGIC, 12) == 0)
     return 0;
-  else
     return BAD_BYTECODE;
 }
 
@@ -302,6 +302,7 @@ static void parse_camlrunparam(void)
 {
   char *opt = getenv ("OCAMLRUNPARAM");
   uintnat p;
+  value backtrace = Val_true; // always true
 
   if (opt == NULL) opt = getenv ("CAMLRUNPARAM");
 
@@ -309,7 +310,7 @@ static void parse_camlrunparam(void)
     while (*opt != '\0'){
       switch (*opt++){
       case 'a': scanmult (opt, &p); caml_set_allocation_policy (p); break;
-      case 'b': caml_record_backtrace(Val_true); break;
+        //      case 'b': backtrace = Val_true; break;
       case 'h': scanmult (opt, &heap_size_init); break;
       case 'i': scanmult (opt, &heap_chunk_init); break;
       case 'l': scanmult (opt, &max_stack_init); break;
@@ -318,6 +319,7 @@ static void parse_camlrunparam(void)
       case 'p': caml_parser_trace = 1; break;
       /* case 'R': see stdlib/hashtbl.mli */
       case 's': scanmult (opt, &minor_heap_init); break;
+      MEMPROF_PARSE_OCAMLRUNPARAM();
 #ifdef DEBUG
       case 't': caml_trace_flag = 1; break;
 #endif
@@ -325,6 +327,7 @@ static void parse_camlrunparam(void)
       }
     }
   }
+  caml_record_backtrace(backtrace);
 }
 
 extern void caml_init_ieee_floats (void);
@@ -333,7 +336,8 @@ extern void caml_init_ieee_floats (void);
 extern void caml_signal_thread(void * lpParam);
 #endif
 
-#ifdef _MSC_VER
+#ifdef _WIN32
+//_MSC_VER
 
 /* PR 4887: avoid crash box of windows runtime on some system calls */
 extern void caml_install_invalid_parameter_handler();
@@ -341,7 +345,6 @@ extern void caml_install_invalid_parameter_handler();
 #endif
 
 /* Main entry point when loading code from a file */
-
 CAMLexport void caml_main(char **argv)
 {
   int fd, pos;
@@ -352,10 +355,12 @@ CAMLexport void caml_main(char **argv)
   char * exe_name;
   static char proc_self_exe[256];
 
+    caml_memprof_ccall_locid = PROF_STARTUP;
   /* Machine-dependent initialization of the floating-point hardware
      so that it behaves as much as possible as specified in IEEE */
   caml_init_ieee_floats();
-#ifdef _MSC_VER
+#ifdef _WIN32
+  //_MSC_VER
   caml_install_invalid_parameter_handler();
 #endif
   caml_init_custom_operations();
@@ -397,6 +402,7 @@ CAMLexport void caml_main(char **argv)
       break;
     }
   }
+
   /* Read the table of contents (section descriptors) */
   caml_read_section_descriptors(fd, &trail);
   /* Initialize the abstract machine */
@@ -406,8 +412,11 @@ CAMLexport void caml_main(char **argv)
   init_atoms();
   /* Initialize the interpreter */
   caml_interprete(NULL, 0);
+  caml_sys_init(exe_name, argv + pos);
   /* Initialize the debugger, if needed */
   caml_debugger_init();
+  MEMPROF_INIT();
+  MEMPROF_BYTECODE_INIT(read_section(fd, &trail, "MEMP"));
   /* Load the code */
   caml_code_size = caml_seek_section(fd, &trail, "CODE");
   caml_load_code(fd, caml_code_size);
@@ -423,14 +432,15 @@ CAMLexport void caml_main(char **argv)
   /* Load the globals */
   caml_seek_section(fd, &trail, "DATA");
   chan = caml_open_descriptor_in(fd);
+  caml_memprof_ccall_locid = PROF_STARTUP_INPUT_VAL;
   caml_global_data = caml_input_val(chan);
+  caml_memprof_ccall_locid = PROF_STARTUP;
   caml_close_channel(chan); /* this also closes fd */
   caml_stat_free(trail.section);
   /* Ensure that the globals are in the major heap. */
   caml_oldify_one (caml_global_data, &caml_global_data);
   caml_oldify_mopup ();
   /* Initialize system libraries */
-  caml_sys_init(exe_name, argv + pos);
 #ifdef _WIN32
   /* Start a thread to handle signals */
   if (getenv("CAMLSIGPIPE"))
@@ -438,7 +448,9 @@ CAMLexport void caml_main(char **argv)
 #endif
   /* Execute the program */
   caml_debugger(PROGRAM_START);
+  caml_memprof_ccall_locid = PROF_INTERP;
   res = caml_interprete(caml_start_code, caml_code_size);
+  MEMPROF_EXIT();
   if (Is_exception_result(res)) {
     caml_exn_bucket = Extract_exception(res);
     if (caml_debugger_in_use) {
@@ -464,7 +476,8 @@ CAMLexport void caml_startup_code(
   static char proc_self_exe[256];
 
   caml_init_ieee_floats();
-#ifdef _MSC_VER
+#ifdef _WIN32
+  //_MSC_VER
   caml_install_invalid_parameter_handler();
 #endif
   caml_init_custom_operations();
@@ -517,6 +530,7 @@ CAMLexport void caml_startup_code(
   /* Execute the program */
   caml_debugger(PROGRAM_START);
   res = caml_interprete(caml_start_code, caml_code_size);
+  MEMPROF_EXIT();
   if (Is_exception_result(res)) {
     caml_exn_bucket = Extract_exception(res);
     if (caml_debugger_in_use) {

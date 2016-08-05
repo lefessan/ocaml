@@ -156,7 +156,7 @@ let byte_compile_ocaml_interf mli cmi env build =
 let compile_ocaml_interf mli cmi env build =
   let mli = env mli and cmi = env cmi in
   prepare_compile build mli;
-  let tags = tags_of_pathname mli++"interf" in 
+  let tags = tags_of_pathname mli++"interf" in
   let comp_c = if Tags.mem "native" tags then ocamlopt_c else ocamlc_c in
   comp_c tags mli cmi
 

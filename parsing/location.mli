@@ -115,5 +115,6 @@ val register_error_of_exn: (exn -> error option) -> unit
 
 val report_error: formatter -> error -> unit
 
+val report_backtrace : string -> unit
 val report_exception: formatter -> exn -> unit
   (* Reraise the exception if it is unknown. *)

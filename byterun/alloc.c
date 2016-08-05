@@ -27,7 +27,7 @@
 #define Setup_for_gc
 #define Restore_after_gc
 
-CAMLexport value caml_alloc (mlsize_t wosize, tag_t tag)
+CAMLexport value caml_alloc_loc (mlsize_t wosize, tag_t tag, profiling_t id)
 {
   value result;
   mlsize_t i;
@@ -37,12 +37,12 @@ CAMLexport value caml_alloc (mlsize_t wosize, tag_t tag)
   if (wosize == 0){
     result = Atom (tag);
   }else if (wosize <= Max_young_wosize){
-    Alloc_small (result, wosize, tag);
+    Alloc_small_loc (result, wosize, tag, id);
     if (tag < No_scan_tag){
       for (i = 0; i < wosize; i++) Field (result, i) = Val_unit;
     }
   }else{
-    result = caml_alloc_shr (wosize, tag);
+    result = caml_alloc_shr_loc (wosize, tag, id);
     if (tag < No_scan_tag){
       for (i = 0; i < wosize; i++) Field (result, i) = Val_unit;
     }
@@ -51,15 +51,25 @@ CAMLexport value caml_alloc (mlsize_t wosize, tag_t tag)
   return result;
 }
 
-CAMLexport value caml_alloc_small (mlsize_t wosize, tag_t tag)
+CAMLexport value caml_alloc (mlsize_t wosize, tag_t tag)
+{
+  return caml_alloc_loc(wosize, tag, caml_memprof_ccall_locid);
+}
+
+CAMLexport value caml_alloc_small_loc (mlsize_t wosize, tag_t tag, profiling_t id)
 {
   value result;
 
   Assert (wosize > 0);
   Assert (wosize <= Max_young_wosize);
   Assert (tag < 256);
-  Alloc_small (result, wosize, tag);
+  Alloc_small_loc (result, wosize, tag, id);
   return result;
+}
+
+CAMLexport value caml_alloc_small (mlsize_t wosize, tag_t tag)
+{
+  return caml_alloc_small_loc (wosize, tag, caml_memprof_ccall_locid);
 }
 
 CAMLexport value caml_alloc_tuple(mlsize_t n)
@@ -67,22 +77,32 @@ CAMLexport value caml_alloc_tuple(mlsize_t n)
   return caml_alloc(n, 0);
 }
 
-CAMLexport value caml_alloc_string (mlsize_t len)
+CAMLexport value caml_alloc_tuple_loc(mlsize_t n, profiling_t id)
+{
+  return caml_alloc_loc(n, 0, id);
+}
+
+CAMLexport value caml_alloc_string_loc (mlsize_t len, profiling_t id)
 {
   value result;
   mlsize_t offset_index;
   mlsize_t wosize = (len + sizeof (value)) / sizeof (value);
 
   if (wosize <= Max_young_wosize) {
-    Alloc_small (result, wosize, String_tag);
+    Alloc_small_loc (result, wosize, String_tag, id);
   }else{
-    result = caml_alloc_shr (wosize, String_tag);
+    result = caml_alloc_shr_loc (wosize, String_tag, id);
     result = caml_check_urgent_gc (result);
   }
   Field (result, wosize - 1) = 0;
   offset_index = Bsize_wsize (wosize) - 1;
   Byte (result, offset_index) = offset_index - len;
   return result;
+}
+
+CAMLexport value caml_alloc_string (mlsize_t len)
+{
+  return caml_alloc_string_loc (len, caml_memprof_ccall_locid);
 }
 
 CAMLexport value caml_alloc_final (mlsize_t len, final_fun fun,
@@ -92,15 +112,20 @@ CAMLexport value caml_alloc_final (mlsize_t len, final_fun fun,
                            len * sizeof(value), mem, max);
 }
 
-CAMLexport value caml_copy_string(char const *s)
+CAMLexport value caml_copy_string_loc(char const *s, profiling_t id)
 {
   int len;
   value res;
 
   len = strlen(s);
-  res = caml_alloc_string(len);
+  res = caml_alloc_string_loc(len, id);
   memmove(String_val(res), s, len);
   return res;
+}
+
+CAMLexport value caml_copy_string(char const *s)
+{
+  return caml_copy_string_loc(s, caml_memprof_ccall_locid);
 }
 
 CAMLexport value caml_alloc_array(value (*funct)(char const *),
@@ -184,3 +209,4 @@ CAMLprim value caml_update_dummy(value dummy, value newval)
   }
   return Val_unit;
 }
+

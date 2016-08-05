@@ -1,0 +1,10 @@
+FLEXDLL_DIR=../../../ocpwin/flexdll
+
+MORE_SOURCES= flexdll.h version.rc
+
+include $(FLEXDLL_DIR)/Makefile
+
+host: flexlink.asm
+
+clean::
+	rm -f $(FILES) flexlink.asm

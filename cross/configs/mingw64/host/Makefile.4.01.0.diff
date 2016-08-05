@@ -1,0 +1,84 @@
+18c18
+< PREFIX=
+---
+> PREFIX=C:/ocamlmgw64
+ok
+21c21
+< CAMLP4=cross-camlp4
+---
+> CAMLP4=camlp4
+ok
+24c24
+< BINDIR=bin
+---
+> BINDIR=$(PREFIX)/bin
+ok
+27,28c27
+< LIBDIR=lib
+< OCAMLLIBDIR=lib
+---
+> LIBDIR=$(PREFIX)/lib
+ok
+31c30
+< STUBLIBDIR=lib/stublibs
+---
+> STUBLIBDIR=$(LIBDIR)/stublibs
+ok
+34c33
+< DISTRIB=info
+---
+> DISTRIB=$(PREFIX)
+ok
+37c36
+< MANDIR=man
+---
+> MANDIR=$(PREFIX)/man
+ok
+80,82c79
+< 
+< # I think this should work
+< ASM_CFI_SUPPORTED=true
+---
+> ASM_CFI_SUPPORTED=false
+ok
+106,107c103,104
+< FLEXLINK=$(ROOTDIR)/cross/flexdll/flexlink -chain mingw64 -stack 33554432
+< FLEXDIR=$(ROOTDIR)/cross/flexdll
+---
+> FLEXLINK=flexlink -chain mingw64 -stack 33554432
+> FLEXDIR=$(shell $(FLEXLINK) -where)
+ok
+110c107
+< MKEXE=$(FLEXLINK) -exe -ocaml
+---
+> MKEXE=$(FLEXLINK) -exe
+ok
+113,116d109
+< ### The ranlib command
+< RANLIB=$(TOOLPREF)ranlib
+< RANLIBCMD=$(TOOLPREF)ranlib
+< 
+119,121c112
+< #ml let mklib out files opts = (try Sys.remove out with _ -> ()); Printf.sprintf "%sar rcs %s %s %s" toolpref opts out files;;
+< MKLIB1=$(TOOLPREF)ar rc\ 
+< MKLIB2=$(RANLIB)
+---
+> #ml let mklib out files opts = Printf.sprintf "rm -f %s && %sar rcs %s %s %s" out toolpref opts out files;;
+126a118,121
+> ### The ranlib command
+> RANLIB=$(TOOLPREF)ranlib
+> RANLIBCMD=$(TOOLPREF)ranlib
+> 
+178,189d172
+< 
+< MAKEFILE := -f Makefile.nt
+< WITH_FRAME_POINTERS=false
+< # to avoid compiling "ocamlbuild"
+< OCB=cross-
+< # to avoid modifying "ocamlcomp.sh" and "ocamlcompopt.sh" with cross .opt
+< OCAMLCOMP=no-
+< # to change "unix" into "win32unix"
+< WIN32_PREFIX=win32
+< OCP_RELOCATABLE=true
+< OCPBW=false
+< 

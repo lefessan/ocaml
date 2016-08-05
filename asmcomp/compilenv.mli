@@ -24,6 +24,9 @@ val current_unit_infos: unit -> unit_infos
 val current_unit_name: unit -> string
         (* Return the name of the unit being compiled *)
 
+val current_unit_path: unit -> Path.t
+
+
 val make_symbol: ?unitname:string -> string option -> string
         (* [make_symbol ~unitname:u None] returns the asm symbol that
            corresponds to the compilation unit [u] (default: the current unit).
@@ -80,6 +83,9 @@ val cache_unit_info: unit_infos -> unit
            without looking at the corresponding .cmx file. *)
 
 val read_library_info: string -> library_infos
+
+val wrap_locid: Lambda.locid -> Clambda.locid
+val wrap_prim: Lambda.primitive -> Clambda.primitive
 
 type error =
     Not_a_unit_info of string

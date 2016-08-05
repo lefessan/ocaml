@@ -85,7 +85,7 @@ CAMLprim value caml_natdynlink_run(void *handle, value symbol) {
   if (NULL != sym) caml_register_frametable(sym);
 
   sym = optsym("");
-  if (NULL != sym) caml_register_dyn_global(sym);
+  if (NULL != sym) caml_register_dynlink_global(unit, sym);
 
   sym = optsym("__data_begin");
   sym2 = optsym("__data_end");

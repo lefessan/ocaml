@@ -20,6 +20,9 @@ let option opt () = compargs := opt :: !compargs
 let option_with_arg opt arg =
   compargs := (Filename.quote arg) :: opt :: !compargs
 ;;
+let option_with_int opt arg =
+  compargs := (string_of_int arg) :: opt :: !compargs
+;;
 
 let make_archive = ref false;;
 let with_impl = ref false;;
@@ -63,6 +66,7 @@ module Options = Main_args.Make_bytecomp_options (struct
   let _intf_suffix s = option_with_arg "-intf-suffix" s
   let _keep_locs = option "-keep-locs"
   let _labels = option "-labels"
+  let _error_size s = option_with_int "-error-size" s
   let _linkall = option "-linkall"
   let _make_runtime = option "-make-runtime"
   let _no_alias_deps = option "-no-alias-deps"
@@ -71,6 +75,7 @@ module Options = Main_args.Make_bytecomp_options (struct
   let _nolabels = option "-nolabels"
   let _noautolink = option "-noautolink"
   let _nostdlib = option "-nostdlib"
+  let _nowatcher = option "-nowatcher"
   let _o s = option_with_arg "-o" s
   let _open s = option_with_arg "-open" s
   let _output_obj = option "-output-obj"
@@ -107,6 +112,10 @@ module Options = Main_args.Make_bytecomp_options (struct
   let _dinstr = option "-dinstr"
   let anonymous = process_file
 end);;
+
+let _ =
+  Ocpstd.Arg.default_arglist :=
+    (Main_args.mk_make (option_with_arg "-make")) :: !Ocpstd.Arg.default_arglist
 
 let add_profarg s =
   profargs := (Filename.quote s) :: "-m" :: !profargs

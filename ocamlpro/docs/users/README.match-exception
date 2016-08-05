@@ -1,0 +1,25 @@
+Exception cases in pattern matching
+===================================
+
+Exception cases in pattern matching have been introduced in 4.02.
+To allow the use of these cases as early as possible, a weaker form
+has been implemented in this version of OCaml.
+
+The current form is:
+MATCH exp WITH [initial_exception_cases] match_cases [final_exception_cases]
+
+i.e. exception cases must appear only at the beginning and at the end
+of the pattern matching, not mixed with other normal cases.
+
+These exception cases are implemented using polymorphic variants `Ok and `Exn:
+
+ MATCH TRY `Ok exp WITH e -> `Exn e
+ WITH `Ok v -> 
+   MATCH v WITH match_cases
+              | `Exn e -> TRY raise e WITH
+                          | initial_exception_cases
+                          | final_exception_cases
+
+This implementation guarantees correct tailcalls from match cases.
+
+

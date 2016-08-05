@@ -1,0 +1,30 @@
+relocatable = true
+flexlink = true
+(*  these ones use flexlink  *)
+mkdll = [  "-merge-manifest" "-stack" "16777216" ]
+mkexe = [  "-merge-manifest" "-stack" "16777216" "-exe" "-ocaml" ]
+mkmaindll = [  "-merge-manifest" "-stack" "16777216" "-maindll" ]
+ccomp_type = "msvc"
+bytecomp_c_compiler = [ "cl" "/nologo" "-D_CRT_SECURE_NO_DEPRECATE" "/Ox" "/MD" ]
+bytecomp_c_libraries = [ "advapi32.lib" "ws2_32.lib" ]
+native_c_compiler = [ "cl" "/nologo" "/Ox" "/MD" ]
+native_c_libraries = [ "advapi32.lib" "ws2_32.lib" ]
+native_pack_linker = [ "link" "/lib" "/nologo" "/machine:AMD64" "/out:" ]
+ranlib = ""
+cc_profile = ""
+architecture = "i386"
+model = "default"
+system = "win32"
+assembler = [ "ml" "/nologo" "/coff" "/Cp" "/c" "/Fo" ]
+asm_cfi_supported = false
+with_frame_pointers = false
+ext_obj = ".o"
+ext_cc_obj = ".obj"
+ext_asm = ".asm"
+ext_lib = ".a"
+ext_dll = ".dll"
+detect_msvc = true
+mklib1 = [ "link" "/lib" "/nologo" ]
+mklib2 = []
+
+flexlink_dir = "C:/Users/LeFessant/AppData/Roaming/OCamlPro/OCPWin64/bin"

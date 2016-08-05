@@ -35,6 +35,9 @@ let maybe_skip_phrase lexbuf =
 let wrap parsing_fun lexbuf =
   try
     Lexer.init ();
+    (* in the case of an interface, parsing_fun is
+       going to unset it immediatly *)
+    Ocputils.parse_intf := false;
     let ast = parsing_fun Lexer.token lexbuf in
     Parsing.clear_parser();
     ast
@@ -54,7 +57,9 @@ let wrap parsing_fun lexbuf =
       raise(Syntaxerr.Error(Syntaxerr.Other loc))
 
 let implementation = wrap Parser.implementation
-and interface = wrap Parser.interface
+and interface = wrap (fun lexer lexbuf ->
+  Ocputils.parse_intf := true;
+  Parser.interface lexer lexbuf)
 and toplevel_phrase = wrap Parser.toplevel_phrase
 and use_file = wrap Parser.use_file
 and core_type = wrap Parser.parse_core_type

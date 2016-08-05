@@ -45,6 +45,8 @@ val save_signature:
 val package_units:
   Env.t -> string list -> string -> string -> Typedtree.module_coercion
 
+val path_of_module: Typedtree.module_expr -> Path.t option
+
 type error =
     Cannot_apply of module_type
   | Not_included of Includemod.error list

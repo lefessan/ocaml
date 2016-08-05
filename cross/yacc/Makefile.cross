@@ -1,0 +1,16 @@
+
+FILES=   defs.h   lalr.c  Makefile  output.c    symtab.c \
+   error.c  lr0.c   Makefile.nt  reader.c    verbose.c   \
+   closure.c  main.c  mkpar.c	 skeleton.c  warshall.c
+
+all: $(FILES)
+	$(MAKE) -f Makefile ocamlyacc
+	cp ocamlyacc ../../boot/ocamlyacc
+
+$(FILES): %: ../../yacc/%
+	rm -f $*
+	ln -s ../../yacc/$* $*
+
+clean:
+	rm -f $(FILES) *~ *.o ocamlyacc
+#	$(MAKE) -f Makefile clean

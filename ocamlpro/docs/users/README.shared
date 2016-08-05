@@ -1,0 +1,36 @@
+libasmrun_shared.so
+===================
+
+By default, OCaml does not compile an equivalent of "libasmrun.a" with
+relocatable code (-fPIC option of gcc), whereas it is built for
+"libcamlrun.a". In this version of OCaml, we generate a file
+"libasmrun_shared.so" that is a relocatable version of "libasmrun.a".
+
+A typical example
+-----------------
+
+A typical example is a plugin containing some OCaml code to a C/C++
+program.
+
+You compile your OCaml files, generate a C object file with them, and
+then, want to produce a shared library that will be linked at runtime
+to some application:
+
+Compile your OCaml files (note that `-fPIC` is enabled by default):
+
+    ocamlopt -c -fPIC a.ml b.ml c.ml
+
+Build the shared object:
+
+    ocamlopt -o my-ocaml-obj.o -output-obj -ccopt -fPIC a.cmx b.cmx c.cmx
+
+Compile some C code also with `-fPIC`:
+
+    gcc -c -fPIC some-c-stubs-glue.c
+
+Build the shared library:
+
+    gcc -g -fPIC -shared -o my-shared-lib.so some-c-stubs-glue.o \
+      $OCAMLLIB/libasmrun_shared.so my-ocaml-obj.o
+
+

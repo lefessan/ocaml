@@ -1,0 +1,87 @@
+\documentclass[11pt]{book}
+
+\usepackage{enumerate}
+\usepackage{color}
+%\usepackage{a4wide}
+\usepackage[colorlinks=true,linkcolor=blue] {hyperref}
+\usepackage{url}
+\usepackage{eurosym}
+\usepackage{listings}
+\usepackage{multirow}
+
+\definecolor{mygreen}{rgb}{0,0.5,0}
+\definecolor{mygray}{rgb}{0.52,0.52,0.51}
+\definecolor{mymauve}{rgb}{0.58,0,0.82}
+
+\lstdefinestyle{OCaml2}{
+  language=Caml,
+  emptylines=1,
+  breaklines=true,
+  morekeywords={external, ref, val},
+  keywordstyle=\bf\color{blue}\ttfamily,
+  basicstyle=\ttfamily\color{black}\ttfamily,
+  moredelim=**[is][\color{mygreen}]{@}{@},
+  numbers=left,
+  xleftmargin=.1\textwidth, xrightmargin=.1\textwidth,
+  numbersep=-7pt,
+  numberstyle=\tiny\color{mygray}\ttfamily,
+  stringstyle=\color{magenta}\ttfamily, 
+  commentstyle=\it\color{darkgray}\ttfamily,
+  basicstyle=\ttfamily,
+  frame=single,
+}
+\lstdefinestyle{OCaml}{
+  language=Caml,
+  emptylines=1,
+  breaklines=true,
+  morekeywords={external, ref, val},
+  keywordstyle=\bf\color{blue}\ttfamily,
+  basicstyle=\ttfamily\color{black}\ttfamily,
+  moredelim=**[is][\color{mygreen}]{@}{@},
+  numbers=left,
+  xleftmargin=.1\textwidth, xrightmargin=.01\textwidth,
+  numbersep=-5pt,
+  numberstyle=\tiny\color{mygray},
+  stringstyle=\color{magenta}\ttfamily, 
+  commentstyle=\it\color{darkgray}\ttfamily,
+  basicstyle=\footnotesize\ttfamily,
+  frame=single,
+}
+\lstdefinestyle{Bash}{
+  language=bash,
+  emptylines=1,
+  breaklines=true,
+  morekeywords={},
+  keywordstyle=\ttfamily,
+  basicstyle=\ttfamily\color{black}\ttfamily,
+  moredelim=**[is][\bf\color{black}\ttfamily]{@}{@},
+  xleftmargin=.05\textwidth, xrightmargin=.05\textwidth,
+  stringstyle=\ttfamily, 
+  commentstyle=\it\color{darkgray}\ttfamily,
+  basicstyle=\footnotesize\ttfamily,
+}
+
+
+\newcommand{\cmd}[1]{$\texttt{#1}$}
+
+\newcommand{\typerex}{TypeRex}
+\newcommand{\opam}{\cmd{opam}}
+\newcommand{\github}{GitHub}
+
+\title{TypeRex OCaml User Manual}
+
+\author{OCamlPro}
+\date{Oct 27, 2014}
+\begin{document}
+
+\maketitle
+\thispagestyle{empty}
+\tableofcontents
+
+\input{introduction}
+\input{language}
+\input{compiler}
+\input{runtime}
+\input{libraries}
+
+\end{document}

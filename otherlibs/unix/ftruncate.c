@@ -14,7 +14,7 @@
 #include <sys/types.h>
 #include <fail.h>
 #include <mlvalues.h>
-#include <io.h>
+#include <camlio.h>
 #include <signals.h>
 #include "unixsupport.h"
 #ifdef HAS_UNISTD

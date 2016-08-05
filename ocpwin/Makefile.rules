@@ -1,0 +1,38 @@
+# This Makefile is included in the main Makefile of OCaml
+
+OCPWIN_DIR=../ocpwin
+
+# cross-compilation stuff
+
+cross-ocaml:
+	cd cross; OCPWATCHER=0 $(MAKE) all
+	OCPWATCHER=0 $(MAKE) world.opt
+	cd cross/flexdll; OCPWATCHER=0 $(MAKE) -f Makefile.cross host
+	cd cross/ocpwin-nsis; OCPWATCHER=0 $(MAKE) -f Makefile.cross build
+	cd cross/ocpwin-tool; OCPWATCHER=0 $(MAKE) -f Makefile.cross host
+
+cross-clean:
+	cd cross; $(MAKE) clean
+	$(MAKE) clean
+	$(MAKE) -f cross/ocamlbuild/Makefile.ocamlbuild clean
+	$(MAKE) -f cross/camlp4/Makefile.camlp4 clean
+
+cross-ocamlbuild.byte: ocamlc otherlibraries
+	$(MAKE) -f cross/ocamlbuild/Makefile.ocamlbuild byte-only
+cross-ocamlbuild.native: ocamlopt otherlibrariesopt
+
+#	$(MAKE) -f cross/ocamlbuild/Makefile.ocamlbuild native-only
+
+cross-camlp4out: ocamlc otherlibraries
+	$(MAKE) -f cross/camlp4/Makefile.camlp4 byte-only
+
+cross-camlp4opt: ocamlopt otherlibrariesopt
+	$(MAKE) -f cross/camlp4/Makefile.camlp4 native-only
+
+cross-install:
+	$(MAKE) -f $(OCPWIN_DIR)/Makefile.install install
+
+cross-installer:
+	$(MAKE) -f $(OCPWIN_DIR)/Makefile.install installer
+
+cross-checkstack:

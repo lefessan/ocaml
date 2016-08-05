@@ -1,0 +1,9 @@
+* Why does the testsuite not compile correctly ?
+  * You need to use "TERM= OCAMLPARAM=_,g=0 make all", otherwise,
+      * getopt.ml will fail (debugging disables optimizations)
+      * ocaml error messages are different
+
+* Why do I get inconsistent assumptions between ocamlopt.opt and
+  {ocamlc.opt, ocamlc, ocamlopt} ?
+  * Because you didn't patch toplevel/genprintval.ml which introduces
+    new identifiers.

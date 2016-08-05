@@ -24,14 +24,14 @@ type environment = (Ident.t, Reg.t array) Tbl.t
 
 let oper_result_type = function
     Capply(ty, _) -> ty
-  | Cextcall(s, ty, alloc, _) -> ty
+  | Cextcall(s, ty, alloc, _, _) -> ty
   | Cload c ->
       begin match c with
         Word -> typ_addr
       | Single | Double | Double_u -> typ_float
       | _ -> typ_int
       end
-  | Calloc -> typ_addr
+  | Calloc _ -> typ_addr
   | Cstore c -> typ_void
   | Caddi | Csubi | Cmuli | Cmulhi | Cdivi | Cmodi |
     Cand | Cor | Cxor | Clsl | Clsr | Casr |
@@ -154,7 +154,7 @@ let join_array rs =
 (* Extract debug info contained in a C-- operation *)
 let debuginfo_op = function
   | Capply(_, dbg) -> dbg
-  | Cextcall(_, _, _, dbg) -> dbg
+  | Cextcall(_, _, _, _, dbg) -> dbg
   | Craise (_, dbg) -> dbg
   | Ccheckbound dbg -> dbg
   | _ -> Debuginfo.none
@@ -191,7 +191,7 @@ method is_simple_expr = function
   | Cop(op, args) ->
       begin match op with
         (* The following may have side effects *)
-      | Capply _ | Cextcall _ | Calloc | Cstore _ | Craise _ -> false
+      | Capply _ | Cextcall _ | Calloc _ | Cstore _ | Craise _ -> false
         (* The remaining operations are simple if their args are *)
       | _ ->
           List.for_all self#is_simple_expr args
@@ -249,7 +249,7 @@ method select_operation op args =
   match (op, args) with
     (Capply(ty, dbg), Cconst_symbol s :: rem) -> (Icall_imm s, rem)
   | (Capply(ty, dbg), _) -> (Icall_ind, args)
-  | (Cextcall(s, ty, alloc, dbg), _) -> (Iextcall(s, alloc), args)
+  | (Cextcall(s, ty, alloc, locid_o, dbg), _) -> (Iextcall(s, alloc, locid_o), args)
   | (Cload chunk, [arg]) ->
       let (addr, eloc) = self#select_addressing chunk arg in
       (Iload(chunk, addr), [eloc])
@@ -262,7 +262,7 @@ method select_operation op args =
         (Istore(chunk, addr, true), [arg2; eloc])
         (* Inversion addr/datum in Istore *)
       end
-  | (Calloc, _) -> (Ialloc 0, args)
+  | (Calloc dbg, _) -> (Ialloc 0, args)
   | (Caddi, _) -> self#select_arith_comm Iadd args
   | (Csubi, _) -> self#select_arith Isub args
   | (Cmuli, _) -> self#select_arith_comm Imul args
@@ -508,18 +508,18 @@ method emit_expr env exp =
               self#insert_debug (Iop(Icall_imm lbl)) dbg loc_arg loc_res;
               self#insert_move_results loc_res rd stack_ofs;
               Some rd
-          | Iextcall(lbl, alloc) ->
+          | Iextcall(lbl, alloc, locid_o) ->
               let (loc_arg, stack_ofs) =
                 self#emit_extcall_args env new_args in
               let rd = self#regs_for ty in
-              let loc_res = self#insert_op_debug (Iextcall(lbl, alloc)) dbg
+              let loc_res = self#insert_op_debug (Iextcall(lbl, alloc, locid_o)) dbg
                                     loc_arg (Proc.loc_external_results rd) in
               self#insert_move_results loc_res rd stack_ofs;
               Some rd
           | Ialloc _ ->
               let rd = self#regs_for typ_addr in
               let size = size_expr env (Ctuple new_args) in
-              self#insert (Iop(Ialloc size)) [||] rd;
+              self#insert_debug (Iop(Ialloc size)) dbg [||] rd;
               self#emit_stores env new_args rd;
               Some rd
           | op ->

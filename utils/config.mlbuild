@@ -23,7 +23,7 @@
 (* The main OCaml version string has moved to ../VERSION *)
 let version = Sys.ocaml_version
 
-module C = Myocamlbuild_config
+module C = Myocamlbuild_runtime_config
 
 let standard_library_default = C.libdir
 
@@ -70,6 +70,13 @@ and ast_impl_magic_number = "Caml1999M016"
 and ast_intf_magic_number = "Caml1999N015"
 and cmxs_magic_number = "Caml2007D001"
 and cmt_magic_number = "Caml2012T002"
+
+let cmo_magic_number = "OCP-1999O009"
+and cma_magic_number = "OCP-1999A010"
+and cmx_magic_number = "OCP-1999Y011"
+and cmxa_magic_number = "OCP-1999Z010"
+and cmxs_magic_number = "OCP-2007D001"
+and cmt_magic_number = "OCP-2012T002"
 
 let load_path = ref ([] : string list)
 

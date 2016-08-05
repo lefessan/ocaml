@@ -25,6 +25,9 @@
 #include <string.h>
 #include <stdio.h>
 
+#define CAML_MORE_ALLOC_H
+#include "memprof.h"
+
 /* Roots registered from C functions */
 
 struct caml__roots_block *caml_local_roots = NULL;
@@ -98,6 +101,7 @@ void caml_init_frame_descriptors(void)
   /* Allocate the hash table */
   caml_frame_descriptors =
     (frame_descr **) caml_stat_alloc(tblsize * sizeof(frame_descr *));
+  caml_frame_stats = NULL;
   for (i = 0; i < tblsize; i++) caml_frame_descriptors[i] = NULL;
   caml_frame_descriptors_mask = tblsize - 1;
 

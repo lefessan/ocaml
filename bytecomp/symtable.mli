@@ -44,6 +44,8 @@ val restore_state: global_map -> unit
 val hide_additions: global_map -> unit
 val filter_global_map: (Ident.t -> bool) -> global_map -> global_map
 
+val string_of_memprof_info : Cmo_format.memprof_info list -> bytes
+
 (* Error report *)
 
 type error =
@@ -57,5 +59,13 @@ exception Error of error
 open Format
 
 val report_error: formatter -> error -> unit
+
+(**/**)
+
+type 'a numtable =
+  { num_cnt: int;
+    num_tbl: ('a, int) Tbl.t }
+
+val dll_failed : bool ref
 
 val reset: unit -> unit

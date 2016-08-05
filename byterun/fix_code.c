@@ -64,6 +64,8 @@ void caml_load_code(int fd, asize_t len)
     len /= sizeof(opcode_t);
     caml_saved_code = (unsigned char *) caml_stat_alloc(len);
     for (i = 0; i < len; i++) caml_saved_code[i] = caml_start_code[i];
+  } else {
+    MEMPROF_BYTECODE_FIX_LOCIDS(caml_start_code, caml_code_size);
   }
 #ifdef THREADED_CODE
   /* Better to thread now than at the beginning of [caml_interprete],
@@ -88,6 +90,58 @@ void caml_fixup_endianness(code_t code, asize_t len)
 
 #endif
 
+int* opcode_nargs = NULL;
+int* caml_init_opcode_nargs()
+{
+  if( opcode_nargs == NULL ){
+    int i;
+    int *l = (int*) malloc( sizeof(int) * FIRST_UNIMPLEMENTED_OP );
+    
+    for (i = 0; i < FIRST_UNIMPLEMENTED_OP; i++) {
+      l [i] = 0;
+    }
+    /* Instructions with one operand */
+    l[PUSHACC] = l[ACC] = l[POP] = l[ASSIGN] =
+      l[PUSHENVACC] = l[ENVACC] = l[PUSH_RETADDR] = l[APPLY] =
+      l[APPTERM1] = l[APPTERM2] = l[APPTERM3] = l[RETURN] =
+      l[GRAB] = l[PUSHGETGLOBAL] = l[GETGLOBAL] = l[SETGLOBAL] =
+      l[PUSHATOM] = l[ATOM] = l[MAKEBLOCK1] = l[MAKEBLOCK2] =
+      l[MAKEBLOCK3] = l[MAKEFLOATBLOCK] = l[GETFIELD] =
+      l[GETFLOATFIELD] = l[SETFIELD] = l[SETFLOATFIELD] =
+      l[BRANCH] = l[BRANCHIF] = l[BRANCHIFNOT] = l[PUSHTRAP] =
+      l[C_CALL1] = l[C_CALL2] = l[C_CALL3] = l[C_CALL4] = l[C_CALL5] =
+      l[CONSTINT] = l[PUSHCONSTINT] = l[OFFSETINT] =
+      l[OFFSETREF] = l[OFFSETCLOSURE] = l[PUSHOFFSETCLOSURE] = 1;
+    
+    /* Instructions with two operands */
+    l[APPTERM] = l[CLOSURE] = l[PUSHGETGLOBALFIELD] =
+      l[GETGLOBALFIELD] = l[MAKEBLOCK] = l[C_CALLN] =
+      l[BEQ] = l[BNEQ] = l[BLTINT] = l[BLEINT] = l[BGTINT] = l[BGEINT] =
+      l[BULTINT] = l[BUGEINT] = l[GETPUBMET] = 2;
+    
+  /* with LOCID (except CLOSUREREC_WITH_LOCID) */
+    l[GRAB_WITH_LOCID] = 
+      l[MAKEBLOCK1_WITH_LOCID] =
+      l[MAKEBLOCK2_WITH_LOCID] =
+      l[MAKEBLOCK3_WITH_LOCID] =
+      l[MAKEFLOATBLOCK_WITH_LOCID] =
+      l[GETFLOATFIELD_WITH_LOCID] =
+      l[C_CALL1_WITH_LOCID] = 
+      l[C_CALL2_WITH_LOCID] = 
+      l[C_CALL3_WITH_LOCID] = 
+      l[C_CALL4_WITH_LOCID] = 
+      l[C_CALL5_WITH_LOCID] = 2;
+
+    l[MAKEBLOCK_WITH_LOCID] = 
+    l[CLOSURE_WITH_LOCID] = 
+      l[C_CALLN_WITH_LOCID] = 3;
+
+    opcode_nargs = l;
+  }
+  return opcode_nargs;
+}
+
+
 /* This code is needed only if we're using threaded code */
 
 #ifdef THREADED_CODE
@@ -98,30 +152,8 @@ char * caml_instr_base;
 void caml_thread_code (code_t code, asize_t len)
 {
   code_t p;
-  int l [FIRST_UNIMPLEMENTED_OP];
-  int i;
+  int* l = caml_init_opcode_nargs();
 
-  for (i = 0; i < FIRST_UNIMPLEMENTED_OP; i++) {
-    l [i] = 0;
-  }
-  /* Instructions with one operand */
-  l[PUSHACC] = l[ACC] = l[POP] = l[ASSIGN] =
-  l[PUSHENVACC] = l[ENVACC] = l[PUSH_RETADDR] = l[APPLY] =
-  l[APPTERM1] = l[APPTERM2] = l[APPTERM3] = l[RETURN] =
-  l[GRAB] = l[PUSHGETGLOBAL] = l[GETGLOBAL] = l[SETGLOBAL] =
-  l[PUSHATOM] = l[ATOM] = l[MAKEBLOCK1] = l[MAKEBLOCK2] =
-  l[MAKEBLOCK3] = l[MAKEFLOATBLOCK] = l[GETFIELD] =
-  l[GETFLOATFIELD] = l[SETFIELD] = l[SETFLOATFIELD] =
-  l[BRANCH] = l[BRANCHIF] = l[BRANCHIFNOT] = l[PUSHTRAP] =
-  l[C_CALL1] = l[C_CALL2] = l[C_CALL3] = l[C_CALL4] = l[C_CALL5] =
-  l[CONSTINT] = l[PUSHCONSTINT] = l[OFFSETINT] =
-  l[OFFSETREF] = l[OFFSETCLOSURE] = l[PUSHOFFSETCLOSURE] = 1;
-
-  /* Instructions with two operands */
-  l[APPTERM] = l[CLOSURE] = l[PUSHGETGLOBALFIELD] =
-  l[GETGLOBALFIELD] = l[MAKEBLOCK] = l[C_CALLN] =
-  l[BEQ] = l[BNEQ] = l[BLTINT] = l[BLEINT] = l[BGTINT] = l[BGEINT] =
-  l[BULTINT] = l[BUGEINT] = l[GETPUBMET] = 2;
   len /= sizeof(opcode_t);
   for (p = code; p < code + len; /*nothing*/) {
     opcode_t instr = *p;
@@ -139,6 +171,12 @@ void caml_thread_code (code_t code, asize_t len)
       uint32 block_size = sizes >> 16;
       p += const_size + block_size;
     } else if (instr == CLOSUREREC) {
+      uint32 nfuncs = *p++;
+      p++;                      /* skip nvars */
+      p += nfuncs;
+    } else if (instr == CLOSUREREC_WITH_LOCID) {
+      /* int _locid = */
+        (void)*p++;
       uint32 nfuncs = *p++;
       p++;                      /* skip nvars */
       p += nfuncs;
@@ -168,3 +206,12 @@ int caml_is_instruction(opcode_t instr1, opcode_t instr2)
   return instr1 == instr2;
 #endif
 }
+
+
+
+
+
+
+
+
+

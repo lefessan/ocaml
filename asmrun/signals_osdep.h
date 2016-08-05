@@ -29,6 +29,7 @@
   #define CONTEXT_EXCEPTION_POINTER (context->uc_mcontext.gregs[REG_R14])
   #define CONTEXT_YOUNG_PTR (context->uc_mcontext.gregs[REG_R15])
   #define CONTEXT_FAULTING_ADDRESS ((char *)context->uc_mcontext.gregs[REG_CR2])
+  #define CONTEXT_STACK_POINTER   (context->uc_mcontext.gregs[REG_RSP])
 
 /****************** AMD64, MacOSX */
 

@@ -13,8 +13,12 @@
 
 include Makefile.common
 
-CFLAGS=-DCAML_NAME_SPACE -O $(BYTECCCOMPOPTS) $(IFLEXDIR)
-DFLAGS=-DCAML_NAME_SPACE -g -DDEBUG $(BYTECCCOMPOPTS) $(IFLEXDIR)
+#OTHERINC=-I../otherlibs/heapdump
+
+CFLAGS=-DCAML_NAME_SPACE -g -O $(BYTECCCOMPOPTS) $(IFLEXDIR) \
+  -I. $(OTHERINC)
+DFLAGS=-DCAML_NAME_SPACE -g -DDEBUG $(BYTECCCOMPOPTS) $(IFLEXDIR) \
+  -I. $(OTHERINC)
 
 OBJS=$(COMMONOBJS) $(UNIX_OR_WIN32).o main.o
 DOBJS=$(OBJS:.o=.d.o) instrtrace.d.o
@@ -66,10 +70,10 @@ clean::
 clean::
 	rm -f *.pic.c *.d.c
 
-depend : prims.c opnames.h jumptbl.h version.h
-	-gcc -MM $(BYTECCCOMPOPTS) *.c > .depend
-	-gcc -MM $(BYTECCCOMPOPTS) -DDEBUG *.c | sed -e 's/\.o/.d.o/' >> .depend
-	-gcc -MM $(BYTECCCOMPOPTS) *.c | sed -e 's/\.o/.pic.o/' >> .depend
+depend : prims.c opnames.h jumptbl.h version.h commit.h
+	-gcc -MM $(BYTECCCOMPOPTS) $(OTHERINC) *.c > .depend
+	-gcc -MM $(BYTECCCOMPOPTS) $(OTHERINC) -DDEBUG *.c | sed -e 's/\.o/.d.o/' >> .depend
+	-gcc -MM $(BYTECCCOMPOPTS) $(OTHERINC) *.c | sed -e 's/\.o/.pic.o/' >> .depend
 .PHONY: depend
 
 include .depend

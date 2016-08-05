@@ -22,6 +22,16 @@ type reloc_info =
 
 (* Descriptor for compilation units *)
 
+type memprof_info = {
+  mp_name : string;
+  mp_table : string;  (* marshalled version of the .cmg table *)
+  mp_table_size : int; (* number of entries in the table *)
+  mp_locids : (int * Lambda.alloc) array;
+    (* pairs [position, locid], where [position] is the position
+       of an instruction that may allocate with that [locid] *)
+  mp_nopcodes : int;
+}
+
 type compilation_unit =
   { cu_name: string;                    (* Name of compilation unit *)
     mutable cu_pos: int;                (* Absolute position in file *)
@@ -32,7 +42,9 @@ type compilation_unit =
     cu_primitives: string list;         (* Primitives declared inside *)
     mutable cu_force_link: bool;        (* Must be linked even if unref'ed *)
     mutable cu_debug: int;              (* Position of debugging info, or 0 *)
-    cu_debugsize: int }                 (* Length of debugging info *)
+    cu_debugsize: int;                  (* Length of debugging info *)
+    cu_memprof: memprof_info list;      (* Memory Profiling Section *)
+  }
 
 (* Format of a .cmo file:
      magic number (Config.cmo_magic_number)

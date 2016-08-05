@@ -43,10 +43,15 @@ extern void caml_shrink_heap (char *);              /* memory.c */
   XXX (see [caml_register_global_roots])
   XXX Should be able to fix it to only assume 2-byte alignment.
 */
-#define Make_ehd(s,t,c) (((s) << 10) | (t) << 2 | (c))
+#ifdef ARCH_SIXTYFOUR
+#define Make_ehd(s,t,c,p) (((s) << 32) | ((p) << 10) | ((t) << 2) | (c))
+#else
+#define Make_ehd(s,t,c,_) (((s) << 10) | ((t) << 2) | (c))
+#endif
 #define Whsize_ehd(h) Whsize_hd (h)
 #define Wosize_ehd(h) Wosize_hd (h)
 #define Tag_ehd(h) (((h) >> 2) & 0xFF)
+#define Locid_ehd(h) (((h) >> 10) & 0xFFFFF)
 #define Ecolor(w) ((w) & 3)
 
 typedef uintnat word;
@@ -85,7 +90,7 @@ static void invert_pointer_at (word *p)
           Hd_val (q) = (header_t) ((word) p | 2);
           /* Change block header's tag to Infix_tag, and change its size
              to point to the infix list. */
-          *hp = Make_ehd (Wosize_bhsize (q - val), Infix_tag, 3);
+          *hp = Make_ehd (Wosize_bhsize (q - val), Infix_tag, 3, PROF_DUMMY);
         }else{                            Assert (Tag_ehd (*hp) == Infix_tag);
           /* Point the last of this infix list to the current first infix
              list of the block. */
@@ -93,7 +98,7 @@ static void invert_pointer_at (word *p)
           /* Point the head of this infix list to the above. */
           Hd_val (q) = (header_t) ((word) p | 2);
           /* Change block header's size to point to this infix list. */
-          *hp = Make_ehd (Wosize_bhsize (q - val), Infix_tag, 3);
+          *hp = Make_ehd (Wosize_bhsize (q - val), Infix_tag, 3, PROF_DUMMY);
         }
       }
       break;
@@ -148,9 +153,12 @@ static void do_compaction (void)
                                           Assert (caml_gc_phase == Phase_idle);
   caml_gc_message (0x10, "Compacting heap...\n", 0);
 
+  GCPROF_GCTIME(GCPROF_GCTIME_COMPACT_BEGIN);
+
 #ifdef DEBUG
   caml_heap_check ();
 #endif
+  MEMPROF_COMPACT_BEGIN();
 
   /* First pass: encode all noninfix headers. */
   {
@@ -162,13 +170,16 @@ static void do_compaction (void)
       while ((char *) p < chend){
         header_t hd = Hd_hp (p);
         mlsize_t sz = Wosize_hd (hd);
+#ifdef ARCH_SIXTYFOUR
+        profiling_t id = Locid_hd (hd);
+#endif
 
         if (Is_blue_hd (hd)){
           /* Free object.  Give it a string tag. */
-          Hd_hp (p) = Make_ehd (sz, String_tag, 3);
+          Hd_hp (p) = Make_ehd (sz, String_tag, 3, id);
         }else{                                      Assert (Is_white_hd (hd));
           /* Live object.  Keep its tag. */
-          Hd_hp (p) = Make_ehd (sz, Tag_hd (hd), 3);
+          Hd_hp (p) = Make_ehd (sz, Tag_hd (hd), 3, id);
         }
         p += Whsize_wosize (sz);
       }
@@ -259,12 +270,18 @@ static void do_compaction (void)
           /* There were (normal or infix) pointers to this block. */
           size_t sz;
           tag_t t;
+#ifdef ARCH_SIXTYFOUR
+          profiling_t id;
+#else
+          profiling_t __attribute__((unused)) id;
+#endif
           char *newadr;
           word *infixes = NULL;
 
           while (Ecolor (q) == 0) q = * (word *) q;
           sz = Whsize_ehd (q);
           t = Tag_ehd (q);
+          id = Locid_ehd(q);
 
           if (t == Infix_tag){
             /* Get the original header of this block. */
@@ -273,6 +290,7 @@ static void do_compaction (void)
             while (Ecolor (q) != 3) q = * (word *) (q & ~(uintnat)3);
             sz = Whsize_ehd (q);
             t = Tag_ehd (q);
+            id = Locid_ehd(q);
           }
 
           newadr = compact_allocate (Bsize_wsize (sz));
@@ -282,7 +300,7 @@ static void do_compaction (void)
             * (word *) q = (word) Val_hp (newadr);
             q = next;
           }
-          *p = Make_header (Wosize_whsize (sz), t, Caml_white);
+          *p = Make_header_loc (Wosize_whsize (sz), t, Caml_white, id);
 
           if (infixes != NULL){
             /* Rebuild the infix headers and revert the infix pointers. */
@@ -296,7 +314,8 @@ static void do_compaction (void)
                 * (word *) q = (word) Val_hp ((word *) newadr + (infixes - p));
                 q = next;
               }                    Assert (Ecolor (q) == 1 || Ecolor (q) == 3);
-              *infixes = Make_header (infixes - p, Infix_tag, Caml_white);
+              *infixes =
+                Make_header (infixes - p, Infix_tag, Caml_white);
               infixes = (word *) q;
             }
           }
@@ -307,7 +326,7 @@ static void do_compaction (void)
           */
           /* No pointers to the header and no infix header:
              the object was free. */
-          *p = Make_header (Wosize_ehd (q), Tag_ehd (q), Caml_blue);
+          *p = Make_header_loc (Wosize_ehd (q), Tag_ehd (q), Caml_blue, Locid_ehd(q));
           p += Whsize_ehd (q);
         }
       }
@@ -331,6 +350,7 @@ static void do_compaction (void)
           size_t sz = Bhsize_hd (q);
           char *newadr = compact_allocate (sz);
           memmove (newadr, p, sz);
+          MEMPROF_COMPACT_MOVE(p, newadr, sz);
           p += Wsize_bsize (sz);
         }else{
           Assert (Color_hd (q) == Caml_blue);
@@ -388,8 +408,10 @@ static void do_compaction (void)
       ch = Chunk_next (ch);
     }
   }
+  MEMPROF_COMPACT_END();
   ++ caml_stat_compactions;
   caml_gc_message (0x10, "done.\n", 0);
+  GCPROF_GCTIME(GCPROF_GCTIME_COMPACT_END);
 }
 
 uintnat caml_percent_max;  /* used in gc_ctrl.c and memory.c */
@@ -398,7 +420,12 @@ void caml_compact_heap (void)
 {
   uintnat target_words, target_size, live;
 
+  GCPROF_GC_PHASE(Phase_compact, Subphase_main);
+  GCPROF_MAJOR_SCAN( COMPACT_FREE );
   do_compaction ();
+  GCPROF_MAJOR_SCAN( COMPACT_ALLOC );
+  GCPROF_GC_PHASE(Phase_compact, Subphase_final);
+
   /* Compaction may fail to shrink the heap to a reasonable size
      because it deals in complete chunks: if a very large chunk
      is at the beginning of the heap, everything gets moved to
@@ -431,6 +458,7 @@ void caml_compact_heap (void)
   if (target_size < caml_stat_heap_size / 2){
     char *chunk;
 
+
     caml_gc_message (0x10, "Recompacting heap (target=%luk)\n",
                      target_size / 1024);
 
@@ -451,6 +479,7 @@ void caml_compact_heap (void)
     if (caml_stat_heap_size > caml_stat_top_heap_size){
       caml_stat_top_heap_size = caml_stat_heap_size;
     }
+    GCPROF_GC_PHASE(Phase_compact, Subphase_retry);
     do_compaction ();
     Assert (caml_stat_heap_chunks == 1);
     Assert (Chunk_next (caml_heap_start) == NULL);

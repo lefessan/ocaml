@@ -1,3 +1,4 @@
+# 2 "stdlib/sys.mlp"
 (***********************************************************************)
 (*                                                                     *)
 (*                                OCaml                                *)
@@ -92,3 +93,9 @@ let catch_break on =
 (* The version string is found in file ../VERSION *)
 
 let ocaml_version = "%%VERSION%%";;
+
+let system cmdline =
+  command (
+    (* Under Windows, system argument is sent to 'cmd' without the quotes,
+       so we need to add them before !*)
+    if win32 then "\"" ^ cmdline ^ "\"" else cmdline)

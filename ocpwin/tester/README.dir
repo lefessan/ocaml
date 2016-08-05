@@ -1,0 +1,6 @@
+The goal of this tool is to run a set of commands, while removing some files
+from the distribution, to localize the files that are really needed to
+run these commands (in commands.cmds). The ultimate goal is to keep only
+in the distribution the files that are needed for OCaml.
+
+To test, go in "test1", and run "tester.exe 

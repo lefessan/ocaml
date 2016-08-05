@@ -26,15 +26,15 @@ let rec eliminate_ref id = function
   | Lconst cst as lam -> lam
   | Lapply(e1, el, loc) ->
       Lapply(eliminate_ref id e1, List.map (eliminate_ref id) el, loc)
-  | Lfunction(kind, params, body) as lam ->
+  | Lfunction(kind, params, body, locid) as lam ->
       if IdentSet.mem id (free_variables lam)
       then raise Real_reference
       else lam
-  | Llet(str, v, e1, e2) ->
-      Llet(str, v, eliminate_ref id e1, eliminate_ref id e2)
-  | Lletrec(idel, e2) ->
+  | Llet(str, v, loc, e1, e2) ->
+      Llet(str, v, loc, eliminate_ref id e1, eliminate_ref id e2)
+  | Lletrec(idel, e2, locid) ->
       Lletrec(List.map (fun (v, e) -> (v, eliminate_ref id e)) idel,
-              eliminate_ref id e2)
+              eliminate_ref id e2, locid)
   | Lprim(Pfield 0, [Lvar v]) when Ident.same v id ->
       Lvar id
   | Lprim(Psetfield(0, _), [Lvar v; e]) when Ident.same v id ->
@@ -53,13 +53,13 @@ let rec eliminate_ref id = function
             List.map (fun (n, e) -> (n, eliminate_ref id e)) sw.sw_blocks;
          sw_failaction =
             Misc.may_map (eliminate_ref id) sw.sw_failaction; })
-  | Lstringswitch(e, sw, default) ->
+  | Lstringswitch(e, sw, default, loc) ->
       Lstringswitch
         (eliminate_ref id e,
          List.map (fun (s, e) -> (s, eliminate_ref id e)) sw,
-         Misc.may_map (eliminate_ref id) default)
-  | Lstaticraise (i,args) ->
-      Lstaticraise (i,List.map (eliminate_ref id) args)
+         Misc.may_map (eliminate_ref id) default, loc)
+  | Lstaticraise (loc, i,args) ->
+      Lstaticraise (loc, i,List.map (eliminate_ref id) args)
   | Lstaticcatch(e1, i, e2) ->
       Lstaticcatch(eliminate_ref id e1, i, eliminate_ref id e2)
   | Ltrywith(e1, v, e2) ->
@@ -107,10 +107,10 @@ let simplify_exits lam =
   let rec count = function
   | (Lvar _| Lconst _) -> ()
   | Lapply(l1, ll, _) -> count l1; List.iter count ll
-  | Lfunction(kind, params, l) -> count l
-  | Llet(str, v, l1, l2) ->
+  | Lfunction(kind, params, l, locid) -> count l
+  | Llet(str, v, _, l1, l2) ->
       count l2; count l1
-  | Lletrec(bindings, body) ->
+  | Lletrec(bindings, body, _locid) ->
       List.iter (fun (v, l) -> count l) bindings;
       count body
   | Lprim(p, ll) -> List.iter count ll
@@ -119,7 +119,7 @@ let simplify_exits lam =
       count l;
       List.iter (fun (_, l) -> count l) sw.sw_consts;
       List.iter (fun (_, l) -> count l) sw.sw_blocks
-  | Lstringswitch(l, sw, d) ->
+  | Lstringswitch(l, sw, d, _loc) ->
       count l;
       List.iter (fun (_, l) -> count l) sw;
       begin match  d with
@@ -128,8 +128,8 @@ let simplify_exits lam =
         | []|[_] -> count d
         | _ -> count d; count d (* default will get replicated *)
       end
-  | Lstaticraise (i,ls) -> incr_exit i ; List.iter count ls
-  | Lstaticcatch (l1,(i,[]),Lstaticraise (j,[])) ->
+  | Lstaticraise (_, i,ls) -> incr_exit i ; List.iter count ls
+  | Lstaticcatch (l1,(i,[]),Lstaticraise (_,j,[])) ->
       (* i will be replaced by j in l1, so each occurence of i in l1
          increases j's ref count *)
       count l1 ;
@@ -193,11 +193,14 @@ let simplify_exits lam =
 
   let rec simplif = function
   | (Lvar _|Lconst _) as l -> l
-  | Lapply(l1, ll, loc) -> Lapply(simplif l1, List.map simplif ll, loc)
-  | Lfunction(kind, params, l) -> Lfunction(kind, params, simplif l)
-  | Llet(kind, v, l1, l2) -> Llet(kind, v, simplif l1, simplif l2)
-  | Lletrec(bindings, body) ->
-      Lletrec(List.map (fun (v, l) -> (v, simplif l)) bindings, simplif body)
+  | Lapply(l1, ll, loc) ->
+    Lapply(simplif l1, List.map simplif ll, loc)
+  | Lfunction(kind, params, l, locid) ->
+      Lfunction(kind, params, simplif l, locid)
+  | Llet(kind, v, loc, l1, l2) -> Llet(kind, v, loc, simplif l1, simplif l2)
+  | Lletrec(bindings, body, locid) ->
+      Lletrec(List.map (fun (v, l) -> (v, simplif l)) bindings, simplif body,
+              locid)
   | Lprim(p, ll) -> begin
     let ll = List.map simplif ll in
     match p, ll with
@@ -224,18 +227,18 @@ let simplify_exits lam =
         (new_l,
          {sw with sw_consts = new_consts ; sw_blocks = new_blocks;
                   sw_failaction = new_fail})
-  | Lstringswitch(l,sw,d) ->
+  | Lstringswitch(l,sw,d, loc) ->
       Lstringswitch
         (simplif l,List.map (fun (s,l) -> s,simplif l) sw,
-         Misc.may_map simplif d)
-  | Lstaticraise (i,[]) as l ->
+         Misc.may_map simplif d, loc)
+  | Lstaticraise (_,i,[]) as l ->
       begin try
         let _,handler =  Hashtbl.find subst i in
         handler
       with
       | Not_found -> l
       end
-  | Lstaticraise (i,ls) ->
+  | Lstaticraise (loc,i,ls) ->
       let ls = List.map simplif ls in
       begin try
         let xs,handler =  Hashtbl.find subst i in
@@ -245,12 +248,12 @@ let simplify_exits lam =
             (fun x y t -> Ident.add x (Lvar y) t)
             xs ys Ident.empty in
         List.fold_right2
-          (fun y l r -> Llet (Alias, y, l, r))
+          (fun y l r -> Llet (Alias, y, loc, l, r))
           ys ls (Lambda.subst_lambda env handler)
       with
-      | Not_found -> Lstaticraise (i,ls)
+      | Not_found -> Lstaticraise (loc,i,ls)
       end
-  | Lstaticcatch (l1,(i,[]),(Lstaticraise (j,[]) as l2)) ->
+  | Lstaticcatch (l1,(i,[]),(Lstaticraise (_,j,[]) as l2)) ->
       Hashtbl.add subst i ([],simplif l2) ;
       simplif l1
   | Lstaticcatch (l1,(i,xs),l2) ->
@@ -284,8 +287,8 @@ let simplify_exits lam =
    Assumes |args| = |params|.
 *)
 
-let beta_reduce params body args =
-  List.fold_left2 (fun l param arg -> Llet(Strict, param, arg, l))
+let beta_reduce loc params body args =
+  List.fold_left2 (fun l param arg -> Llet(Strict, param, loc, arg, l))
                   body params args
 
 (* Simplification of lets *)
@@ -338,26 +341,27 @@ let simplify_lets lam =
   | Lconst cst -> ()
   | Lvar v ->
       use_var bv v 1
-  | Lapply(Lfunction(Curried, params, body), args, _)
+  | Lapply(Lfunction(Curried, params, body, _), args, loc)
     when optimize && List.length params = List.length args ->
-      count bv (beta_reduce params body args)
-  | Lapply(Lfunction(Tupled, params, body), [Lprim(Pmakeblock _, args)], _)
+      count bv (beta_reduce loc params body args)
+  | Lapply(Lfunction(Tupled, params, body, _),
+           [Lprim(Pmakeblock _, args)], loc)
     when optimize && List.length params = List.length args ->
-      count bv (beta_reduce params body args)
+      count bv (beta_reduce loc params body args)
   | Lapply(l1, ll, _) ->
       count bv l1; List.iter (count bv) ll
-  | Lfunction(kind, params, l) ->
+  | Lfunction(kind, params, l, _) ->
       count Tbl.empty l
-  | Llet(str, v, Lvar w, l2) when optimize ->
+  | Llet(str, v, _, Lvar w, l2) when optimize ->
       (* v will be replaced by w in l2, so each occurrence of v in l2
          increases w's refcount *)
       count (bind_var bv v) l2;
       use_var bv w (count_var v)
-  | Llet(str, v, l1, l2) ->
+  | Llet(str, v, _, l1, l2) ->
       count (bind_var bv v) l2;
       (* If v is unused, l1 will be removed, so don't count its variables *)
       if str = Strict || count_var v > 0 then count bv l1
-  | Lletrec(bindings, body) ->
+  | Lletrec(bindings, body, _locid) ->
       List.iter (fun (v, l) -> count bv l) bindings;
       count bv body
   | Lprim(p, ll) -> List.iter (count bv) ll
@@ -366,7 +370,7 @@ let simplify_lets lam =
       count bv l;
       List.iter (fun (_, l) -> count bv l) sw.sw_consts;
       List.iter (fun (_, l) -> count bv l) sw.sw_blocks
-  | Lstringswitch(l, sw, d) ->
+  | Lstringswitch(l, sw, d, _loc) ->
       count bv l ;
       List.iter (fun (_, l) -> count bv l) sw ;
       begin match d with
@@ -377,7 +381,7 @@ let simplify_lets lam =
           end
       | None -> ()
       end
-  | Lstaticraise (i,ls) -> List.iter (count bv) ls
+  | Lstaticraise (_,i,ls) -> List.iter (count bv) ls
   | Lstaticcatch(l1, (i,_), l2) -> count bv l1; count bv l2
   | Ltrywith(l1, v, l2) -> count bv l1; count bv l2
   | Lifthenelse(l1, l2, l3) -> count bv l1; count bv l2; count bv l3
@@ -417,9 +421,9 @@ let simplify_lets lam =
 (* This (small)  optimisation is always legal, it may uncover some
    tail call later on. *)
 
-  let mklet (kind,v,e1,e2) = match e2 with
+  let mklet (kind,v,loc,e1,e2) = match e2 with
   | Lvar w when optimize && Ident.same v w -> e1
-  | _ -> Llet (kind,v,e1,e2) in
+  | _ -> Llet (kind,v,loc,e1,e2) in
 
 
   let rec simplif = function
@@ -430,40 +434,43 @@ let simplify_lets lam =
         l
       end
   | Lconst cst as l -> l
-  | Lapply(Lfunction(Curried, params, body), args, _)
+  | Lapply(Lfunction(Curried, params, body, _), args, loc)
     when optimize && List.length params = List.length args ->
-      simplif (beta_reduce params body args)
-  | Lapply(Lfunction(Tupled, params, body), [Lprim(Pmakeblock _, args)], _)
+      simplif (beta_reduce loc params body args)
+  | Lapply(Lfunction(Tupled, params, body, _), [Lprim(Pmakeblock _, args)], loc)
     when optimize && List.length params = List.length args ->
-      simplif (beta_reduce params body args)
+      simplif (beta_reduce loc params body args)
   | Lapply(l1, ll, loc) -> Lapply(simplif l1, List.map simplif ll, loc)
-  | Lfunction(kind, params, l) -> Lfunction(kind, params, simplif l)
-  | Llet(str, v, Lvar w, l2) when optimize ->
+  | Lfunction(kind, params, l, locid) ->
+      Lfunction(kind, params, simplif l, locid)
+  | Llet(str, v, _, Lvar w, l2) when optimize ->
       Hashtbl.add subst v (simplif (Lvar w));
       simplif l2
-  | Llet(Strict, v, Lprim(Pmakeblock(0, Mutable), [linit]), lbody)
+  | Llet(Strict, v, loc, Lprim(Pmakeblock(0, Mutable, locid), [linit]), lbody)
     when optimize ->
       let slinit = simplif linit in
       let slbody = simplif lbody in
       begin try
-       mklet (Variable, v, slinit, eliminate_ref v slbody)
+       mklet (Variable, v, loc, slinit, eliminate_ref v slbody)
       with Real_reference ->
-        mklet(Strict, v, Lprim(Pmakeblock(0, Mutable), [slinit]), slbody)
+        mklet(Strict, v, loc,
+              Lprim(Pmakeblock(0, Mutable, locid), [slinit]), slbody)
       end
-  | Llet(Alias, v, l1, l2) ->
+  | Llet(Alias, v, loc, l1, l2) ->
       begin match count_var v with
         0 -> simplif l2
       | 1 when optimize -> Hashtbl.add subst v (simplif l1); simplif l2
-      | n -> Llet(Alias, v, simplif l1, simplif l2)
+      | n -> Llet(Alias, v, loc, simplif l1, simplif l2)
       end
-  | Llet(StrictOpt, v, l1, l2) ->
+  | Llet(StrictOpt, v, loc, l1, l2) ->
       begin match count_var v with
         0 -> simplif l2
-      | n -> mklet(Alias, v, simplif l1, simplif l2)
+      | n -> mklet(Alias, v, loc, simplif l1, simplif l2)
       end
-  | Llet(kind, v, l1, l2) -> mklet(kind, v, simplif l1, simplif l2)
-  | Lletrec(bindings, body) ->
-      Lletrec(List.map (fun (v, l) -> (v, simplif l)) bindings, simplif body)
+  | Llet(kind, v, loc, l1, l2) -> mklet(kind, v, loc, simplif l1, simplif l2)
+  | Lletrec(bindings, body, locid) ->
+      Lletrec(List.map (fun (v, l) -> (v, simplif l)) bindings, simplif body,
+              locid)
   | Lprim(p, ll) -> Lprim(p, List.map simplif ll)
   | Lswitch(l, sw) ->
       let new_l = simplif l
@@ -474,12 +481,12 @@ let simplify_lets lam =
         (new_l,
          {sw with sw_consts = new_consts ; sw_blocks = new_blocks;
                   sw_failaction = new_fail})
-  | Lstringswitch (l,sw,d) ->
+  | Lstringswitch (l,sw,d,loc) ->
       Lstringswitch
         (simplif l,List.map (fun (s,l) -> s,simplif l) sw,
-         Misc.may_map simplif d)
-  | Lstaticraise (i,ls) ->
-      Lstaticraise (i, List.map simplif ls)
+         Misc.may_map simplif d,loc)
+  | Lstaticraise (loc, i,ls) ->
+      Lstaticraise (loc, i, List.map simplif ls)
   | Lstaticcatch(l1, (i,args), l2) ->
       Lstaticcatch (simplif l1, (i,args), simplif l2)
   | Ltrywith(l1, v, l2) -> Ltrywith(simplif l1, v, simplif l2)
@@ -518,13 +525,13 @@ let rec emit_tail_infos is_tail lambda =
   | Lconst _ -> ()
   | Lapply (func, l, loc) ->
       list_emit_tail_infos false l;
-      Stypes.record (Stypes.An_call (loc, call_kind l))
-  | Lfunction (_, _, lam) ->
+      Stypes.record (Stypes.An_call (loc.l, call_kind l))
+  | Lfunction (_, _, lam, _) ->
       emit_tail_infos true lam
-  | Llet (_, _, lam, body) ->
+  | Llet (_, _, _, lam, body) ->
       emit_tail_infos false lam;
       emit_tail_infos is_tail body
-  | Lletrec (bindings, body) ->
+  | Lletrec (bindings, body, _locid) ->
       List.iter (fun (_, lam) -> emit_tail_infos false lam) bindings;
       emit_tail_infos is_tail body
   | Lprim (Pidentity, [arg]) ->
@@ -540,13 +547,13 @@ let rec emit_tail_infos is_tail lambda =
       list_emit_tail_infos_fun snd is_tail sw.sw_consts;
       list_emit_tail_infos_fun snd is_tail sw.sw_blocks;
       Misc.may  (emit_tail_infos is_tail) sw.sw_failaction
-  | Lstringswitch (lam, sw, d) ->
+  | Lstringswitch (lam, sw, d,_loc) ->
       emit_tail_infos false lam;
       List.iter
         (fun (_,lam) ->  emit_tail_infos is_tail lam)
         sw ;
       Misc.may (emit_tail_infos is_tail) d
-  | Lstaticraise (_, l) ->
+  | Lstaticraise (_,_, l) ->
       list_emit_tail_infos false l
   | Lstaticcatch (body, _, handler) ->
       emit_tail_infos is_tail body;
@@ -574,7 +581,7 @@ let rec emit_tail_infos is_tail lambda =
       emit_tail_infos false meth;
       emit_tail_infos false obj;
       list_emit_tail_infos false args;
-      Stypes.record (Stypes.An_call (loc, call_kind (obj :: args)))
+      Stypes.record (Stypes.An_call (loc.l, call_kind (obj :: args)))
   | Levent (lam, _) ->
       emit_tail_infos is_tail lam
   | Lifused (_, lam) ->

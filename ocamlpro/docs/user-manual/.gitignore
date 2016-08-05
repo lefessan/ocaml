@@ -1,0 +1,7 @@
+*.aux
+*.log
+*.out
+*.toc
+/user-manual.pdf
+/ocaml-4.01-refman.pdf
+/ocaml-4.01-refman-html.tar.gz

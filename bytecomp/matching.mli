@@ -18,18 +18,18 @@ open Lambda
 
 (* Entry points to match compiler *)
 val for_function:
-        Location.t -> int ref option -> lambda -> (pattern * lambda) list ->
+        Lambda.location -> int ref option -> lambda -> (pattern * lambda) list ->
         partial -> lambda
 val for_trywith:
-        lambda -> (pattern * lambda) list -> lambda
+        Lambda.location -> lambda -> (pattern * lambda) list -> lambda
 val for_let:
-        Location.t -> lambda -> pattern -> lambda -> lambda
+        Lambda.location -> lambda -> pattern -> lambda -> lambda
 val for_multiple_match:
-        Location.t -> lambda list -> (pattern * lambda) list -> partial ->
+        Lambda.location -> lambda list -> (pattern * lambda) list -> partial ->
         lambda
 
 val for_tupled_function:
-        Location.t -> Ident.t list -> (pattern list * lambda) list ->
+        Lambda.location -> Ident.t list -> (pattern list * lambda) list ->
         partial -> lambda
 
 exception Cannot_flatten
@@ -38,6 +38,6 @@ val flatten_pattern: int -> pattern -> pattern list
 
 (* Expand stringswitch to  string test tree *)
 val expand_stringswitch:
-    lambda -> (string * lambda) list -> lambda option -> lambda
+    Lambda.location -> lambda -> (string * lambda) list -> lambda option -> lambda
 
-val inline_lazy_force : lambda -> Location.t -> lambda
+val inline_lazy_force : lambda -> Lambda.location -> lambda

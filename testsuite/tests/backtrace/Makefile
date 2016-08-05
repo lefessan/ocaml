@@ -57,7 +57,7 @@ native:
 	    F="`basename $$file .ml`"; \
 	    (OCAMLRUNPARAM=b=1 ./$(EXECNAME) $$arg || true) \
 	         >$$F.$$arg.native.result 2>&1; \
-	    $(DIFF) $$F.$$arg.reference $$F.$$arg.native.result >/dev/null \
+	    $(DIFF) $$F.$$arg.native.reference $$F.$$arg.native.result >/dev/null \
 	    && echo " => passed" || echo " => failed"; \
 	  done; \
 	done

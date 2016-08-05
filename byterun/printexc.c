@@ -133,11 +133,12 @@ void caml_fatal_uncaught_exception(value exn)
 
   handle_uncaught_exception =
     caml_named_value("Printexc.handle_uncaught_exception");
-  if (handle_uncaught_exception != NULL)
+  if (getenv("OCAMLEXNHANDLER") == NULL && handle_uncaught_exception != NULL){
     /* [Printexc.handle_uncaught_exception] does not raise exception. */
     caml_callback2(*handle_uncaught_exception, exn, Val_bool(DEBUGGER_IN_USE));
-  else
+  } else {
     default_fatal_uncaught_exception(exn);
+  }
   /* Terminate the process */
   exit(2);
 }

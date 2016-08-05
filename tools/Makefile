@@ -15,7 +15,11 @@ include Makefile.shared
 # To make custom toplevels
 
 ocamlmktop: ocamlmktop.tpl ../config/Makefile
-	sed -e 's|%%BINDIR%%|$(BINDIR)|' ocamlmktop.tpl > ocamlmktop
+	if ${OCP_RELOCATABLE}; then \
+	  sed -e 's|%%BINDIR%%|$$(dirname $$0)|' ocamlmktop.tpl > ocamlmktop; \
+        else \
+	  sed -e 's|%%BINDIR%%|$(BINDIR)|' ocamlmktop.tpl > ocamlmktop; \
+        fi
 	chmod +x ocamlmktop
 
 install::

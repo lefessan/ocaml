@@ -52,7 +52,7 @@ val use_silently : formatter -> string -> bool
         (* Read and execute commands from a file.
            [use_file] prints the types and values of the results.
            [use_silently] does not print them. *)
-val eval_path: Path.t -> Obj.t
+val eval_path: Env.t -> Path.t -> Obj.t
         (* Return the toplevel object referred to by the given path *)
 
 (* Printing of values *)
@@ -95,7 +95,7 @@ val print_out_phrase :
 
 (* Hooks for external line editor *)
 
-val read_interactive_input : (string -> string -> int -> int * bool) ref
+val read_interactive_input : (string -> bytes -> int -> int * bool) ref
 
 (* Hooks for initialization *)
 

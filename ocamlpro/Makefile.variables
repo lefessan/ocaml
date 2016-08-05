@@ -1,0 +1,63 @@
+# We could do two versions:
+# * Makefile.variables.boot : contains only the files needed to bootstrap (ocpp)
+# * Makefile.variables : contains all the needed files
+
+# When calling a recursive make in a symlinked directory, paths in the
+# sub-Makefile are relative to the linked directory, not to the link itself
+OCAML_VERSION=$(shell cat VERSION)
+export OCAML_VERSION
+
+OCP_INCLUDES=-I tools
+
+# for depends, clean
+OCP_DIR= tools
+
+# for installation of compiler-libs
+OCP_CMIS=
+
+OCP_MSVC= utils/msvc.cmo
+WATCHER_UTILS= utils/watcherCompilerProtocol.cmo utils/watcherUtils.cmo
+OCPUTILS= utils/ocputils.cmo $(WATCHER_UTILS)
+
+OCP_COMMON= typing/globalize.cmo bytecomp/memprof.cmo	\
+  driver/patch_types.cmo driver/patch_lexer.cmo		\
+  driver/patch_parser.cmo driver/patch_engine.cmo	\
+  driver/patch_main.cmo
+
+OCPPARSING= \
+  parsing/src_cache.cmo
+
+#OCPP=parsing/ocpp_types.cmo parsing/ocpp_version.cmo \
+#        parsing/ocpp_parser.cmo parsing/ocpp_lexer.cmo parsing/ocpp.cmo \
+
+OCPP=parsing/ocpp_types.cmo parsing/ocpp_version.cmo \
+        parsing/ocpp_parser.cmo parsing/ocpp_lexer.cmo parsing/ocpp.cmo \
+        parsing/parsetreeMap.cmo \
+        parsing/parsetreeIter.cmo \
+
+OCPMAIN=\
+        driver/styleCheck1.cmo \
+	driver/needhcons.cmo \
+	tools/depend.cmo driver/toposort.cmo driver/maker.cmo \
+        driver/tailrec.cmo driver/ocpMain.cmo
+
+# ocamlpro/parsetreeIter.cmo \
+
+INTEL_ASM=\
+  driver/intel_proc.cmo \
+  driver/intel_gas.cmo \
+  driver/intel_masm.cmo \
+  \
+  driver/intel_assembler.cmo \
+  driver/coff.cmo \
+  driver/intel_coff.cmo \
+  \
+  driver/elf.cmo \
+  driver/intel_elf.cmo \
+  driver/intel_tests.cmo
+
+INTEL_MAIN=driver/intel_main.cmo
+
+OCPBWBYTEOBJS= driver/watcherCompilerBytecode.cmo
+# Since ocamlopt can be used as ocamlc, we need to include the bytecode part
+OCPBWNATIVEOBJS= driver/watcherCompilerNative.cmo driver/watcherCompilerBytecode.cmo

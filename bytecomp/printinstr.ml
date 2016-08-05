@@ -29,10 +29,10 @@ let instruction ppf = function
       fprintf ppf "\tappterm %i, %i" n m
   | Kreturn n -> fprintf ppf "\treturn %i" n
   | Krestart -> fprintf ppf "\trestart"
-  | Kgrab n -> fprintf ppf "\tgrab %i" n
-  | Kclosure(lbl, n) ->
+  | Kgrab (n, _) -> fprintf ppf "\tgrab %i" n
+  | Kclosure(lbl, n, _) ->
       fprintf ppf "\tclosure L%i, %i" lbl n
-  | Kclosurerec(lbls, n) ->
+  | Kclosurerec(lbls, n, _) ->
       fprintf ppf "\tclosurerec";
       List.iter (fun lbl -> fprintf ppf " %i" lbl) lbls;
       fprintf ppf ", %i" n
@@ -41,13 +41,13 @@ let instruction ppf = function
   | Ksetglobal id -> fprintf ppf "\tsetglobal %a" Ident.print id
   | Kconst cst ->
       fprintf ppf "@[<10>\tconst@ %a@]" Printlambda.structured_constant cst
-  | Kmakeblock(n, m) ->
+  | Kmakeblock(n, m, _) ->
       fprintf ppf "\tmakeblock %i, %i" n m
-  | Kmakefloatblock(n) ->
+  | Kmakefloatblock (n, _) ->
       fprintf ppf "\tmakefloatblock %i" n
   | Kgetfield n -> fprintf ppf "\tgetfield %i" n
   | Ksetfield n -> fprintf ppf "\tsetfield %i" n
-  | Kgetfloatfield n -> fprintf ppf "\tgetfloatfield %i" n
+  | Kgetfloatfield (n, _) -> fprintf ppf "\tgetfloatfield %i" n
   | Ksetfloatfield n -> fprintf ppf "\tsetfloatfield %i" n
   | Kvectlength -> fprintf ppf "\tvectlength"
   | Kgetvectitem -> fprintf ppf "\tgetvectitem"
@@ -69,6 +69,7 @@ let instruction ppf = function
   | Kpoptrap -> fprintf ppf "\tpoptrap"
   | Kraise k-> fprintf ppf "\t%s" (Lambda.raise_kind k)
   | Kcheck_signals -> fprintf ppf "\tcheck_signals"
+  | Kccall_loc(s, n, _)
   | Kccall(s, n) ->
       fprintf ppf "\tccall %s, %i" s n
   | Knegint -> fprintf ppf "\tnegint"
@@ -97,10 +98,7 @@ let instruction ppf = function
   | Kgetpubmet n -> fprintf ppf "\tgetpubmet %i" n
   | Kgetdynmet -> fprintf ppf "\tgetdynmet"
   | Kstop -> fprintf ppf "\tstop"
-  | Kevent ev -> fprintf ppf "\tevent \"%s\" %i-%i"
-                         ev.ev_loc.Location.loc_start.Lexing.pos_fname
-                         ev.ev_loc.Location.loc_start.Lexing.pos_cnum
-                         ev.ev_loc.Location.loc_end.Lexing.pos_cnum
+  | Kevent ev -> fprintf ppf "\tevent %a" Location.print_loc ev.ev_loc
 
 let rec instruction_list ppf = function
     [] -> ()

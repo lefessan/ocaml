@@ -16,7 +16,7 @@
 #include "config.h"
 #include "alloc.h"
 #include "fail.h"
-#include "io.h"
+#include "camlio.h"
 #include "mlvalues.h"
 
 #define Uninitialised (Val_int(0))
@@ -72,7 +72,7 @@ CAMLprim value caml_terminfo_setup (value vchan)
 
 static int terminfo_putc (int c)
 {
-  putch (chan, c);
+  caml_putch (chan, c);
   return c;
 }
 

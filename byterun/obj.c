@@ -102,18 +102,21 @@ CAMLprim value caml_obj_dup(value arg)
   CAMLlocal1 (res);
   mlsize_t sz, i;
   tag_t tg;
+  profiling_t id;
 
   sz = Wosize_val(arg);
   if (sz == 0) CAMLreturn (arg);
   tg = Tag_val(arg);
+  id = Locid_val(arg);
+  if(id == 0) id = caml_memprof_ccall_locid;
   if (tg >= No_scan_tag) {
-    res = caml_alloc(sz, tg);
+    res = caml_alloc_loc(sz, tg, id);
     memcpy(Bp_val(res), Bp_val(arg), sz * sizeof(value));
   } else if (sz <= Max_young_wosize) {
-    res = caml_alloc_small(sz, tg);
+    res = caml_alloc_small_loc(sz, tg, id);
     for (i = 0; i < sz; i++) Field(res, i) = Field(arg, i);
   } else {
-    res = caml_alloc_shr(sz, tg);
+    res = caml_alloc_shr_loc(sz, tg, id);
     for (i = 0; i < sz; i++) caml_initialize(&Field(res, i), Field(arg, i));
   }
   CAMLreturn (res);

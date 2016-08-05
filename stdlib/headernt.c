@@ -39,6 +39,8 @@ unsigned long read_size(const char * const ptr)
          ((unsigned long) p[2] << 8) | p[3];
 }
 
+#define msg_and_length(msg) msg , (sizeof(msg) - 1)
+
 static __inline char * read_runtime_path(HANDLE h)
 {
   char buffer[TRAILER_SIZE];
@@ -79,8 +81,6 @@ static BOOL WINAPI ctrl_handler(DWORD event)
   else
     return FALSE;
 }
-
-#define msg_and_length(msg) msg , (sizeof(msg) - 1)
 
 static __inline void __declspec(noreturn) run_runtime(char * runtime,
          char * const cmdline)
@@ -145,17 +145,29 @@ void __declspec(noreturn) __cdecl headerentry()
   char * cmdline = GetCommandLine();
   char * runtime_path;
   HANDLE h;
+  HANDLE errh;
+  DWORD numwritten;
+  errh = GetStdHandle(STD_ERROR_HANDLE);
 
   GetModuleFileName(NULL, truename, sizeof(truename));
   h = CreateFile(truename, GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE,
                  NULL, OPEN_EXISTING, 0, NULL);
-  if (h == INVALID_HANDLE_VALUE ||
-      (runtime_path = read_runtime_path(h)) == NULL) {
+  /* Display a meaningful error message in this case */
+  if (h == INVALID_HANDLE_VALUE) {
+    WriteFile(errh, truename, strlen(truename), &numwritten, NULL);
+    WriteFile(errh, msg_and_length(" not found\r\n"),
+              &numwritten, NULL);
+    ExitProcess(2);
+#if _MSC_VER >= 1200
+    __assume(0); /* Not reached */
+#endif
+  }
+  if ((runtime_path = read_runtime_path(h)) == NULL) {
     HANDLE errh;
     DWORD numwritten;
     errh = GetStdHandle(STD_ERROR_HANDLE);
     WriteFile(errh, truename, strlen(truename), &numwritten, NULL);
-    WriteFile(errh, msg_and_length(" not found or is not a bytecode"
+    WriteFile(errh, msg_and_length(" is not a bytecode"
                                    " executable file\r\n"),
               &numwritten, NULL);
     ExitProcess(2);

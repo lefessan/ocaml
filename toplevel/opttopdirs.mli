@@ -22,8 +22,10 @@ val dir_use : formatter -> string -> unit
 val dir_install_printer : formatter -> Longident.t -> unit
 val dir_remove_printer : formatter -> Longident.t -> unit
 
-type 'a printer_type_new = Format.formatter -> 'a -> unit
-type 'a printer_type_old = 'a -> unit
+(* tryocaml: ad-hoc implementation of polymorphic printers *)
+type 'a printer_type2 = Env.t -> Types.type_expr -> 'a -> Outcometree.out_value
+type 'a printer_type1 = Format.formatter -> 'a -> unit
+type 'a printer_type0 = 'a -> unit
 
 (* For topmain.ml. Maybe shouldn't be there *)
 val load_file : formatter -> string -> bool

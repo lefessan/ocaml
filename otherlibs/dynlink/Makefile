@@ -13,14 +13,16 @@
 
 # Makefile for the dynamic link library
 
+include ../../Makefile.ocp
 include ../../config/Makefile
+include ../../$(TOP_OCAML_DIR)/ocamlpro/Makefile.dynlink
 
 ROOTDIR   = ../..
 OCAMLRUN  = $(ROOTDIR)/boot/ocamlrun
 OCAMLC    = $(OCAMLRUN) $(ROOTDIR)/ocamlc -nostdlib -I $(ROOTDIR)/stdlib
 OCAMLOPT  = $(OCAMLRUN) $(ROOTDIR)/ocamlopt -nostdlib -I $(ROOTDIR)/stdlib
 
-INCLUDES=-I ../../utils -I ../../typing -I ../../bytecomp -I ../../asmcomp
+INCLUDES=-I ../../utils -I ../../parsing -I ../../typing -I ../../bytecomp -I ../../asmcomp $(OCP_INCLUDES)
 COMPFLAGS=-w +33..39 -warn-error A -bin-annot -safe-string \
           -I ../../stdlib $(INCLUDES)
 
@@ -28,6 +30,7 @@ OBJS=dynlinkaux.cmo dynlink.cmo
 
 COMPILEROBJS=\
   ../../utils/misc.cmo ../../utils/config.cmo ../../utils/clflags.cmo \
+  $(OCP_UTILS) \
   ../../utils/tbl.cmo ../../utils/consistbl.cmo \
   ../../utils/terminfo.cmo ../../utils/warnings.cmo \
   ../../parsing/asttypes.cmi \
@@ -101,6 +104,9 @@ clean: partialclean
 	$(OCAMLOPT) -c $(COMPFLAGS) $<
 
 depend:
+	$(CAMLRUN) ../../tools/ocamldep $(INCLUDES) -I ../../stdlib *.ml *.mli > .depend
 
 dynlink.cmo: dynlinkaux.cmi dynlink.cmi
 extract_crc.cmo: dynlink.cmi
+
+include .depend

@@ -50,7 +50,7 @@ let rec lam ppf = function
       let lams ppf largs =
         List.iter (fun l -> fprintf ppf "@ %a" lam l) largs in
       fprintf ppf "@[<2>(apply@ %a%a)@]" lam lfun lams largs
-  | Uclosure(clos, fv) ->
+  | Uclosure(clos, fv, locid) ->
       let idents ppf =
         List.iter (fprintf ppf "@ %a" Ident.print)in
       let one_fun ppf f =
@@ -62,9 +62,9 @@ let rec lam ppf = function
         List.iter (fprintf ppf "@ %a" lam) in
       fprintf ppf "@[<2>(closure@ %a %a)@]" funs clos lams fv
   | Uoffset(l,i) -> fprintf ppf "@[<2>(offset %a %d)@]" lam l i
-  | Ulet(id, arg, body) ->
+  | Ulet(id, _, arg, body) ->
       let rec letbody ul = match ul with
-        | Ulet(id, arg, body) ->
+        | Ulet(id, _, arg, body) ->
             fprintf ppf "@ @[<2>%a@ %a@]" Ident.print id lam arg;
             letbody body
         | _ -> ul in

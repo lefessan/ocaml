@@ -1,0 +1,78 @@
+
+2015-07-20 Typerex sur Windows
+==============================
+
+QUESTION: do we already need a native compiler at this point ?
+
+# To cross-compile ocpwin on Linux, we need:
+
+# 32 bits Mingw cross-compiler
+$ sudo apt-get install gcc-mingw-w64-i686 libc6-dev-i386 lib32ncurses5-dev:
+
+# 64 bit Mingw cross-compiler
+$ sudo apt-get install gcc-mingw-w64-x86-64
+
+# A copy of Mingw-builds, currently, we use version 4.8.1
+# See: http://www.ocamlpro.com/pub/ocpwin/mingw-builds/
+$ export MINGW_BUILDS=$HOME/WindowsSharedFolder/mingw-builds/4.8.1
+
+# configure typerex-private for 4.01.0+ocp1
+$ cd ocaml/4.01.0+ocp1
+
+2015-10-27 Manual Compilation
+-----------------------------
+
+# 64 bits MinGW Windows distribution and 64 bit OCaml
+$ export MINGW_DISTRIB=x64-4.8.1-release-posix-seh-rev5
+  ../ocpwin/configure mingw64 $MINGW_BUILDS/$MINGW_DISTRIB
+
+# 32 bits MinGW Windows distribution and 32 bit OCaml
+$ export MINGW_DISTRIB=x32-4.8.1-release-posix-dwarf-rev5
+ ../ocpwin/configure mingw32 $MINGW_BUILDS/$MINGW_DISTRIB
+
+This command should copy cross/configs/mingw??/* files to
+cross/config/{Makefile, m.h, s.h}
+
+# Next commands should be:
+make cross-ocaml
+make cross-install
+
+$ make cross-ocaml &> make.log & tail -f make-cross.log
+
+This will build a cross-compiler for OCaml, using the directories in cross/:
+ otherlibs/unix
+ tools
+ byterun
+ stdlib
+ yacc
+and information to copy content from Makefile.cross files.
+
+It will also build a flexlink binary for Linux.
+
+Back in 4.01.0+ocp1, it will build the Windows distribution:
+
+2015-10-27 Scripted Compilation
+-------------------------------
+
+The previous section can be automated using one of the following commands:
+
+Edit ../ocpwin/Makefile.release, configure the variables
+$ make -f ../ocpwin/Makefile.release local-ocpwin64
+$ make -f ../ocpwin/Makefile.release local-ocpwin32
+
+(use "make cross-ocaml" after fixing a problem in the compilation once
+  it has been configured)
+
+2015-10-07 Typerex sur Windows
+==============================
+
+To do a release:
+
+Edit ../ocpwin/Makefile.release
+Go back in 4.01.0, and call ../ocpwin/build-release.sh
+
+BUG: currently, ./configure --disable-ocpbw should have been called in the
+top directory to generate 4.01.0+ocp1/config/config.mlh needed by
+driver/main.ml (should be fixed !!!)
+
+

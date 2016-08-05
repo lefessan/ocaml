@@ -18,7 +18,14 @@
 
 CAMLextern int caml_backtrace_active;
 CAMLextern int caml_backtrace_pos;
-CAMLextern code_t * caml_backtrace_buffer;
+
+#ifdef NATIVE_CODE
+CAMLextern code_t * caml_after_stackoverflow;
+typedef struct backtrace_item backtrace_item_t;
+#else
+typedef code_t backtrace_item_t;
+#endif
+CAMLextern backtrace_item_t * caml_backtrace_buffer;
 CAMLextern value caml_backtrace_last_exn;
 CAMLextern char * caml_cds_file;
 

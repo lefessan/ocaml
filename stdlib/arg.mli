@@ -156,3 +156,8 @@ val current : int ref
     {!Arg.parse} uses the initial value of {!Arg.current} as the index of
     argument 0 (the program name) and starts parsing arguments
     at the next element. *)
+
+val aligned : bool ref
+ (** If true, a call to [Arg.align] is called on the arguments in
+     [Arg.usage] and [Arg.usage_string]. Default is [false]. Useful
+     when combined with arguments in the [default_arglist]. *)

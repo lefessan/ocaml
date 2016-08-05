@@ -27,3 +27,5 @@ val interferences: formatter -> unit -> unit
 val preferences: formatter -> unit -> unit
 
 val print_live: bool ref
+
+val intop : Mach.integer_operation -> string

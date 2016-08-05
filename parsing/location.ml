@@ -362,12 +362,21 @@ let () =
           None
     )
 
-
+let backtrace = ref None
+let report_backtrace bt =
+  match !backtrace with
+  | None -> backtrace := Some bt
+  | Some _ -> ()
 let rec report_exception_rec n ppf exn =
   try match error_of_exn exn with
   | Some err ->
       fprintf ppf "@[%a@]@." report_error err
-  | None -> raise exn
+  | None ->
+    match !backtrace with
+    | None -> raise exn
+    | Some bt ->
+      fprintf ppf "Exception: %s@ Backtrace: %s@."
+        (Printexc.to_string exn) bt
   with exn when n > 0 ->
     report_exception_rec (n-1) ppf exn
 

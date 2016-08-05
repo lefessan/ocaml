@@ -17,7 +17,7 @@
 #include <signal.h>
 #include "alloc.h"
 #include "fail.h"
-#include "io.h"
+#include "camlio.h"
 #include "gc.h"
 #include "memory.h"
 #include "mlvalues.h"
@@ -54,8 +54,10 @@ char * caml_exception_pointer = NULL;
 void caml_raise(value v)
 {
   Unlock_exn();
-  if (caml_exception_pointer == NULL) caml_fatal_uncaught_exception(v);
 
+  if (caml_exception_pointer == NULL){
+    caml_fatal_uncaught_exception(v);
+  }
 #ifndef Stack_grows_upwards
 #define PUSHED_AFTER <
 #else
@@ -80,7 +82,7 @@ void caml_raise_with_arg(value tag, value arg)
   CAMLparam2 (tag, arg);
   CAMLlocal1 (bucket);
 
-  bucket = caml_alloc_small (2, 0);
+  bucket = caml_alloc_small_loc (2, 0, PROF_EXCEPTION);
   Field(bucket, 0) = tag;
   Field(bucket, 1) = arg;
   caml_raise(bucket);
@@ -95,7 +97,7 @@ void caml_raise_with_args(value tag, int nargs, value args[])
   int i;
 
   Assert(1 + nargs <= Max_young_wosize);
-  bucket = caml_alloc_small (1 + nargs, 0);
+  bucket = caml_alloc_small_loc (1 + nargs, 0, PROF_EXCEPTION);
   Field(bucket, 0) = tag;
   for (i = 0; i < nargs; i++) Field(bucket, 1 + i) = args[i];
   caml_raise(bucket);
@@ -105,7 +107,7 @@ void caml_raise_with_args(value tag, int nargs, value args[])
 void caml_raise_with_string(value tag, char const *msg)
 {
   CAMLparam1(tag);
-  value v_msg = caml_copy_string(msg);
+  value v_msg = caml_copy_string_loc(msg, PROF_EXCEPTION);
   caml_raise_with_arg(tag, v_msg);
   CAMLnoreturn;
 }

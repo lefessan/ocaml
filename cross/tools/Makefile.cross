@@ -1,0 +1,13 @@
+
+FILES := make-version-header.sh
+
+all: $(FILES)
+
+
+
+$(FILES): %: ../../tools/%
+	rm -f $*
+	ln -s ../../tools/$* $*
+
+clean:
+	rm -f $(FILES)

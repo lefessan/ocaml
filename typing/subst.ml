@@ -292,6 +292,11 @@ let class_type s cty =
   cleanup_types ();
   cty
 
+let class_signature s csig =
+  let csig = class_signature s csig in
+  cleanup_types ();
+  csig
+
 let value_description s descr =
   { val_type = type_expr s descr.val_type;
     val_kind = descr.val_kind;

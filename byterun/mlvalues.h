@@ -61,6 +61,7 @@ typedef uintnat mlsize_t;
 typedef unsigned int tag_t;             /* Actually, an unsigned char */
 typedef uintnat color_t;
 typedef uintnat mark_t;
+typedef uintnat profiling_t;
 
 /* Longs vs blocks. */
 #define Is_long(x)   (((x) & 1) != 0)
@@ -86,16 +87,34 @@ For 16-bit and 32-bit architectures:
 bits  31    10 9     8 7   0
 
 For 64-bit architectures:
-
-     +--------+-------+-----+
-     | wosize | color | tag |
-     +--------+-------+-----+
-bits  63    10 9     8 7   0
+     +--------+-------+-------+-----+
+     | wosize | locid | color | tag |
+     +--------+-------+-------+-----+
+bits 63     32 31   10 9     8 7    0
 
 */
 
 #define Tag_hd(hd) ((tag_t) ((hd) & 0xFF))
-#define Wosize_hd(hd) ((mlsize_t) ((hd) >> 10))
+#define Wosize_compat32_hd(hd) ((mlsize_t) ((hd) >> 10))
+#ifdef ARCH_SIXTYFOUR
+#define Locid_hd(hd) ((profiling_t) (((uint32) hd) >> 10))
+#define Wosize_hd(hd) ((mlsize_t) ((hd) >> 32))
+#else
+#define Locid_hd(hd) (0)
+#define Wosize_hd(hd) (Wosize_compat32_hd (hd))
+#endif
+
+#define Locid_val(val) (Locid_hd (Hd_val(val)))
+#define Locid_hp(hp) (Locid_hd (Hd_hp (hp)))
+
+  /* TODO memprof deprecated */
+#ifdef ARCH_SIXTYFOUR
+#define Patchlocid_hd(hd, locid) \
+  Make_header_loc(Wosize_hd(hd), Tag_hd(hd), Color_hd(hd), locid)
+  /* (((hd) & (0xFFFFFFFF000003FF)) | ((locid) << 10)) */
+#else
+#define Patchlocid_hd(hd, locid) (hd)
+#endif
 
 #define Hd_val(val) (((header_t *) (val)) [-1])        /* Also an l-value. */
 #define Hd_op(op) (Hd_val (op))                        /* Also an l-value. */
@@ -111,7 +130,7 @@ bits  63    10 9     8 7   0
 
 #define Num_tags (1 << 8)
 #ifdef ARCH_SIXTYFOUR
-#define Max_wosize (((intnat)1 << 54) - 1)
+#define Max_wosize (((intnat)1 << 32) - 1) /* 32GB */
 #else
 #define Max_wosize ((1 << 22) - 1)
 #endif
@@ -295,11 +314,20 @@ CAMLextern header_t caml_atom_table[];
 /* The table of global identifiers */
 
 extern value caml_global_data;
+#ifndef NATIVE_CODE
+CAMLextern value caml_globals_map;
+#endif
+
+#include "memprof.h"
 
 #ifdef __cplusplus
 }
 #endif
 
 CAMLextern value caml_set_oo_id(value obj);
+
+/* This is used by c_process_info.c to choose the magic before
+   including marshaled types */
+#define OCAML_VERSION_OCP 4020101
 
 #endif /* CAML_MLVALUES_H */

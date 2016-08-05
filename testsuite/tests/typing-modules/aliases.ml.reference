@@ -3,26 +3,26 @@
 # - : char = 'B'
 #   module C' :
   sig
-    external code : char -> int = "%identity"
+    external code : char -> int = "%identity" "!memprof"
     val chr : int -> char
     val escaped : char -> string
     val lowercase : char -> char
     val uppercase : char -> char
     type t = char
     val compare : t -> t -> int
-    external unsafe_chr : int -> char = "%identity"
+    external unsafe_chr : int -> char = "%identity" "!memprof"
   end
 # - : char = 'B'
 #   module C3 :
   sig
-    external code : char -> int = "%identity"
+    external code : char -> int = "%identity" "!memprof"
     val chr : int -> char
     val escaped : char -> string
     val lowercase : char -> char
     val uppercase : char -> char
     type t = char
     val compare : t -> t -> int
-    external unsafe_chr : int -> char = "%identity"
+    external unsafe_chr : int -> char = "%identity" "!memprof"
   end
 # - : char = 'B'
 #   val f : 'a list -> int = <fun>
@@ -30,25 +30,25 @@
 #   module F :
   functor (X : sig  end) ->
     sig
-      external code : char -> int = "%identity"
+      external code : char -> int = "%identity" "!memprof"
       val chr : int -> char
       val escaped : char -> string
       val lowercase : char -> char
       val uppercase : char -> char
       type t = char
       val compare : t -> t -> int
-      external unsafe_chr : int -> char = "%identity"
+      external unsafe_chr : int -> char = "%identity" "!memprof"
     end
 # module C4 :
   sig
-    external code : char -> int = "%identity"
+    external code : char -> int = "%identity" "!memprof"
     val chr : int -> char
     val escaped : char -> string
     val lowercase : char -> char
     val uppercase : char -> char
     type t = char
     val compare : t -> t -> int
-    external unsafe_chr : int -> char = "%identity"
+    external unsafe_chr : int -> char = "%identity" "!memprof"
   end
 # - : char = 'B'
 #   module G : functor (X : sig  end) -> sig module M : sig  end end

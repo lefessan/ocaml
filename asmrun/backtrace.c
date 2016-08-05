@@ -18,15 +18,22 @@
 #include <string.h>
 
 #include "alloc.h"
+#include "stack.h"
 #include "backtrace.h"
 #include "memory.h"
 #include "misc.h"
 #include "mlvalues.h"
-#include "stack.h"
+#include "memprof.h"
 
+struct backtrace_item {
+  frame_descr *backtrace_descriptor;
+  int backtrace_count;
+};
+
+CAMLexport code_t * caml_after_stackoverflow = NULL;
 int caml_backtrace_active = 0;
 int caml_backtrace_pos = 0;
-code_t * caml_backtrace_buffer = NULL;
+backtrace_item_t * caml_backtrace_buffer = NULL;
 value caml_backtrace_last_exn = Val_unit;
 #define BACKTRACE_BUFFER_SIZE 1024
 
@@ -65,6 +72,82 @@ CAMLprim value caml_backtrace_status(value vunit)
 {
   return Val_bool(caml_backtrace_active);
 }
+
+/* When [caml_backtrace_pos] reaches [BACKTRACE_BUFFER_SIZE], we have
+normally no space to record the top of the backtrace. Here, we create
+a space with [TOP_OF_BACKTRACE] entries, called
+[top_of_backtrace]. [caml_backtrace_pos] is set to a negative
+value. Descriptors are stored in this *cyclic* buffer. When leaving
+[caml_stash_backtrace], we call [clean_backtrace] to copy
+[top_of_backtrace] to the standard backtrace buffer, taking only the
+[TOP_OF_BACKTRACE_SIZE] top entries. We add a NULL pointer as a frame
+descriptor, that is printed as "<<< backtrace cut here >>>".
+ */
+#define TOP_OF_BACKTRACE_SIZE 64
+static frame_descr* top_of_backtrace[TOP_OF_BACKTRACE_SIZE];
+static void clean_backtrace()
+{
+  if(caml_backtrace_pos < 0){
+    int i;
+    backtrace_item_t* p = &caml_backtrace_buffer[BACKTRACE_BUFFER_SIZE-1];
+    caml_backtrace_pos++;
+    for(i=0; i<TOP_OF_BACKTRACE_SIZE && caml_backtrace_pos < 0; i++){
+      frame_descr* d = 
+        top_of_backtrace[ (1-caml_backtrace_pos) % TOP_OF_BACKTRACE_SIZE ];
+      caml_backtrace_pos++;
+      p->backtrace_descriptor = d;
+      p->backtrace_count = 0x10;
+      p--;
+    }
+    p->backtrace_descriptor = NULL;
+    p->backtrace_count = 0x10;
+    caml_backtrace_pos = BACKTRACE_BUFFER_SIZE;
+  }
+}
+
+static void really_store_backtrace_item(frame_descr* d)
+{
+  if(caml_backtrace_pos < 0){
+    top_of_backtrace[ (1-caml_backtrace_pos) % TOP_OF_BACKTRACE_SIZE ] = d;
+    caml_backtrace_pos--;
+  } else {
+    backtrace_item_t *p = &caml_backtrace_buffer[caml_backtrace_pos++];
+    p -> backtrace_descriptor = d;
+    p -> backtrace_count = 0x10;
+  }
+}
+
+static void store_backtrace_descr(frame_descr* d)
+{
+  backtrace_item_t *prev1, *prev2, *prev3;
+  if( caml_backtrace_pos < 4 )
+    return really_store_backtrace_item(d);
+
+  prev1 = &caml_backtrace_buffer[caml_backtrace_pos-1];
+  if ( prev1->backtrace_descriptor == d && 
+       (prev1->backtrace_count & 0xf) == 0 ){
+    prev1->backtrace_count += 0x10;
+    return;
+  } 
+
+  prev2 = &caml_backtrace_buffer[caml_backtrace_pos-2];
+  prev3 = &caml_backtrace_buffer[caml_backtrace_pos-3];
+  if(
+     (prev2->backtrace_descriptor == d) &&
+     (prev1->backtrace_descriptor == prev3->backtrace_descriptor) &&
+     (prev2->backtrace_count == prev3->backtrace_count) &&
+     ( (prev2->backtrace_count & 0x01) == 0x01 ||
+      prev2->backtrace_count == 0x10) &&
+     (prev1->backtrace_count == 0x10)
+     ) {
+       caml_backtrace_pos--;
+       prev2->backtrace_count = (prev2->backtrace_count + 0x10) | 0x01;
+       prev3->backtrace_count = prev2->backtrace_count;
+       return;
+  }
+  really_store_backtrace_item(d);
+}
+
 
 /* returns the next frame descriptor (or NULL if none is available),
    and updates *pc and *sp to point to the following one.  */
@@ -116,6 +199,8 @@ frame_descr * caml_next_frame_descriptor(uintnat * pc, char ** sp)
    implementation -- before the more flexible
    [caml_get_current_callstack] was implemented. */
 
+extern int caml_in_sigaltstack(char* ptr);
+
 void caml_stash_backtrace(value exn, uintnat pc, char * sp, char * trapsp)
 {
   if (exn != caml_backtrace_last_exn) {
@@ -124,18 +209,76 @@ void caml_stash_backtrace(value exn, uintnat pc, char * sp, char * trapsp)
   }
   if (caml_backtrace_buffer == NULL) {
     Assert(caml_backtrace_pos == 0);
-    caml_backtrace_buffer = malloc(BACKTRACE_BUFFER_SIZE * sizeof(code_t));
+    caml_backtrace_buffer = malloc(BACKTRACE_BUFFER_SIZE * sizeof(backtrace_item_t));
     if (caml_backtrace_buffer == NULL) return;
+  }
+
+  if( caml_in_sigaltstack((char*) &sp)
+      && ((char*)caml_bottom_of_stack - (char*)caml_after_stackoverflow) != 32776 ){
+
+  /* 
+
+     We are after a stack-overflow: [caml_in_sigaltstack] is true, so we
+     can use the value of [caml_after_stackoverflow].
+
+     After a stack-overflow, we arrive here using
+     [caml_bottom_of_stack] for [sp]. However, [caml_bottom_of_stack]
+     is only updated on [caml_c_call], but we might have done a lot of
+     work since the last C call.  In Typerex, we save the value of
+     %rsp in [caml_after_stackoverflow] in the [segv_handler], so it
+     might be possible to recover some information. Unfortunately,
+     this %rsp is not a frame descriptor, so we should probably try to
+     walk the stack upward to find the return address.
+     
+     Since calls to C touch the stack with an offset of 32776, we can
+     compare the two values, and use the heuristics that a different
+     offset means that OCaml code has overflowed the stack, in which
+     case we cannot use [caml_bottom_of_stack].
+
+     We should then use [caml_after_stackoverflow] to discover a
+     correct starting position in the stack. We can just search the
+     stack for a correct frame_descr.
+
+   */
+    frame_descr * d;
+    uintnat h;
+    int found = 0;
+    
+    // fprintf(stderr, "STACK OVERFLOW BACKTRACE RECOVERY MODE...\n");
+    if (caml_frame_descriptors == NULL) caml_init_frame_descriptors();
+
+    sp = (char*)caml_after_stackoverflow;
+
+    /* let's forget the top of the stack */
+    sp += 1024 * sizeof(void*);
+    while(!found && sp < caml_bottom_of_stack ){
+      /* No stack grows upwards these days... */
+      sp += sizeof(void*);
+      pc = Saved_return_address(sp);
+      h = Hash_retaddr(pc);
+      while (1) {
+        d = caml_frame_descriptors[h];
+        if (d == 0) break;
+        if (d->retaddr == pc){ found = 1; break; }
+        h = (h+1) & caml_frame_descriptors_mask;
+      }
+    }
+    pc = Saved_return_address(sp);
   }
 
   /* iterate on each frame  */
   while (1) {
     frame_descr * descr = caml_next_frame_descriptor(&pc, &sp);
-    if (descr == NULL) return;
+    if (descr == NULL) {
+      return;
+    }
     /* store its descriptor in the backtrace buffer */
-    if (caml_backtrace_pos >= BACKTRACE_BUFFER_SIZE) return;
-    caml_backtrace_buffer[caml_backtrace_pos++] = (code_t) descr;
-
+    if (caml_backtrace_pos >= BACKTRACE_BUFFER_SIZE){
+      /* OCaml would just stop here, but we prefer to do something 
+         different */
+      caml_backtrace_pos = -1;
+    }
+    store_backtrace_descr(descr);
     /* Stop when we reach the current exception handler */
 #ifndef Stack_grows_upwards
     if (sp > trapsp) return;
@@ -204,21 +347,21 @@ CAMLprim value caml_get_current_callstack(value max_frames_value) {
 
 /* Extract location information for the given frame descriptor */
 
-struct loc_info {
-  int loc_valid;
-  int loc_is_raise;
-  char * loc_filename;
-  int loc_lnum;
-  int loc_startchr;
-  int loc_endchr;
-};
-
-static void extract_location_info(frame_descr * d,
-                                  /*out*/ struct loc_info * li)
+void caml_extract_location_info(frame_descr * d,
+                                  /*out*/ struct caml_loc_info * li)
 {
   uintnat infoptr;
   uint32 info1, info2;
 
+  if(d == NULL){
+    li->loc_valid = 1;
+    li->loc_is_raise = 1;
+    li->loc_filename = "long backtrace cut here =========";
+    li->loc_lnum = -1;
+    li->loc_startchr = 0;
+    li->loc_endchr = 0;
+    return;
+  }
   /* If no debugging information available, print nothing.
      When everything is compiled with -g, this corresponds to
      compiler-inserted re-raise operations. */
@@ -255,17 +398,19 @@ static void extract_location_info(frame_descr * d,
 
    note that the test for compiler-inserted raises is slightly redundant:
      (!li->loc_valid && li->loc_is_raise)
-   extract_location_info above guarantees that when li->loc_valid is
+   caml_extract_location_info above guarantees that when li->loc_valid is
    0, then li->loc_is_raise is always 1, so the latter test is
    useless. We kept it to keep code identical to the byterun/
    implementation. */
 
-static void print_location(struct loc_info * li, int index)
+static void print_location(struct caml_loc_info * li, int index, char* indent)
 {
   char * info;
 
   /* Ignore compiler-inserted raise */
-  if (!li->loc_valid && li->loc_is_raise) return;
+  if (!li->loc_valid && li->loc_is_raise){
+    return;
+  }
 
   if (li->loc_is_raise) {
     /* Initial raise if index == 0, re-raise otherwise */
@@ -280,9 +425,10 @@ static void print_location(struct loc_info * li, int index)
       info = "Called from";
   }
   if (! li->loc_valid) {
-    fprintf(stderr, "%s unknown location\n", info);
+    fprintf(stderr, "%s%s unknown location\n", indent, info);
   } else {
-    fprintf (stderr, "%s file \"%s\", line %d, characters %d-%d\n",
+    fprintf (stderr, "%s%s file \"%s\", line %d, characters %d-%d\n",
+             indent,
              info, li->loc_filename, li->loc_lnum,
              li->loc_startchr, li->loc_endchr);
   }
@@ -293,11 +439,26 @@ static void print_location(struct loc_info * li, int index)
 void caml_print_exception_backtrace(void)
 {
   int i;
-  struct loc_info li;
+  struct caml_loc_info li;
+  int count;
 
+  clean_backtrace();
   for (i = 0; i < caml_backtrace_pos; i++) {
-    extract_location_info((frame_descr *) (caml_backtrace_buffer[i]), &li);
-    print_location(&li, i);
+    caml_extract_location_info(caml_backtrace_buffer[i].backtrace_descriptor, &li);
+    count = caml_backtrace_buffer[i].backtrace_count;
+    if( count == 0x10 ){
+      print_location(&li, i,"");
+    } else
+      if( (count & 0x01) == 0x01 ){
+        fprintf(stderr, "Mutual recursion called %d times:\n", count >> 4);
+        print_location(&li, i,"  [1] ");
+        i++;
+        caml_extract_location_info(caml_backtrace_buffer[i].backtrace_descriptor, &li);
+        print_location(&li, i,"  [2] ");
+      } else {
+        fprintf(stderr, "Recursion called %d times:\n", count >> 4);
+        print_location(&li, i,"  * ");
+      }
   }
 }
 
@@ -306,9 +467,9 @@ void caml_print_exception_backtrace(void)
 CAMLprim value caml_convert_raw_backtrace_slot(value backtrace_slot) {
   CAMLparam1(backtrace_slot);
   CAMLlocal2(p, fname);
-  struct loc_info li;
+  struct caml_loc_info li;
 
-  extract_location_info(Descrptr_Val(backtrace_slot), &li);
+  caml_extract_location_info(Descrptr_Val(backtrace_slot), &li);
 
   if (li.loc_valid) {
     fname = caml_copy_string(li.loc_filename);
@@ -341,25 +502,51 @@ CAMLprim value caml_get_exception_raw_backtrace(value unit)
 
   if (caml_backtrace_buffer == NULL || caml_backtrace_pos == 0) {
     res = caml_alloc(0, tag);
-  }
-  else {
-    code_t saved_caml_backtrace_buffer[BACKTRACE_BUFFER_SIZE];
-    int saved_caml_backtrace_pos;
-    intnat i;
+  } else {
+    int backtrace_size = 0;
 
-    saved_caml_backtrace_pos = caml_backtrace_pos;
-
-    if (saved_caml_backtrace_pos > BACKTRACE_BUFFER_SIZE) {
-      saved_caml_backtrace_pos = BACKTRACE_BUFFER_SIZE;
+    if(caml_backtrace_buffer != NULL){
+      int i;
+      clean_backtrace();
+      for(i=0; i<caml_backtrace_pos; i++)
+        backtrace_size += caml_backtrace_buffer[i].backtrace_count >> 4;    
+      if(backtrace_size > BACKTRACE_BUFFER_SIZE) 
+        backtrace_size = BACKTRACE_BUFFER_SIZE;
     }
 
-    memcpy(saved_caml_backtrace_buffer, caml_backtrace_buffer,
-           saved_caml_backtrace_pos * sizeof(code_t));
-
-    res = caml_alloc(saved_caml_backtrace_pos, tag);
-    for (i = 0; i < saved_caml_backtrace_pos; i++) {
-      /* [Val_Descrptr] always returns an immediate. */
-      Field(res, i) = Val_Descrptr(saved_caml_backtrace_buffer[i]);
+    {
+      code_t saved_caml_backtrace_buffer[BACKTRACE_BUFFER_SIZE];
+      int i;
+      
+      backtrace_size = 0;
+      for(i=0; i<caml_backtrace_pos; i++){
+        int count = caml_backtrace_buffer[i].backtrace_count >> 4;
+        int repeat = caml_backtrace_buffer[i].backtrace_count & 0x01;
+        int j;
+        for(j=0; j < count; j++){
+          saved_caml_backtrace_buffer[backtrace_size] = (code_t)
+            caml_backtrace_buffer[i].backtrace_descriptor;
+          backtrace_size++;
+          if(backtrace_size == BACKTRACE_BUFFER_SIZE){
+            i = caml_backtrace_pos; break; /* end of both for loops */
+          }
+          if( repeat ){
+            saved_caml_backtrace_buffer[backtrace_size] = (code_t)
+              caml_backtrace_buffer[i+1].backtrace_descriptor;
+            backtrace_size++;
+            if(backtrace_size == BACKTRACE_BUFFER_SIZE){
+              i = caml_backtrace_pos; break; /* end of both for loops */
+            }
+          }
+        }
+        if(repeat) i++;
+      }
+            
+      res = caml_alloc(backtrace_size, tag);
+      for (i = 0; i < backtrace_size; i++) {
+        /* [Val_Descrptr] always returns an immediate. */
+        Field(res, i) = Val_Descrptr(saved_caml_backtrace_buffer[i]);
+      }
     }
   }
 
@@ -389,6 +576,8 @@ CAMLprim value caml_get_exception_backtrace(value unit)
     Store_field(arr, i, caml_convert_raw_backtrace_slot(Field(backtrace, i)));
   }
 
-  res = caml_alloc_small(1, 0); Field(res, 0) = arr; /* Some */
+  res = caml_alloc_small(1, 0);
+  Field(res, 0) = arr; /* Some */
   CAMLreturn(res);
 }
+

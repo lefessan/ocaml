@@ -10,9 +10,16 @@
 (*                                                                     *)
 (***********************************************************************)
 
+(* Override the compilation modules *)
+module Optcompile = WatcherCompilerNative.Optcompile
+module Asmlibrarian = WatcherCompilerNative.Asmlibrarian
+module Asmpackager = WatcherCompilerNative.Asmpackager
+module Asmlink = WatcherCompilerNative.Asmlink
+
 open Config
 open Clflags
 open Compenv
+
 
 let process_interface_file ppf name =
   Optcompile.interface ppf name (output_prefix name)
@@ -85,13 +92,14 @@ module Options = Main_args.Make_optcomp_options (struct
   let _for_pack s = for_package := Some s
   let _g = set debug
   let _i () = print_types := true; compile_only := true
-  let _I dir = include_dirs := dir :: !include_dirs
+  let _I dir = if Maker.add_dir dir then include_dirs := dir :: !include_dirs
   let _impl = impl
   let _inline n = inline_threshold := n * 8
   let _intf = intf
   let _intf_suffix s = Config.interface_suffix := s
   let _keep_locs = set keep_locs
   let _labels = clear classic
+  let _error_size n = error_size := n
   let _linkall = set link_everything
   let _no_alias_deps = set transparent_modules
   let _no_app_funct = clear applicative_functors
@@ -101,6 +109,7 @@ module Options = Main_args.Make_optcomp_options (struct
   let _nodynlink = clear dlcode
   let _nolabels = set classic
   let _nostdlib = set no_std_include
+  let _nowatcher = clear use_ocp_watcher
   let _o s = output_name := Some s
   let _open s = open_modules := s :: !open_modules
   let _output_obj = set output_c_object
@@ -151,7 +160,6 @@ module Options = Main_args.Make_optcomp_options (struct
   let _dlinear = set dump_linear
   let _dstartup = set keep_startup_file
   let _opaque = set opaque
-
   let anonymous = anonymous
 end);;
 
@@ -171,19 +179,24 @@ let main () =
     if !make_archive then begin
       if !cmxa_present then
         fatal "Option -a cannot be used with .cmxa input files.";
+      Msvc.maybe_detect_env ();
       Compmisc.init_path true;
-      let target = extract_output !output_name in
+      let target = extract_output ~ext:".cmxa" !output_name in
       Asmlibrarian.create_archive (get_objfiles ()) target;
       Warnings.check_fatal ();
     end
     else if !make_package then begin
+      Src_cache.clear_sources ();
+      Msvc.maybe_detect_env ();
       Compmisc.init_path true;
-      let target = extract_output !output_name in
+      let target = extract_output ~ext:".cmx" !output_name in
       Asmpackager.package_files ppf (Compmisc.initial_env ())
         (get_objfiles ()) target;
       Warnings.check_fatal ();
     end
     else if !shared then begin
+      Src_cache.clear_sources ();
+      Msvc.maybe_detect_env ();
       Compmisc.init_path true;
       let target = extract_output !output_name in
       Asmlink.link_shared ppf (get_objfiles ()) target;
@@ -205,13 +218,69 @@ let main () =
         else
           default_output !output_name
       in
+      Msvc.maybe_detect_env ();
       Compmisc.init_path true;
       Asmlink.link ppf (get_objfiles ()) target;
       Warnings.check_fatal ();
     end;
     exit 0
   with x ->
-      Location.report_exception ppf x;
-      exit 2
+    Location.report_backtrace  (Printexc.get_backtrace());
+    Location.report_exception ppf x;
+    exit 2
 
-let _ = main ()
+let rootname =
+  let exename = Filename.basename Sys.executable_name in
+  (* chop until two extensions *)
+  let exename = try Filename.chop_extension exename with _ -> exename in
+  let exename = try Filename.chop_extension exename with _ -> exename in
+  String.lowercase exename
+
+(* We generate a "fat" ocamlopt executable, that is able to execute as
+   "ocamlc", "ocamldep", "ocaml"/"ocamlnat" and "ocamlopt". For that,
+   we just link all compiler-libs, the stdlib with -linkall, and
+   finally, we check the basename of the executable to check under
+   which name it was called.
+
+   For "ocaml", there is a special trick: since "toploop.ml" and other
+   modules have side effects, and thus can interfere with other
+   behaviors, we link "ocamltoplevel.cma" after Optmain, so that they
+   are only executed if the name is "ocaml". Otherwise, the execution
+   of other tools stops in this module.
+*)
+
+let _ =
+  Printexc.record_backtrace true;
+  match rootname with
+  | "ocamlc" ->
+    let module Main = struct
+#include "driver/main.ml"
+    end in
+    exit 0
+  | "ocamldep" ->
+    let module Main = struct
+#include "tools/ocamldep.ml"
+    end in
+    exit 0
+#if defined("OCAML_NATIVE")
+  | "ocamlnat" ->
+    let module Main = struct
+#include "toplevel/opttopstart.ml"
+    end in
+    exit 0
+#else
+  | "ocaml" -> ()
+#endif
+  | "ocamlopt" | _ ->
+    let macros = [ "OCAML_NATIVE" ] in
+    OcpMain.register_extensions ~macros ();
+    Maker.register
+      Format.err_formatter
+      true (* native *)
+      process_file
+      (fun ppf -> Asmpackager.package_files ppf  (Compmisc.initial_env ()))
+      (fun ppf -> Asmlibrarian.create_archive)
+      Asmlink.link
+      Location.report_exception;
+    main ();
+    exit 0

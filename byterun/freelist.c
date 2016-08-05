@@ -43,7 +43,7 @@ static struct {
   header_t h;
   value first_bp;
   value filler2; /* Make sure the sentinel is never adjacent to any block. */
-} sentinel = {0, Make_header (0, 0, Caml_blue), 0, 0};
+} sentinel = {0, Make_header_loc(0, 0, Caml_blue, PROF_INIT), 0, 0};
 
 #define Fl_head ((char *) (&(sentinel.first_bp)))
 static char *fl_prev = Fl_head;  /* Current allocation pointer. */
@@ -281,7 +281,9 @@ char *caml_fl_allocate (mlsize_t wo_sz)
           beyond = NULL;
         }
       }else{
-        char *buf [FLP_MAX];
+        /* Make it static to avoid a call to [__chkstk_ms] under Windows,
+           to keep compatibility between MSVC and MINGW. */
+        static char *buf [FLP_MAX];
         int j = 0;
         mlsize_t oldsz = sz;
 

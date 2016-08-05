@@ -1,0 +1,4 @@
+patch add_record_fields {
+  record_labels = [ "prim_alloc" ]
+  record_new_labels = [ "prim_memprof" ]
+}

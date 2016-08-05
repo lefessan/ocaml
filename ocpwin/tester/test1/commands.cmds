@@ -1,0 +1,4 @@
+ocamlc -custom -o test.exe str.cma unix.cma bigarray.cma dynlink.cma nums.cma graphics.cma test_c.c test.ml
+ocamlopt -o test.exe str.cmxa unix.cmxa bigarray.cmxa dynlink.cmxa nums.cmxa graphics.cmxa test_c.c test.ml
+ocamlc -a -o test.cma test.cmo
+ocamlopt -a -o test.cmxa test.cmx

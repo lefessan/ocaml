@@ -84,29 +84,43 @@ char * caml_search_in_path(struct ext_table * path, char * name)
 CAMLexport char * caml_search_exe_in_path(char * name)
 {
   char * fullname, * filepart;
-  size_t fullnamelen;
+  size_t pathlen;
   DWORD retcode;
-
-  fullnamelen = strlen(name) + 1;
-  if (fullnamelen < 256) fullnamelen = 256;
+  DWORD namelen = strlen(name);
+  pathlen = namelen + 1;
+  if (pathlen < 256) pathlen = 256;
   while (1) {
-    fullname = caml_stat_alloc(fullnamelen);
+    fullname = caml_stat_alloc(pathlen);
     retcode = SearchPath(NULL,              /* use system search path */
                          name,
                          ".exe",            /* add .exe extension if needed */
-                         fullnamelen,
+                         pathlen,
                          fullname,
                          &filepart);
+    /* If the filename contains both an extension and a .exe, we need
+       some extra work to find it ! */
+    if (retcode == 0) {
+      char *name_exe = caml_stat_alloc(namelen+5);
+      strcpy(name_exe, name);
+      strcat(name_exe, ".exe");
+      retcode = SearchPath(NULL,              /* use system search path */
+                           name_exe,
+                           NULL,
+                         pathlen,
+                         fullname,
+                         &filepart);
+      caml_stat_free(name_exe);
+    }
     if (retcode == 0) {
       caml_gc_message(0x100, "%s not found in search path\n",
                       (uintnat) name);
       caml_stat_free(fullname);
       return caml_strdup(name);
     }
-    if (retcode < fullnamelen)
+    if (retcode < pathlen)
       return fullname;
     caml_stat_free(fullname);
-    fullnamelen = retcode + 1;
+    pathlen = retcode + 1;
   }
 }
 
@@ -179,18 +193,31 @@ static BOOL WINAPI ctrl_handler(DWORD event)
   return TRUE;
 }
 
+sighandler ocp_signal(int sig, sighandler action);
+static volatile sighandler alrm_handler_action = SIG_DFL;
+
 sighandler caml_win32_signal(int sig, sighandler action)
 {
   sighandler oldaction;
 
-  if (sig != SIGINT) return signal(sig, action);
-  if (! ctrl_handler_installed) {
-    SetConsoleCtrlHandler(ctrl_handler, TRUE);
-    ctrl_handler_installed = 1;
+  switch(sig){
+  case SIGINT: {
+    if (! ctrl_handler_installed) {
+      SetConsoleCtrlHandler(ctrl_handler, TRUE);
+      ctrl_handler_installed = 1;
+    }
+    oldaction = ctrl_handler_action;
+    ctrl_handler_action = action;
+    return oldaction;
   }
-  oldaction = ctrl_handler_action;
-  ctrl_handler_action = action;
-  return oldaction;
+  case SIGALRM: {
+    oldaction = alrm_handler_action;
+    alrm_handler_action = action;
+    return oldaction;
+  }
+  default:
+    return ocp_signal(sig, action);
+  }
 }
 
 /* Expansion of @responsefile and *? file patterns in the command line */
@@ -311,6 +338,10 @@ int caml_read_directory(char * dirname, struct ext_table * contents)
 
 #ifndef NATIVE_CODE
 
+#if defined(ARCH_SIXTYFOUR) && defined(_WIN32)
+#define strtoll _strtoi64
+#endif
+
 /* Set up a new thread for control-C emulation and termination */
 
 void caml_signal_thread(void * lpParam)
@@ -318,7 +349,11 @@ void caml_signal_thread(void * lpParam)
   char *endptr;
   HANDLE h;
   /* Get an hexa-code raw handle through the environment */
+#ifdef ARCH_SIXTYFOUR
+  h = (HANDLE) strtoll(getenv("CAMLSIGPIPE"), &endptr, 16);
+#else
   h = (HANDLE) strtol(getenv("CAMLSIGPIPE"), &endptr, 16);
+#endif
   while (1) {
     DWORD numread;
     BOOL ret;
@@ -481,8 +516,8 @@ int caml_win32_random_seed (intnat data[16])
   return 5;
 }
 
-
-#ifdef _MSC_VER
+#ifdef _WIN32
+// #ifdef _MSC_VER
 
 static void invalid_parameter_handler(const wchar_t* expression,
    const wchar_t* function,
@@ -533,6 +568,12 @@ int caml_snprintf(char * buf, size_t size, const char * format, ...)
        Put a null terminator, truncating the output. */
     buf[size - 1] = 0;
   }
+#ifdef ARCH_SIXTYFOUR
+#ifdef _WIN32
+#define strtoll _strtoi64
+#endif
+#endif
+
   /* Compute the actual length of output, excluding null terminator */
   va_start(args, format);
   len = _vscprintf(format, args);

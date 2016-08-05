@@ -669,7 +669,7 @@ and lookup_module ~load lid env : Path.t =
         if !Clflags.transparent_modules && not load then
           try ignore (find_pers_struct ~check:false s)
           with Not_found ->
-	    Location.prerr_warning Location.none (Warnings.No_cmi_file s)
+       Location.prerr_warning Location.none (Warnings.No_cmi_file s)
         else ignore (find_pers_struct s);
         Pident(Ident.create_persistent s)
       end
@@ -1060,7 +1060,7 @@ let rec scrape_alias env ?path mty =
         scrape_alias env (find_module path env).md_type ~path
       with Not_found ->
         (*Location.prerr_warning Location.none
-	  (Warnings.No_cmi_file (Path.name path));*)
+     (Warnings.No_cmi_file (Path.name path));*)
         mty
       end
   | mty, Some path ->
@@ -1611,6 +1611,8 @@ let crc_of_unit name =
 let imports() =
   Consistbl.extract (StringSet.elements !imported_units) crc_units
 
+let () = WatcherUtils.set_imports_function imports
+
 (* Save a signature to a file *)
 
 let save_signature_with_imports sg modname filename imports =
@@ -1628,6 +1630,8 @@ let save_signature_with_imports sg modname filename imports =
       cmi_flags = if !Clflags.recursive_types then [Rectypes] else [];
     } in
     let crc = output_cmi filename oc cmi in
+    WatcherUtils.register_crc filename crc;
+    Src_cache.register_cmi crc;
     close_out oc;
     (* Enter signature in persistent table so that imported_unit()
        will also return its crc *)

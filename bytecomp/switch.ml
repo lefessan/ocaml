@@ -86,11 +86,10 @@ module Store(A:Stored) = struct
      act_get = get; act_get_shared = get_shared; }
 end
 
-
-
 module type S =
  sig
    type primitive
+   type location
    val eqint : primitive
    val neint : primitive
    val leint : primitive
@@ -99,7 +98,7 @@ module type S =
    val gtint : primitive
    type act
 
-   val bind : act -> (act -> act) -> act
+   val bind : location -> act -> (act -> act) -> act
    val make_const : int -> act
    val make_offset : act -> int -> act
    val make_prim : primitive -> act list -> act
@@ -108,7 +107,7 @@ module type S =
    val make_if : act -> act -> act -> act
    val make_switch : act -> int array -> act array -> act
    val make_catch : act -> int * (act -> act)
-   val make_exit : int -> act
+   val make_exit : location -> int -> act
  end
 
 (* The module will ``produce good code for the case statement'' *)
@@ -584,7 +583,7 @@ and enum top cases =
         do_make_if_out
           (Arg.make_const d) ctx.arg (mk_ifso ctx) (mk_ifno ctx)
     | _ ->
-        Arg.bind
+        Arg.bind loc
           (Arg.make_offset ctx.arg (-l))
           (fun arg ->
             let ctx = {off= (-l+ctx.off) ; arg=arg} in
@@ -599,7 +598,7 @@ and enum top cases =
         do_make_if_in
           (Arg.make_const d) ctx.arg (mk_ifso ctx) (mk_ifno ctx)
     | _ ->
-        Arg.bind
+        Arg.bind loc
           (Arg.make_offset ctx.arg (-l))
           (fun arg ->
             let ctx = {off= (-l+ctx.off) ; arg=arg} in
@@ -746,7 +745,7 @@ let comp_clusters ({cases=cases ; actions=actions} as s) =
   min_clusters.(len-1),k
 
 (* Assume j > i *)
-let make_switch  {cases=cases ; actions=actions} i j =
+let make_switch loc {cases=cases ; actions=actions} i j =
   let ll,_,_ = cases.(i)
   and _,hh,_ = cases.(j) in
   let tbl = Array.make (hh-ll+1) 0
@@ -777,7 +776,7 @@ let make_switch  {cases=cases ; actions=actions} i j =
     match -ll-ctx.off with
     | 0 -> Arg.make_switch ctx.arg tbl acts
     | _ ->
-        Arg.bind
+        Arg.bind loc
           (Arg.make_offset ctx.arg (-ll-ctx.off))
           (fun arg -> Arg.make_switch arg tbl acts))
 
@@ -815,7 +814,7 @@ let make_clusters ({cases=cases ; actions=actions} as s) n_clusters k =
     else (* assert i < j *)
       let l,_,_ = cases.(i)
       and _,h,_ = cases.(j) in
-      r.(ir) <- (l,h,add_index (make_switch s i j))
+      r.(ir) <- (l,h,add_index (make_switch loc s i j))
     end ;
     if i > 0 then zyva (i-1) (ir-1) in
 
@@ -842,7 +841,7 @@ let do_zyva (low,high) arg cases actions =
   let r = c_test {arg=arg ; off=0} clusters in
   r
 
-let abstract_shared actions =
+let abstract_shared loc actions =
   let handlers = ref (fun x -> x) in
   let actions =
     Array.map
@@ -852,18 +851,18 @@ let abstract_shared actions =
           let i,h = Arg.make_catch act in
           let oh = !handlers in
           handlers := (fun act -> h (oh act)) ;
-          Arg.make_exit i)
+          Arg.make_exit loc i)
       actions in
   !handlers,actions
 
-let zyva lh arg cases actions =
+let zyva loc lh arg cases actions =
   let actions = actions.act_get_shared () in
-  let hs,actions = abstract_shared actions in
+  let hs,actions = abstract_shared loc actions in
   hs (do_zyva lh arg cases actions)
 
 and test_sequence arg cases actions =
   let actions = actions.act_get_shared () in
-  let hs,actions = abstract_shared actions in
+  let hs,actions = abstract_shared loc actions in
   let old_ok = !ok_inter in
   ok_inter := false ;
   if !ok_inter <> old_ok then Hashtbl.clear t ;

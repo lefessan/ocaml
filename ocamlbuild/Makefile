@@ -125,15 +125,17 @@ ocamlbuildlib.cmxa: ocamlbuild_pack.cmx $(EXTRA_CMX)
 
 # The packs
 
-ocamlbuild_pack.cmo ocamlbuild_pack.cmi: $(PACK_CMO)
+ocamlbuild_pack.cmo: $(PACK_CMO)
 	$(OCAMLC) -pack $(PACK_CMO) -o ocamlbuild_pack.cmo
+
+ocamlbuild_pack.cmi: ocamlbuild_pack.cmo
 
 ocamlbuild_pack.cmx: $(PACK_CMX)
 	$(OCAMLOPT) -pack $(PACK_CMX) -o ocamlbuild_pack.cmx
 
 # The config file
 
-ocamlbuild_config.ml: ../config/Makefile
+ocamlbuild_config.ml: Makefile ../config/Makefile myocamlbuild_runtime_config.ml
 	(echo 'let bindir = "$(BINDIR)"'; \
          echo 'let libdir = "$(LIBDIR)"'; \
          echo 'let supports_shared_libraries = $(SUPPORTS_SHARED_LIBRARIES)';\
@@ -141,6 +143,10 @@ ocamlbuild_config.ml: ../config/Makefile
          echo 'let o = "$(O)"'; \
          echo 'let so = "$(SO)"'; \
          echo 'let exe = "$(EXE)"'; \
+         echo 'let ocp_relocatable = $(OCP_RELOCATABLE)'; \
+         echo 'let prefix = "$(PREFIX)"'; \
+         echo 'let ocamllibdir = "$(OCAMLLIBDIR)"'; \
+         cat myocamlbuild_runtime_config.ml; \
         ) > ocamlbuild_config.ml
 clean::
 	rm -f ocamlbuild_config.ml

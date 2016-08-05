@@ -16,4 +16,5 @@ open Format
 
 val structured_constant: formatter -> structured_constant -> unit
 val lambda: formatter -> lambda -> unit
-val primitive: formatter -> primitive -> unit
+val primitive: formatter -> 'a raw_primitive -> unit
+val locid: formatter -> locid -> unit

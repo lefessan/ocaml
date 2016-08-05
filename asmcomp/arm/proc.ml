@@ -197,9 +197,9 @@ let destroyed_at_c_call =
 
 let destroyed_at_oper = function
     Iop(Icall_ind | Icall_imm _)
-  | Iop(Iextcall(_, true)) ->
+  | Iop(Iextcall(_, true, _)) ->
       all_phys_regs
-  | Iop(Iextcall(_, false)) ->
+  | Iop(Iextcall(_, false, _locid)) ->
       destroyed_at_c_call
   | Iop(Ialloc _) ->
       destroyed_at_alloc
@@ -216,14 +216,14 @@ let destroyed_at_raise = all_phys_regs
 (* Maximal register pressure *)
 
 let safe_register_pressure = function
-    Iextcall(_, _) -> if abi = EABI then 0 else 4
+    Iextcall(_, _, _) -> if abi = EABI then 0 else 4
   | Ialloc _ -> if abi = EABI then 0 else 7
   | Iconst_symbol _ when !pic_code -> 7
   | Iintop Imulh when !arch < ARMv6 -> 8
   | _ -> 9
 
 let max_register_pressure = function
-    Iextcall(_, _) -> if abi = EABI then [| 4; 0; 0 |] else [| 4; 8; 8 |]
+    Iextcall(_, _, _) -> if abi = EABI then [| 4; 0; 0 |] else [| 4; 8; 8 |]
   | Ialloc _ -> if abi = EABI then [| 7; 0; 0 |] else [| 7; 8; 8 |]
   | Iconst_symbol _ when !pic_code -> [| 7; 16; 32 |]
   | Iintoffloat | Ifloatofint

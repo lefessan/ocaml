@@ -26,6 +26,7 @@
 #include "signals_machdep.h"
 #include "signals_osdep.h"
 #include "stack.h"
+#include "memprof.h"
 
 #ifdef HAS_STACK_OVERFLOW_DETECTION
 #include <sys/time.h>
@@ -63,13 +64,20 @@ extern char caml_system__code_begin, caml_system__code_end;
    Only generated assembly code can call [caml_garbage_collection],
    via the caml_call_gc assembly stubs.  */
 
+/* If a signal was received, the allocation will abort, i.e. [caml_young_ptr]
+   has been decreased, but we will still redo the allocation when we come
+   back to the code, so the corresponding space has been lost.
+   We modified the code of [Alloc_small] to also call this function,
+   so it might also be called from C code. */
+
 void caml_garbage_collection(void)
 {
-  caml_young_limit = caml_young_start;
+  ALLOCPROF_BEGIN_GARBAGE_COLLECTION();
   if (caml_young_ptr < caml_young_start || caml_force_major_slice) {
     caml_minor_collection();
   }
   caml_process_pending_signals();
+  ALLOCPROF_END_GARBAGE_COLLECTION();
 }
 
 DECLARE_SIGNAL_HANDLER(handle_signal)
@@ -109,8 +117,12 @@ int caml_set_signal_action(int signo, int action)
 #ifdef POSIX_SIGNALS
   switch(action) {
   case 0:
-    sigact.sa_handler = SIG_DFL;
-    sigact.sa_flags = 0;
+    if (signo == caml_hooked_signal) {
+      SET_SIGACT(sigact, handle_signal);
+    } else {
+      sigact.sa_handler = SIG_DFL;
+      sigact.sa_flags = 0;
+    }
     break;
   case 1:
     sigact.sa_handler = SIG_IGN;
@@ -125,7 +137,12 @@ int caml_set_signal_action(int signo, int action)
   oldact = oldsigact.sa_handler;
 #else
   switch(action) {
-  case 0:  act = SIG_DFL; break;
+  case 0:
+      if (signo == caml_hooked_signal)
+        act = handle_signal;
+      else
+        act = SIG_DFL;
+      break;
   case 1:  act = SIG_IGN; break;
   default: act = handle_signal; break;
   }
@@ -192,6 +209,7 @@ static char sig_alt_stack[SIGSTKSZ];
 extern void caml_stack_overflow(void);
 #endif
 
+extern void* caml_after_stackoverflow;
 DECLARE_SIGNAL_HANDLER(segv_handler)
 {
   struct rlimit limit;
@@ -211,6 +229,18 @@ DECLARE_SIGNAL_HANDLER(segv_handler)
       && Is_in_code_area(CONTEXT_PC)
 #endif
       ) {
+
+    /* Save %rsp in [caml_after_stackoverflow]. If we detect in
+       [caml_stash_backtrace] that the stack-overflow was not
+       triggered by touching the stack, we will need this pointer to
+       find a faulty return address in the stack. Usually, OCaml
+       prints useless empty backtraces otherwise.*/
+#ifdef CONTEXT_STACK_POINTER
+    caml_after_stackoverflow = (code_t*) CONTEXT_STACK_POINTER;
+#else
+    caml_after_stackoverflow = NULL;
+#endif
+    
 #ifdef RETURN_AFTER_STACK_OVERFLOW
     /* Tweak the PC part of the context so that on return from this
        handler, we jump to the asm function [caml_stack_overflow]
@@ -270,6 +300,7 @@ void caml_init_signals(void)
   {
     stack_t stk;
     struct sigaction act;
+    
     stk.ss_sp = sig_alt_stack;
     stk.ss_size = SIGSTKSZ;
     stk.ss_flags = 0;
@@ -282,5 +313,18 @@ void caml_init_signals(void)
 #endif
 #if defined(_WIN32) && !defined(_WIN64)
   caml_win32_overflow_detection();
+#endif
+}
+
+    /* This function is useful in [caml_stash_backtrace] to know that
+       we are running in the sig-alt-stack, in which case we are in a
+       stack-overflow, and we can try to recover the stack */
+    
+int caml_in_sigaltstack(char* ptr)
+{
+#ifdef HAS_STACK_OVERFLOW_DETECTION
+  return (ptr >= sig_alt_stack && ptr < sig_alt_stack + SIGSTKSZ);
+#else
+  return 0;
 #endif
 }

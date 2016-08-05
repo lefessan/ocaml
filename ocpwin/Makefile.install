@@ -1,0 +1,361 @@
+-include ../ocpwin/Makefile.local
+include cross/Makefile.config
+include config/Makefile
+
+# We build 3 installers:
+# * $(MSVC_INSTALLER) is the smallest one, it does not include MinGW
+
+## This is Fabrice default settings
+## Configure these lines for your own installation, or
+## override them in Makefile.local
+TARGETDIR?=$(HOME)/WindowsSharedFolder
+MIN_INSTALLER:=ocpwin$(OCPWIN_TARGET)-$(DATE)-$(OCAMLVERSION)-$(MINGW_SYSTEM)
+MSVC_INSTALLER:=ocpwin$(OCPWIN_TARGET)-$(DATE)-$(OCAMLVERSION)-msvc$(OCPWIN_TARGET)
+FULL_INSTALLER:=ocpwin$(OCPWIN_TARGET)-$(DATE)-$(OCAMLVERSION)-full-$(MINGW_SYSTEM)
+MIN_VERSION=$(OCAMLVERSION)-$(MINGW_SYSTEM)-$(DATE)
+MSVC_VERSION=$(OCAMLVERSION)-msvc$(OCPWIN_TARGET)-$(DATE)
+FULL_VERSION=$(OCAMLVERSION)-full-$(MINGW_SYSTEM)-$(DATE)
+
+MAKEREC=$(MAKE) -f $(OCPWIN_DIR)/Makefile.install
+DESTDIR=$(ROOTDIR)/cross/local
+LIBDIR= $(DESTDIR)/lib
+BINDIR= $(DESTDIR)/bin
+
+ifeq ($(OCPWIN_TARGET),64)
+MSVC_ARCH=msvc64
+else
+MSVC_ARCH=msvc
+endif
+
+
+PUBLIC_INCLUDES=\
+  alloc.h callback.h config.h custom.h fail.h hash.h intext.h \
+  memory.h misc.h mlvalues.h printexc.h signals.h compatibility.h \
+  memprof.h
+
+install-mkdirs:
+	mkdir -p $(DESTDIR)
+	mkdir -p $(DESTDIR)/bin
+	mkdir -p $(DESTDIR)/lib
+	mkdir -p $(LIBDIR)/caml
+	mkdir -p $(LIBDIR)/caml/internals
+	mkdir -p $(LIBDIR)/ocamldoc
+	mkdir -p $(LIBDIR)/stublibs
+	mkdir -p $(LIBDIR)/compiler-libs
+	mkdir -p $(LIBDIR)/ocamlbuild
+	mkdir -p $(LIBDIR)/threads
+	mkdir -p $(LIBDIR)/emacs
+
+install-common: uninstall
+	$(MAKEREC) install-mkdirs
+	$(MAKEREC) install-distrib
+	$(MAKEREC) install-typerex
+#	cp -f cross/use_ocaml.bat cross/local/
+#	cp -rf cross/tests cross/local/
+	find cross/local -name '.#*' -exec rm -f {} \;
+
+install-msvc-libs:
+	for msvc in 9.0 11.0 12.0 14.0; do \
+	  mkdir -p $(LIBDIR)/msvc-$$msvc; \
+	  for file in $(MSVC64_OBJECTS); do \
+	    cp cross/stublibs-msvc$(OCPWIN_TARGET)/$$msvc/$${file}_msvc64.obj \
+		$(LIBDIR)/msvc-$$msvc/$${file}_$(MSVC_ARCH).obj; \
+	  done; \
+	  for file in $(MSVC_LIBS); do \
+	    cp cross/stublibs-msvc$(OCPWIN_TARGET)/$$msvc/$$file.lib \
+	      $(LIBDIR)/msvc-$$msvc/$$file.a; \
+	  done; \
+	done
+
+install-msvc32: install-msvc-libs
+	cp -f cross/configs/msvc32/host/ocaml.config $(LIBDIR)/ocaml.config
+
+MSVC64_OBJECTS= flexdll_ocaml flexdll_initer	\
+  flexdll
+MSVC_LIBS= libasmrun libcamlstr libthreads libbigarray libgraphics	\
+  libthreadsnat libcamlrun libnum libunix
+
+
+install-msvc64: install-msvc-libs
+	cp -f cross/configs/msvc64/host/ocaml.config $(LIBDIR)/ocaml.config
+
+install:
+	$(MAKEREC) install-common
+	$(MAKEREC) install-msvc$(OCPWIN_TARGET)
+	$(MAKEREC) install-$(SYSTEM)
+
+cross/nsis/config.nsi: $(OCPWIN_DIR)/Makefile.install cross/Makefile.config
+	echo '!define RELEASE_DATE "'$(DATE)'"' > cross/nsis/config.nsi
+	echo '!define OCAML_VERSION "$(OCAMLVERSION)"' >> cross/nsis/config.nsi
+	echo "!define OCPWIN_ARCH \"${OCPWIN_TARGET}\"" >> cross/nsis/config.nsi
+	echo "!define MINGW_PREFIX \"${MINGW_PREFIX}\"" >> cross/nsis/config.nsi
+
+
+installer-msvc:
+	$(MAKEREC) install-msvc$(OCPWIN_TARGET)
+	rm -rf cross/nsis/files
+	./cross/ocpwin-nsis/ocpwin-nsis-pre -fake -src cross/local -nsis cross/nsis
+	echo '!define PRODUCT_OPTION "msvc"' > cross/nsis/system.nsi
+	echo '!define C_COMPILER "msvc"' >> cross/nsis/system.nsi
+	echo "$(MSVC_VERSION)" > cross/nsis/files/ocpwin-version.txt
+	makensis cross/nsis/install.nsi
+	mv cross/nsis/$(MSVC_INSTALLER).exe $(TARGETDIR)/$(MSVC_INSTALLER).exe
+	cd cross/nsis; mv files $(MSVC_VERSION); \
+		zip -r $(MSVC_INSTALLER).zip $(MSVC_VERSION); \
+			mv $(MSVC_VERSION) files
+	mv cross/nsis/$(MSVC_INSTALLER).zip $(TARGETDIR)/$(MSVC_INSTALLER).zip
+
+installer-full:
+	$(MAKEREC) install-$(SYSTEM)
+	rm -rf cross/nsis/files
+	./cross/ocpwin-nsis/ocpwin-nsis-pre -fake -src cross/local -nsis cross/nsis
+	echo '!define PRODUCT_OPTION "full"' > cross/nsis/system.nsi
+	echo '!define C_COMPILER "full-mingw"' >> cross/nsis/system.nsi
+	echo "$(FULL_VERSION)" > cross/nsis/files/ocpwin-version.txt
+	makensis cross/nsis/install.nsi
+	mv cross/nsis/$(FULL_INSTALLER).exe $(TARGETDIR)/$(FULL_INSTALLER).exe
+	cd cross/nsis; mv files $(FULL_VERSION); \
+		zip -r $(FULL_INSTALLER).zip $(FULL_VERSION); \
+			mv $(FULL_VERSION) files
+	mv cross/nsis/$(FULL_INSTALLER).zip $(TARGETDIR)/$(FULL_INSTALLER).zip
+
+installer-min:
+	cd cross/local; $(OCPWIN_DIR)/make-minimal-$(MINGW_SYSTEM).sh
+	rm -rf cross/nsis/files
+	./cross/ocpwin-nsis/ocpwin-nsis-pre -fake -src cross/local -nsis cross/nsis
+	echo '!define PRODUCT_OPTION "mini"' > cross/nsis/system.nsi
+	echo '!define C_COMPILER "mingw"' >> cross/nsis/system.nsi
+	echo "$(MIN_VERSION)" > cross/nsis/files/ocpwin-version.txt
+	makensis cross/nsis/install.nsi
+	cp cross/nsis/$(MIN_INSTALLER).exe $(TARGETDIR)/
+	cd cross/nsis; mv files $(MIN_VERSION); \
+		zip -r $(MIN_INSTALLER).zip $(MIN_VERSION); \
+			mv $(MIN_VERSION) files
+	mv cross/nsis/$(MIN_INSTALLER).zip $(TARGETDIR)/$(MIN_INSTALLER).zip
+
+installer: $(OCPWIN_DIR)/make-minimal-$(MINGW_SYSTEM).sh cross/nsis/config.nsi
+	rm -rf cross/local
+	$(MAKEREC) install-common
+	$(MAKEREC) installer-msvc
+	$(MAKEREC) installer-full
+	$(MAKEREC) installer-min
+	cp cross/nsis/$(MIN_INSTALLER).exe $(TARGETDIR)/
+
+min-installer: installer
+
+publish:
+	rm -rf cross/local
+	$(MAKEREC)
+	mv cross/local cross/$(MIN_INSTALLER)
+	cd cross; zip -r -9 $(MIN_INSTALLER).zip $(MIN_INSTALLER)
+	echo "When sure, use: $(MAKEREC) push"
+
+push:
+	scp cross/nsis/$(MIN_INSTALLER).exe www.ocamlpro.com:/home/www.ocamlpro.com/www/pub/ocpwin/ocpwin-builds/
+
+save-installer:
+
+update-distrib:
+	./cross/new-release.sh $(MIN_INSTALLER) $(DATE)
+
+# install-distrib: 135 208 kB
+# install-camlp4:  227 304 kB
+# install-mingw64: 310 980 kB
+
+install-typerex:
+	cp $(OCPWIN_DIR)/typerex-$(SYSTEM)/ocp-build.exe $(BINDIR)/
+	cp $(OCPWIN_DIR)/ocp-build/ocaml.ocp $(LIBDIR)/
+
+# We move lib*.a to mingw/ to avoid that the user mistakenly adds $(OCAMLLIB)
+# on the command line when compiling with MSVC. ocamlc/ocamlopt will
+# automatically add this directory to LIB/LIBPATH before calling any C
+# compiler/linker in non-msvc mode.
+
+install-distrib:
+	$(MAKEREC) install-ocaml install-ocamlbuild install-ocamldoc \
+             install-otherlibs install-flexdll install-compilerlibs \
+	     install-doc install-emacs
+	$(MAKE) -f cross/camlp4/Makefile.camlp4 install DESTDIR=$(DESTDIR)
+	cp -f cross/configs/mingw$(OCPWIN_TARGET)/host/ocaml.config $(LIBDIR)/ocaml.mingw$(OCPWIN_TARGET)
+	cp -f cross/configs/msvc$(OCPWIN_TARGET)/host/ocaml.config $(LIBDIR)/ocaml.msvc$(OCPWIN_TARGET)
+	mkdir $(LIBDIR)/mingw
+	mv $(LIBDIR)/lib*.a $(LIBDIR)/mingw/
+
+install-mingw-common:
+	cp -f cross/ocaml.config $(LIBDIR)/
+	cp -f $(MINGW64_DIR)/$(MINGW_SYSTEM)/bin/$(MINGW_PREFIX)-gcc.exe $(BINDIR)/
+	cp -f $(MINGW64_DIR)/$(MINGW_SYSTEM)/bin/libwinpthread-1.dll $(BINDIR)/
+	cp -f $(MINGW64_DIR)/$(MINGW_SYSTEM)/bin/ar.exe $(BINDIR)/ar.exe
+	cp -f $(MINGW64_DIR)/$(MINGW_SYSTEM)/bin/windres.exe $(BINDIR)/windres.exe
+	cp -f $(MINGW64_DIR)/$(MINGW_SYSTEM)/bin/ld.exe $(BINDIR)/ld.exe
+	cp -f $(MINGW64_DIR)/$(MINGW_SYSTEM)/bin/ld.exe $(BINDIR)/$(MINGW_PREFIX)-ld.exe
+	cp -f $(MINGW64_DIR)/$(MINGW_SYSTEM)/bin/ar.exe $(BINDIR)/$(MINGW_PREFIX)-ar.exe
+	cp -f $(MINGW64_DIR)/$(MINGW_SYSTEM)/bin/ranlib.exe $(BINDIR)/$(MINGW_PREFIX)-ranlib.exe
+	cp -f $(MINGW64_DIR)/$(MINGW_SYSTEM)/bin/as.exe $(BINDIR)/$(MINGW_PREFIX)-as.exe
+	cp -rf $(MINGW64_DIR)/$(MINGW_SYSTEM)/libexec $(DESTDIR)/
+	cp -rf $(MINGW64_DIR)/$(MINGW_SYSTEM)/lib/gcc $(LIBDIR)/
+	cp -rf $(MINGW64_DIR)/$(MINGW_SYSTEM)/$(MINGW_PREFIX) $(DESTDIR)/
+	cp -rf $(MINGW64_DIR)/$(MINGW_SYSTEM)/licenses $(DESTDIR)/Licenses.$(MINGW_SYSTEM)
+
+install-mingw64: install-mingw-common
+install-mingw: install-mingw-common
+
+uninstall:
+	rm -rf $(LIBDIR)
+
+# We replace these files by ocamlopt/ocamlopt.opt
+# was ocamlc
+OCAMLC_BYTE=ocamlopt
+# was ocamlc.opt
+OCAMLC_OPT=ocamlopt.opt
+# was ocaml
+OCAML_BYTE=ocamlopt
+# was tools/ocamldep
+OCAMLDEP_BYTE=ocamlopt
+# was tools/ocamldep.opt
+OCAMLDEP_OPT=ocamlopt.opt
+
+# We don't install bytecode binaries anymore for tools that have a corresponding
+# native executable.
+
+install-ocaml:
+	cd stdlib; \
+		cp -f *.ml *.mli *.cmi *.cma *.cmx *.a *.cmxa  \
+		      std_exit.o std_exit.cmo \
+		      camlheader camlheader_ur $(LIBDIR)/
+	cp -f VERSION $(LIBDIR)/ocaml-version.txt
+	cp -f byterun/ocamlrun.exe $(BINDIR)/ocamlrun.exe
+	cp -f yacc/ocamlyacc.exe $(BINDIR)/ocamlyacc.exe
+	cp -f $(OCAMLC_OPT) $(BINDIR)/ocamlc.exe
+	cp -f $(OCAMLC_OPT) $(BINDIR)/ocamlc.opt.exe
+	cp -f ocamlopt.opt $(BINDIR)/ocamlopt.exe
+	cp -f ocamlopt.opt $(BINDIR)/ocamlopt.opt.exe
+	cp -f $(OCAML_BYTE) $(BINDIR)/ocaml.exe
+	cp -f $(OCAMLDEP_OPT) $(BINDIR)/ocamldep.exe
+	cp -f $(OCAMLDEP_OPT) $(BINDIR)/ocamldep.opt.exe
+	cp -f tools/ocamlprof $(BINDIR)/ocamlprof.exe
+	cp -f tools/ocamlmktop $(BINDIR)/ocamlmktop.exe
+	cp -f tools/objinfo $(BINDIR)/ocamlobjinfo.exe
+	cp -f tools/ocamlcp $(BINDIR)/ocamlcp.exe
+	cp -f tools/ocamloptp $(BINDIR)/ocamloptp.exe
+	cp -f tools/ocamlmklib $(BINDIR)/ocamlmklib.exe
+	cp -f lex/ocamllex.opt $(BINDIR)/ocamllex.exe
+	cp -f lex/ocamllex.opt $(BINDIR)/ocamllex.opt.exe
+	cp -f debugger/ocamldebug.exe $(BINDIR)/ocamldebug.exe
+	for i in $(PUBLIC_INCLUDES); do \
+	  (cd byterun; \
+	  sed -f ../tools/cleanup-header $$i > $(LIBDIR)/caml/$$i); \
+	done
+	cp -f byterun/ld.conf $(LIBDIR)/ld.conf
+	cp -f toplevel/topdirs.cmi tools/profiling.cmi tools/profiling.cmo $(LIBDIR)/
+	cp -f expunge $(LIBDIR)/expunge.exe
+	cp -f tools/objinfo_helper.exe $(LIBDIR)/
+#	cp -f ocamlopt $(BINDIR)/ocamlopt.byte.exe
+#	cp -f $(OCAMLC_BYTE) $(BINDIR)/ocamlc.byte.exe
+#	cp -f $(OCAMLDEP_BYTE) $(BINDIR)/ocamldep.byte.exe
+#	cp -f lex/ocamllex $(BINDIR)/ocamllex.byte.exe
+
+
+
+install-doc:
+	cp -f config/Makefile $(LIBDIR)/Makefile.config
+	cp -f LICENSE $(DESTDIR)/License.inria.txt
+	cp -f Changes $(DESTDIR)/Changes.ocaml.txt
+	cp -f README $(DESTDIR)/Readme.inria.txt
+	cp -f $(OCPWIN_DIR)/README.txt $(DESTDIR)/Readme.ocamlpro.txt
+	cp -f $(OCPWIN_DIR)/LICENSE.txt $(DESTDIR)/License.ocamlpro.txt
+
+install-compilerlibs:
+	for dir in utils parsing typing bytecomp asmcomp driver toplevel; do \
+	    (cd $$dir; \
+	    cp -f *.cmi $(LIBDIR)/compiler-libs/; \
+	    ); done
+	cp -f compilerlibs/* $(LIBDIR)/compiler-libs/
+	cp -f toplevel/topstart.cmo $(LIBDIR)/compiler-libs/
+	cp -f byterun/*.h $(LIBDIR)/caml/internals/
+	cp -f asmrun/stack.h  $(LIBDIR)/caml/internals/
+
+install-otherlibs:
+	for lib in win32unix str bigarray win32graph num ; do \
+		(cd otherlibs/$$lib; \
+		cp -f *.a *.cmxa *.cmx *.cmi *.cma *.cmxs *.mli $(LIBDIR)/; \
+		cp -f *.dll $(LIBDIR)/stublibs/; \
+		); \
+	done
+	cd otherlibs/dynlink; \
+		cp -f *.a *.cmxa *.cmx *.cmi *.cma *.mli $(LIBDIR)/
+	cd otherlibs/systhreads; \
+		cp -f *.cmxa *.cmxs *.cmi *.cma $(LIBDIR)/threads/; \
+		cp -f threads.a $(LIBDIR)/threads/; \
+		cp -f libthreads.a libthreadsnat.a $(LIBDIR)/; \
+		cp -f dllthreads.dll $(LIBDIR)/stublibs/; \
+		cp -f *.h $(LIBDIR)/caml/
+	cp -f otherlibs/bigarray/*.h $(LIBDIR)/caml/
+	cp -f otherlibs/$(WIN32_PREFIX)unix/*.h $(LIBDIR)/caml/
+	cp -f otherlibs/dynlink/extract_crc $(LIBDIR)/extract_crc.exe
+
+install-ocamlbuild:
+	cp -f \
+		ocamlbuild/ocamlbuild.cmo \
+		ocamlbuild/ocamlbuildlib.cma \
+		ocamlbuild/ocamlbuild_executor.cm? \
+		ocamlbuild/ocamlbuild*plugin.cm? \
+		ocamlbuild/ocamlbuild_pack.cmi \
+					$(LIBDIR)/ocamlbuild/
+	cp -f ocamlbuild/ocamlbuild.byte $(BINDIR)/ocamlbuild.byte.exe
+	cp -f ocamlbuild/ocamlbuild.byte $(BINDIR)/ocamlbuild.exe
+
+#		ocamlbuild/ocamlbuild.o \
+#		ocamlbuild/ocamlbuild.cmx \
+#		ocamlbuild/ocamlbuildlib.a \
+#		ocamlbuild/ocamlbuildlib.cmxa \
+#		ocamlbuild/ocamlbuild_executor.o \
+#		ocamlbuild/ocamlbuild*plugin.o \
+
+install-ocamldoc:
+	cp -f ocamldoc/ocamldoc $(BINDIR)/ocamldoc.exe
+	cp -f ocamldoc/ocamldoc.opt $(BINDIR)/ocamldoc.opt.exe
+	cp -f ocamldoc/*.cmi $(LIBDIR)/ocamldoc/
+	cp -f ocamldoc/odoc_info.a \
+	      ocamldoc/odoc_info.cma \
+	      ocamldoc/odoc_info.cmxa \
+	      ocamldoc/odoc_info.mli \
+	      ocamldoc/ocamldoc.hva \
+					 $(LIBDIR)/ocamldoc/
+
+install-flexdll:
+	cp -f cross/flexdll/flexlink.asm $(BINDIR)/flexlink.exe
+	cp -f cross/ocpwin-tool/ocpwin.asm $(BINDIR)/ocpwin.exe
+	cp -f cross/ocpwin-tool/ocp-wrapper.exe $(BINDIR)/ocp-wrapper.exe
+	cp -f \
+	 cross/flexdll/flexdll.h \
+	 cross/flexdll/flexdll_$(SYSTEM).o \
+	 cross/flexdll/flexdll_ocaml_$(SYSTEM).o \
+	 cross/flexdll/flexdll_initer_$(SYSTEM).o \
+	 ../ocpwin/flexdll/default_amd64.manifest \
+	 ../ocpwin/flexdll/default.manifest \
+	   $(BINDIR)/
+	cp -f ../ocpwin/flexdll/LICENSE $(DESTDIR)/License.flexdll.txt
+
+EMACS_FILES=emacs/caml-compat.el emacs/caml-font.el			\
+   emacs/caml-types.el emacs/camldebug.el emacs/caml-font-old.el	\
+   emacs/caml-xemacs.el emacs/caml.el emacs/caml-help.el		\
+   emacs/inf-caml.el emacs/caml-emacs.el emacs/caml-hilit.el
+
+install-emacs:
+	mkdir -p  $(LIBDIR)/emacs
+	cp -f $(EMACS_FILES) $(LIBDIR)/emacs/
+
+diff:
+	(cd $(DESTDIR); find | sort) > cross/files.result
+	diff cross/files.result cross/files.reference
+
+diff-bin:
+	(cd $(DESTDIR); find | grep bin/ | sort) > cross/files-bin.result
+	grep bin/ cross/files.reference > cross/files-bin.reference
+	diff cross/files-bin.result cross/files-bin.reference
+
+diff-lib:
+	(cd $(DESTDIR); find | grep lib/ | sort) > cross/files-lib.result
+	grep lib/ cross/files.reference > cross/files-lib.reference
+	diff cross/files-lib.result cross/files-lib.reference

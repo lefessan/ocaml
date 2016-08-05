@@ -45,18 +45,26 @@ CAMLprim value caml_get_section_table(value unit)
                                      caml_section_table_size);
 }
 
-CAMLprim value caml_reify_bytecode(value prog, value len)
+CAMLprim value caml_reify_bytecode(value prog_v, value len_v, value memprof_v)
 {
   value clos;
+  code_t prog = (code_t)prog_v;
+  asize_t len = Long_val(len_v);
 #ifdef ARCH_BIG_ENDIAN
-  caml_fixup_endianness((code_t) prog, (asize_t) Long_val(len));
+  caml_fixup_endianness(prog, len));
 #endif
+
+if(caml_string_length(memprof_v) > 0){
+  /*  fprintf(stderr, "reify_bytecode: with memprof info\n"); */
+  MEMPROF_BYTECODE_INIT(String_val(memprof_v));
+  MEMPROF_BYTECODE_FIX_LOCIDS(prog, len);
+ }
 #ifdef THREADED_CODE
-  caml_thread_code((code_t) prog, (asize_t) Long_val(len));
+  caml_thread_code(prog, len);
 #endif
-  caml_prepare_bytecode((code_t) prog, (asize_t) Long_val(len));
+  caml_prepare_bytecode(prog, len);
   clos = caml_alloc_small (1, Closure_tag);
-  Code_val(clos) = (code_t) prog;
+  Code_val(clos) = prog;
   return clos;
 }
 

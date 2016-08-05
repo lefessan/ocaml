@@ -1,0 +1,28 @@
+
+# OCP_INCLUDES=-I ../ocamlpro
+
+OCP_LEXER=ocpp_parser.cmo ocpp_version.cmo ocpp_lexer.cmo ocpp.cmo
+OCP_UTILS=../parsing/src_cache.cmo ../utils/watcherCompilerProtocol.cmo ../utils/watcherUtils.cmo
+
+OCP_PARSING=\
+	../parsing/ocpp_types.cmo \
+	../parsing/ocpp_version.cmo \
+	../parsing/ocpp_lexer.cmo \
+	../parsing/ocpp_parser.cmo \
+	../parsing/ocpp.cmo
+
+OCP_PATCH=parsetreeMap.cmo patch_types.cmo patch_lexer.cmo	\
+     patch_parser.cmo patch_engine.cmo patch_main.cmo
+
+
+OCP_COMMON= \
+  ../typing/globalize.cmo \
+  ../bytecomp/memprof.cmo 
+
+OCPP1=ocputils.cmo  msvc.cmo
+
+OCPP2=ocpp_types.cmo ocpp_version.cmo ocpp_lexer.cmo ocpp_parser.cmo ocpp.cmo
+
+OCPP3=src_cache.cmo watcherCompilerProtocol.cmo watcherUtils.cmo
+
+LEXER=ocputils.cmo parser.cmo lexer.cmo parse.cmo ccomp.cmo pparse.cmo $(OCP_LEXER) $(OCP_PATCH)

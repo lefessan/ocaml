@@ -1,0 +1,47 @@
+
+CFILES= accept.c exit.c getserv.c read.c symlink.c access.c fchmod.c	\
+  getsockname.c readdir.c termios.c addrofstr.c fchown.c		\
+  gettimeofday.c readlink.c time.c alarm.c fcntl.c getuid.c rename.c	\
+  times.c bind.c fork.c gmtime.c rewinddir.c truncate.c chdir.c		\
+  ftruncate.c initgroups.c rmdir.c umask.c chmod.c getaddrinfo.c	\
+  isatty.c select.c chown.c getcwd.c itimer.c sendrecv.c chroot.c	\
+  getegid.c kill.c setgid.c close.c geteuid.c setgroups.c closedir.c	\
+  getgid.c link.c setsid.c connect.c getgr.c listen.c setuid.c		\
+  cst2constr.c getgroups.c lockf.c shutdown.c gethost.c lseek.c		\
+  signals.c unixsupport.c cstringv.c gethostname.c Makefile sleep.c	\
+  dup2.c getlogin.c mkdir.c socketaddr.c unlink.c dup.c getnameinfo.c	\
+  mkfifo.c utimes.c envir.c getpeername.c nice.c socket.c wait.c	\
+  errmsg.c getpid.c open.c socketpair.c write.c execv.c getppid.c	\
+  opendir.c sockopt.c execve.c getproto.c pipe.c stat.c execvp.c	\
+  getpw.c putenv.c strofaddr.c
+
+FILES= $(CFILES) .depend unix.ml unix.mli \
+  cst2constr.h socketaddr.h unixsupport.h
+
+MAKEFILES=../Makefile ../Makefile.shared
+
+all: unix.cma libunix.a
+
+links: $(FILES)
+
+unix.cma libunix.a: $(FILES) $(MAKEFILES) 
+	$(MAKE) -f Makefile $(CFILES:.c=.o)
+	ar rc libunix.a $(CFILES:.c=.o)
+	ranlib libunix.a
+	../../../boot/ocamlrun ../../../ocamlc -I ../../stdlib -I ../../byterun -a unix.mli unix.ml -o unix.cma
+
+$(FILES): %: ../../../otherlibs/unix/%
+	rm -f $*
+	ln -s ../../../otherlibs/unix/$* $*
+
+../Makefile: ../../../otherlibs/Makefile
+	rm -f ../Makefile
+	ln -s ../../otherlibs/Makefile ../Makefile
+
+../Makefile.shared: ../../../otherlibs/Makefile.shared
+	rm -f ../Makefile.shared
+	ln -s ../../otherlibs/Makefile.shared ../Makefile.shared
+
+clean:
+	rm -f $(FILES)
+	rm -f *.cm? *.o *.a *~

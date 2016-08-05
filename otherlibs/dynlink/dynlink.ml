@@ -237,8 +237,9 @@ let load_compunit ic file_name file_digest compunit =
      Unit name is needed for .cma files, which produce several code fragments.*)
   let digest = Digest.string (file_digest ^ compunit.cu_name) in
   register_code_fragment code code_size digest;
+  let mp_info = Symtable.string_of_memprof_info compunit.cu_memprof in
   begin try
-    ignore((Meta.reify_bytecode code code_size) ())
+    ignore((Meta.reify_bytecode code code_size mp_info) ())
   with exn ->
     Symtable.restore_state initial_symtable;
     raise exn

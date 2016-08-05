@@ -205,6 +205,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
   register char * jumptbl_base;
 #endif
 #endif
+  int locid = PROF_DUMMY;
   value env;
   intnat extra_args;
   struct longjmp_buffer * initial_external_raise;
@@ -231,6 +232,8 @@ value caml_interprete(code_t prog, asize_t prog_size)
 #endif
     return Val_unit;
   }
+
+  caml_memprof_ccall_locid = PROF_INTERP;
 
 #if defined(THREADED_CODE) && defined(ARCH_SIXTYFOUR) && !defined(ARCH_CODE32)
   jumptbl_base = Jumptbl_base;
@@ -499,6 +502,30 @@ value caml_interprete(code_t prog, asize_t prog_size)
       Next;
     }
 
+      /* not fallthrough, because the offset to the restart instruction
+	 needs to take the locid into account */
+    Instruct(GRAB_WITH_LOCID): {
+      int required;
+      locid = *pc++;
+      required = *pc++;
+      if (extra_args >= required) {
+        extra_args -= required;
+      } else {
+        mlsize_t num_args, i;
+        num_args = 1 + extra_args; /* arg1 + extra args */
+        Alloc_small_loc(accu, num_args + 2, Closure_tag, locid);
+        Field(accu, 1) = env;
+        for (i = 0; i < num_args; i++) Field(accu, i + 2) = sp[i];
+        Code_val(accu) = pc - 4; /* Point to the preceding RESTART instr. */
+        sp += num_args;
+        pc = (code_t)(sp[0]);
+        env = sp[1];
+        extra_args = Long_val(sp[2]);
+        sp += 3;
+      }
+      Next;
+    }
+
     Instruct(GRAB): {
       int required = *pc++;
       if (extra_args >= required) {
@@ -506,7 +533,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
       } else {
         mlsize_t num_args, i;
         num_args = 1 + extra_args; /* arg1 + extra args */
-        Alloc_small(accu, num_args + 2, Closure_tag);
+        Alloc_small_loc(accu, num_args + 2, Closure_tag, PROF_INTERP);
         Field(accu, 1) = env;
         for (i = 0; i < num_args; i++) Field(accu, i + 2) = sp[i];
         Code_val(accu) = pc - 3; /* Point to the preceding RESTART instr. */
@@ -519,19 +546,21 @@ value caml_interprete(code_t prog, asize_t prog_size)
       Next;
     }
 
+    Instruct(CLOSURE_WITH_LOCID):
+	locid = *pc++;  /* fallthrough */
     Instruct(CLOSURE): {
       int nvars = *pc++;
       int i;
       if (nvars > 0) *--sp = accu;
       if (nvars < Max_young_wosize) {
         /* nvars + 1 <= Max_young_wosize, can allocate in minor heap */
-        Alloc_small(accu, 1 + nvars, Closure_tag);
+        Alloc_small_loc(accu, 1 + nvars, Closure_tag, locid);
         for (i = 0; i < nvars; i++) Field(accu, i + 1) = sp[i];
       } else {
         /* PR#6385: must allocate in major heap */
         /* caml_alloc_shr and caml_initialize never trigger a GC,
            so no need to Setup_for_gc */
-        accu = caml_alloc_shr(1 + nvars, Closure_tag);
+        accu = caml_alloc_shr_loc(1 + nvars, Closure_tag, locid);
         for (i = 0; i < nvars; i++) caml_initialize(&Field(accu, i + 1), sp[i]);
       }
       /* The code pointer is not in the heap, so no need to go through
@@ -542,6 +571,8 @@ value caml_interprete(code_t prog, asize_t prog_size)
       Next;
     }
 
+    Instruct(CLOSUREREC_WITH_LOCID): 
+	locid = *pc++;  /* fallthrough */
     Instruct(CLOSUREREC): {
       int nfuncs = *pc++;
       int nvars = *pc++;
@@ -550,14 +581,14 @@ value caml_interprete(code_t prog, asize_t prog_size)
       value * p;
       if (nvars > 0) *--sp = accu;
       if (blksize <= Max_young_wosize) {
-        Alloc_small(accu, blksize, Closure_tag);
+        Alloc_small_loc(accu, blksize, Closure_tag, locid);
         p = &Field(accu, nfuncs * 2 - 1);
         for (i = 0; i < nvars; i++, p++) *p = sp[i];
       } else {
         /* PR#6385: must allocate in major heap */
         /* caml_alloc_shr and caml_initialize never trigger a GC,
            so no need to Setup_for_gc */
-        accu = caml_alloc_shr(blksize, Closure_tag);
+        accu = caml_alloc_shr_loc(blksize, Closure_tag, locid);
         p = &Field(accu, nfuncs * 2 - 1);
         for (i = 0; i < nvars; i++, p++) caml_initialize(p, sp[i]);
       }
@@ -569,7 +600,7 @@ value caml_interprete(code_t prog, asize_t prog_size)
       *--sp = accu;
       p++;
       for (i = 1; i < nfuncs; i++) {
-        *p = Make_header(i * 2, Infix_tag, Caml_white);  /* color irrelevant. */
+	*p = Make_header_loc(i * 2, Infix_tag, Caml_white, locid);  /* color irrelevant. */
         p++;
         *p = (value) (pc + pc[i]);
         *--sp = (value) p;
@@ -639,45 +670,53 @@ value caml_interprete(code_t prog, asize_t prog_size)
     Instruct(ATOM):
       accu = Atom(*pc++); Next;
 
+    Instruct(MAKEBLOCK_WITH_LOCID): 
+	locid = *pc++;  /* fallthrough */
     Instruct(MAKEBLOCK): {
       mlsize_t wosize = *pc++;
       tag_t tag = *pc++;
       mlsize_t i;
       value block;
       if (wosize <= Max_young_wosize) {
-        Alloc_small(block, wosize, tag);
+	Alloc_small_loc(block, wosize, tag, locid);
         Field(block, 0) = accu;
         for (i = 1; i < wosize; i++) Field(block, i) = *sp++;
       } else {
-        block = caml_alloc_shr(wosize, tag);
+        block = caml_alloc_shr_loc(wosize, tag, locid);
         caml_initialize(&Field(block, 0), accu);
         for (i = 1; i < wosize; i++) caml_initialize(&Field(block, i), *sp++);
       }
       accu = block;
       Next;
     }
+    Instruct(MAKEBLOCK1_WITH_LOCID):
+	locid = *pc++;  /* fallthrough */
     Instruct(MAKEBLOCK1): {
       tag_t tag = *pc++;
       value block;
-      Alloc_small(block, 1, tag);
+      Alloc_small_loc(block, 1, tag, locid);
       Field(block, 0) = accu;
       accu = block;
       Next;
     }
+    Instruct(MAKEBLOCK2_WITH_LOCID):
+	locid = *pc++;  /* fallthrough */
     Instruct(MAKEBLOCK2): {
       tag_t tag = *pc++;
       value block;
-      Alloc_small(block, 2, tag);
+      Alloc_small_loc(block, 2, tag, locid);
       Field(block, 0) = accu;
       Field(block, 1) = sp[0];
       sp += 1;
       accu = block;
       Next;
     }
+    Instruct(MAKEBLOCK3_WITH_LOCID):
+	locid = *pc++;  /* fallthrough */
     Instruct(MAKEBLOCK3): {
       tag_t tag = *pc++;
       value block;
-      Alloc_small(block, 3, tag);
+      Alloc_small_loc(block, 3, tag, locid);
       Field(block, 0) = accu;
       Field(block, 1) = sp[0];
       Field(block, 2) = sp[1];
@@ -685,14 +724,16 @@ value caml_interprete(code_t prog, asize_t prog_size)
       accu = block;
       Next;
     }
+    Instruct(MAKEFLOATBLOCK_WITH_LOCID):
+	locid = *pc++;  /* fallthrough */
     Instruct(MAKEFLOATBLOCK): {
       mlsize_t size = *pc++;
       mlsize_t i;
       value block;
       if (size <= Max_young_wosize / Double_wosize) {
-        Alloc_small(block, size * Double_wosize, Double_array_tag);
+	Alloc_small_loc(block, size * Double_wosize, Double_array_tag, locid);
       } else {
-        block = caml_alloc_shr(size * Double_wosize, Double_array_tag);
+        block = caml_alloc_shr_loc(size * Double_wosize, Double_array_tag, locid);
       }
       Store_double_field(block, 0, Double_val(accu));
       for (i = 1; i < size; i++){
@@ -715,9 +756,11 @@ value caml_interprete(code_t prog, asize_t prog_size)
       accu = Field(accu, 3); Next;
     Instruct(GETFIELD):
       accu = Field(accu, *pc); pc++; Next;
+    Instruct(GETFLOATFIELD_WITH_LOCID):
+	locid = *pc++;  /* fallthrough */
     Instruct(GETFLOATFIELD): {
       double d = Double_field(accu, *pc);
-      Alloc_small(accu, Double_wosize, Double_tag);
+      Alloc_small_loc(accu, Double_wosize, Double_tag, locid);
       Store_double_val(accu, d);
       pc++;
       Next;
@@ -887,13 +930,28 @@ value caml_interprete(code_t prog, asize_t prog_size)
       Next;
 
 /* Calling C functions */
+//#define DEBUG_C_CALL_WITH_LOCID
 
+    Instruct(C_CALL1_WITH_LOCID):
+      caml_memprof_ccall_locid = *pc++; /* fallthrough */
+#ifdef DEBUG_C_CALL_WITH_LOCID
+      fprintf(stderr, "C_CALL1_WITH_LOCID %s = %d\n", 
+	      caml_names_of_builtin_cprim[*pc],
+	      caml_memprof_ccall_locid);
+#endif
     Instruct(C_CALL1):
       Setup_for_c_call;
       accu = Primitive(*pc)(accu);
       Restore_after_c_call;
       pc++;
       Next;
+    Instruct(C_CALL2_WITH_LOCID):
+      caml_memprof_ccall_locid = *pc++; /* fallthrough */
+#ifdef DEBUG_C_CALL_WITH_LOCID
+      fprintf(stderr, "C_CALL2_WITH_LOCID %s = %d\n", 
+	      caml_names_of_builtin_cprim[*pc],
+	      caml_memprof_ccall_locid);
+#endif
     Instruct(C_CALL2):
       Setup_for_c_call;
       accu = Primitive(*pc)(accu, sp[1]);
@@ -901,6 +959,13 @@ value caml_interprete(code_t prog, asize_t prog_size)
       sp += 1;
       pc++;
       Next;
+    Instruct(C_CALL3_WITH_LOCID):
+      caml_memprof_ccall_locid = *pc++; /* fallthrough */
+#ifdef DEBUG_C_CALL_WITH_LOCID
+      fprintf(stderr, "C_CALL3_WITH_LOCID %s = %d\n", 
+	      caml_names_of_builtin_cprim[*pc],
+	      caml_memprof_ccall_locid);
+#endif
     Instruct(C_CALL3):
       Setup_for_c_call;
       accu = Primitive(*pc)(accu, sp[1], sp[2]);
@@ -908,6 +973,13 @@ value caml_interprete(code_t prog, asize_t prog_size)
       sp += 2;
       pc++;
       Next;
+    Instruct(C_CALL4_WITH_LOCID):
+      caml_memprof_ccall_locid = *pc++; /* fallthrough */
+#ifdef DEBUG_C_CALL_WITH_LOCID
+      fprintf(stderr, "C_CALL4_WITH_LOCID %s = %d\n", 
+	      caml_names_of_builtin_cprim[*pc],
+	      caml_memprof_ccall_locid);
+#endif
     Instruct(C_CALL4):
       Setup_for_c_call;
       accu = Primitive(*pc)(accu, sp[1], sp[2], sp[3]);
@@ -915,6 +987,13 @@ value caml_interprete(code_t prog, asize_t prog_size)
       sp += 3;
       pc++;
       Next;
+    Instruct(C_CALL5_WITH_LOCID):
+      caml_memprof_ccall_locid = *pc++; /* fallthrough */
+#ifdef DEBUG_C_CALL_WITH_LOCID
+      fprintf(stderr, "C_CALL5_WITH_LOCID %s = %d\n", 
+	      caml_names_of_builtin_cprim[*pc],
+	      caml_memprof_ccall_locid);
+#endif
     Instruct(C_CALL5):
       Setup_for_c_call;
       accu = Primitive(*pc)(accu, sp[1], sp[2], sp[3], sp[4]);
@@ -922,6 +1001,12 @@ value caml_interprete(code_t prog, asize_t prog_size)
       sp += 4;
       pc++;
       Next;
+    Instruct(C_CALLN_WITH_LOCID):
+      caml_memprof_ccall_locid = *pc++; /* fallthrough */
+#ifdef DEBUG_C_CALL_WITH_LOCID
+      fprintf(stderr, "C_CALLN_WITH_LOCID = %d\n", 	      
+	      caml_memprof_ccall_locid);
+#endif
     Instruct(C_CALLN): {
       int nargs = *pc++;
       *--sp = accu;

@@ -23,7 +23,7 @@ CAMLDEP=../boot/ocamlrun ../tools/ocamldep
 
 OBJS=camlinternalFormatBasics.cmo pervasives.cmo $(OTHERS)
 OTHERS=array.cmo list.cmo char.cmo bytes.cmo string.cmo sys.cmo \
-  sort.cmo marshal.cmo obj.cmo \
+  sort.cmo marshal.cmo obj.cmo ocpstd.cmo \
   int32.cmo int64.cmo nativeint.cmo \
   lexing.cmo parsing.cmo \
   set.cmo map.cmo stack.cmo queue.cmo \
@@ -33,11 +33,11 @@ OTHERS=array.cmo list.cmo char.cmo bytes.cmo string.cmo sys.cmo \
   digest.cmo random.cmo hashtbl.cmo format.cmo scanf.cmo callback.cmo \
   camlinternalOO.cmo oo.cmo camlinternalMod.cmo \
   genlex.cmo weak.cmo \
-  filename.cmo complex.cmo \
+  filename.cmo complex.cmo stringCompat.cmo \
   arrayLabels.cmo listLabels.cmo bytesLabels.cmo \
   stringLabels.cmo moreLabels.cmo stdLabels.cmo
 
-all: stdlib.cma std_exit.cmo camlheader camlheader_ur
+all: stdlib.cma std_exit.cmo camlheader
 
 INSTALL_LIBDIR=$(DESTDIR)$(LIBDIR)
 
@@ -104,3 +104,10 @@ include .depend
 depend:
 	$(CAMLDEP) *.mli *.ml > .depend
 	$(CAMLDEP) *.ml | sed -e 's/\.cmx/.p.cmx/g' >>.depend
+
+# HACK: If COMMIT is not up-to-date, force its recompilation...
+ifneq ($(shell cat ../COMMIT 2>/dev/null),$(shell git rev-parse --short HEAD))
+.PHONY: ../COMMIT
+endif
+../COMMIT:
+	git rev-parse --short HEAD > ../COMMIT

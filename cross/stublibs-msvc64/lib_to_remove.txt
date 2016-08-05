@@ -1,0 +1,12 @@
+./asmrun/libasmrun.lib
+./byterun/libcamlrun.lib
+./otherlibs/bigarray/libbigarray.lib
+./otherlibs/num/libnum.lib
+./otherlibs/str/libcamlstr.lib
+./otherlibs/systhreads/libthreads.lib
+./otherlibs/systhreads/libthreadsnat.lib
+./otherlibs/win32graph/libgraphics.lib
+./otherlibs/win32unix/libunix.lib
+otherlibs/flexdll/flexdll_initer_msvc64.obj
+otherlibs/flexdll/flexdll_ocaml_msvc64.obj
+otherlibs/flexdll/flexdll_msvc64.obj

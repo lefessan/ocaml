@@ -1,0 +1,7 @@
+
+* Save and restore caml_memprof_ccall_locid in {enter/leave}_blocking_section
+* Discriminate between PROF_EXCEPTION
+
+* locid for Ccall in generated code should not be shifted
+* modify caml_callback to save and restore locid
+* replace Make_header_loc by Make_header for generic C functions

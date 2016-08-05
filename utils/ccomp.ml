@@ -18,6 +18,7 @@ let command cmdline =
     prerr_string cmdline;
     prerr_newline()
   end;
+  Msvc.maybe_detect_env ();
   Sys.command cmdline
 
 let run_command cmdline = ignore(command cmdline)
@@ -49,7 +50,7 @@ let quote_optfile = function
   | Some f -> Filename.quote f
 
 let compile_file name =
-  command
+  let res = command
     (Printf.sprintf
        "%s -c %s %s %s %s"
        (match !Clflags.c_compiler with
@@ -62,6 +63,18 @@ let compile_file name =
        (quote_prefixed "-I" (List.rev !Clflags.include_dirs))
        (Clflags.std_include_flag "-I")
        (Filename.quote name))
+  in
+  (* Compiler file has generated a file with an extension different
+     from what we were expecting. *)
+  if res = 0 && Config.ext_obj <> Config.ext_cc_obj then begin
+    let basename = Filename.chop_extension (Filename.basename name) in
+    let generated = basename ^ Config.ext_cc_obj in
+    let target = basename ^ Config.ext_obj in
+    (try Sys.remove target with _ -> ());
+    try Sys.rename generated target; 0 with _ ->
+      Printf.eprintf "Error: could not rename %S to %S\n" generated target;
+      1
+  end else 0
 
 let create_archive archive file_list =
   Misc.remove_file archive;

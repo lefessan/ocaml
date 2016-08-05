@@ -1,0 +1,44 @@
+
+# Files that were used in previous versions (this variable should be removed
+# when tested it is ok)
+OLD_FILES=allocprof.c  gcprof.c  profiling_ids.h
+
+
+FILES= alloc.c alloc.h array.c backtrace.c backtrace.h \
+       callback.c callback.h compact.c compact.h compare.c compare.h \
+       compatibility.h config.h custom.c custom.h debugger.c debugger.h \
+       dynlink.c dynlink.h exec.h extern.c fail.c fail.h finalise.c \
+       finalise.h fix_code.c fix_code.h floats.c freelist.c freelist.h \
+       gc_ctrl.c gc_ctrl.h gc.h globroots.c globroots.h hash.c \
+       hash.h instrtrace.c instrtrace.h instruct.h int64_emul.h \
+       int64_format.h int64_native.h intern.c interp.c interp.h intext.h \
+       ints.c io.c camlio.h lexing.c major_gc.c major_gc.h Makefile \
+       Makefile.common Makefile.nt md5.c md5.h memory.c memory.h memprof.c \
+       memprof.h meta.c minor_gc.c minor_gc.h misc.c misc.h mlvalues.h obj.c \
+       osdeps.h parsing.c prims.h printexc.c printexc.h \
+       reverse.h roots.c roots.h signals_byt.c signals.c signals.h \
+       signals_machdep.h stacks.c stacks.h startup.c startup.h str.c sys.c \
+       sys.h terminfo.c ui.h unix.c weak.c weak.h win32.c .depend ocpwin.c \
+       main.c
+
+#HEAPDUMP_FILES=../otherlibs/heapdump/heapdump.h \
+#	../otherlibs/heapdump/heapdump_stubs.c \
+#	../otherlibs/heapdump/main.c \
+
+all: $(FILES) $(HEAPDUMP_FILES)
+	$(MAKE) -f Makefile ocamlrun libcamlrun.a
+	cp ocamlrun ../../boot/ocamlrun
+
+$(FILES): %: ../../byterun/%
+	rm -f $*
+	ln -s ../../byterun/$* $*
+
+$(HEAPDUMP_FILES): ../otherlibs/heapdump/%: ../../otherlibs/heapdump/%
+	rm -f $*
+	ln -s ../../../otherlibs/heapdump/$* ../otherlibs/heapdump/$*
+
+clean:
+	rm -f $(FILES) $(HEAPDUMP_FILES)
+	rm -f *.o *.a
+	rm -f COMMIT DATE ocamlrun  prims.c version.h commit.h  jumptbl.h
+	rm -f make.log primitives

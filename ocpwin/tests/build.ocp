@@ -1,0 +1,3 @@
+begin program "hello_world"
+  files = [ "hello_world.ml" ]
+end

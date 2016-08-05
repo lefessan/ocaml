@@ -13,7 +13,7 @@
 
 #include <mlvalues.h>
 #include "unixsupport.h"
-#include <io.h>
+#include <camlio.h>
 
 extern int _close(int);
 

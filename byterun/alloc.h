@@ -47,6 +47,18 @@ CAMLextern value caml_alloc_final (mlsize_t, /*size in words*/
 
 CAMLextern int caml_convert_flag_list (value, int *);
 
+  /* add extra arg for unique identifier in header */
+CAMLextern value caml_alloc_loc (mlsize_t, tag_t, profiling_t);
+CAMLexport value caml_alloc_small_loc (mlsize_t, tag_t, profiling_t);
+CAMLextern value caml_alloc_tuple_loc (mlsize_t, profiling_t);
+CAMLextern value caml_alloc_final_loc (mlsize_t,  /*size in words*/
+                                       final_fun, /*finalization function*/
+                                       mlsize_t,  /*resources consumed*/
+                                       mlsize_t   /*max resources*/,
+                                       profiling_t);
+CAMLextern value caml_alloc_string_loc (mlsize_t, profiling_t);  /* size in bytes */
+CAMLextern value caml_copy_string_loc (char const *, profiling_t);
+
 #ifdef __cplusplus
 }
 #endif

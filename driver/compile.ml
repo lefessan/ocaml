@@ -24,15 +24,22 @@ open Compenv
 let tool_name = "ocamlc"
 
 let interface ppf sourcefile outputprefix =
+  Src_cache.clear_sources ();
+  Src_cache.register_mli sourcefile;
   Compmisc.init_path false;
   let modulename = module_of_filename ppf sourcefile outputprefix in
   Env.set_unit_name modulename;
   let initial_env = Compmisc.initial_env () in
   let ast = Pparse.parse_interface ~tool_name ppf sourcefile in
+    (* patch: internal hooks for parsetrees *)
+  let ast = Ocpp.apply_internal_interface_rewriters sourcefile ast in
   if !Clflags.dump_parsetree then fprintf ppf "%a@." Printast.interface ast;
   if !Clflags.dump_source then fprintf ppf "%a@." Pprintast.signature ast;
   let tsg = Typemod.type_interface initial_env ast in
   if !Clflags.dump_typedtree then fprintf ppf "%a@." Printtyped.interface tsg;
+  (* patch: internal hooks for typedtrees *)
+  let tsg = Globalize.apply_internal_interface_rewriters sourcefile tsg in
+
   let sg = tsg.sig_type in
   if !Clflags.print_types then
     Printtyp.wrap_printing_env initial_env (fun () ->
@@ -56,36 +63,45 @@ let print_if ppf flag printer arg =
 let (++) x f = f x
 
 let implementation ppf sourcefile outputprefix =
+  Src_cache.clear_sources ();
+  Src_cache.register_ml sourcefile;
   Compmisc.init_path false;
   let modulename = module_of_filename ppf sourcefile outputprefix in
   Env.set_unit_name modulename;
   let env = Compmisc.initial_env() in
   if !Clflags.print_types then begin
     let comp ast =
-      ast
+    (* patch: internal hooks for parsetrees *)
+      Ocpp.apply_internal_implementation_rewriters sourcefile ast
       ++ print_if ppf Clflags.dump_parsetree Printast.implementation
       ++ print_if ppf Clflags.dump_source Pprintast.structure
       ++ Typemod.type_implementation sourcefile outputprefix modulename env
       ++ print_if ppf Clflags.dump_typedtree
-          Printtyped.implementation_with_coercion
+        Printtyped.implementation_with_coercion
+      (* patch: internal hooks for typedtrees *)
+      ++ Globalize.apply_internal_implementation_rewriters sourcefile
       ++ (fun _ -> ());
       Warnings.check_fatal ();
       Stypes.dump (Some (outputprefix ^ ".annot"))
     in
     try comp (Pparse.parse_implementation ~tool_name ppf sourcefile)
     with x ->
+      Location.report_backtrace (Printexc.get_backtrace ());
       Stypes.dump (Some (outputprefix ^ ".annot"));
       raise x
   end else begin
     let objfile = outputprefix ^ ".cmo" in
     let oc = open_out_bin objfile in
     let comp ast =
-      ast
+    (* patch: internal hooks for parsetrees *)
+      Ocpp.apply_internal_implementation_rewriters sourcefile ast
       ++ print_if ppf Clflags.dump_parsetree Printast.implementation
       ++ print_if ppf Clflags.dump_source Pprintast.structure
       ++ Typemod.type_implementation sourcefile outputprefix modulename env
       ++ print_if ppf Clflags.dump_typedtree
                   Printtyped.implementation_with_coercion
+      (* patch: internal hooks for typedtrees *)
+      ++ Globalize.apply_internal_implementation_rewriters sourcefile
       ++ Translmod.transl_implementation modulename
       ++ print_if ppf Clflags.dump_rawlambda Printlambda.lambda
       ++ Simplif.simplify_lambda
@@ -99,6 +115,7 @@ let implementation ppf sourcefile outputprefix =
     in
     try comp (Pparse.parse_implementation ~tool_name ppf sourcefile)
     with x ->
+      Location.report_backtrace (Printexc.get_backtrace ());
       close_out oc;
       remove_file objfile;
       Stypes.dump (Some (outputprefix ^ ".annot"));

@@ -47,6 +47,7 @@ let read_member_info pack_path file = (
       if info.ui_symbol <>
          (Compilenv.current_unit_infos()).ui_symbol ^ "__" ^ info.ui_name
       then raise(Error(Wrong_for_pack(file, pack_path)));
+      Src_cache.register_pack_cmx crc;
       Asmlink.check_consistency file info crc;
       Compilenv.cache_unit_info info;
       PM_impl info

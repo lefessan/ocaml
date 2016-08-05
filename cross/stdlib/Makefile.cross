@@ -1,0 +1,62 @@
+include ../Makefile.config
+
+ifeq ($OCAMLVERSION,4.01.0+ocp1)
+
+STDLIB_MORE_FILES=printf.ml.ocpp  stdLabels.mli.ocpp
+
+else
+
+STDLIB_MORE_FILES=camlinternalFormatBasics.ml camlinternalFormatBasics.mli \
+  camlinternalFormat.ml  camlinternalFormat.mli \
+  bytes.ml bytes.mli bytes.ml.ocpp bytes.mli.ocpp \
+  bytesLabels.ml bytesLabels.mli
+
+endif
+
+FILES= arg.ml		      format.ml		map.ml		scanf.mli \
+  arg.mli		      format.mli	map.mli		set.ml	  \
+  arrayLabels.ml	      gc.ml		marshal.ml	set.mli	  \
+  arrayLabels.mli       gc.mli		marshal.mli	sharpbang	  \
+  array.ml	      genlex.ml		moreLabels.ml	sort.ml		  \
+  array.mli	      genlex.mli	moreLabels.mli	sort.mli	  \
+  buffer.ml	      hashtbl.ml	nativeint.ml	stack.ml	  \
+  buffer.mli	      hashtbl.mli	nativeint.mli	stack.mli	  \
+  callback.ml	      header.c		obj.ml		std_exit.ml	  \
+  callback.mli	      headernt.c	obj.mli		stdLabels.ml	  \
+  camlinternalLazy.ml   int32.ml	oo.ml		stdLabels.mli	  \
+  camlinternalLazy.mli  int32.mli	oo.mli		stdlib.mllib	  \
+  camlinternalMod.ml    int64.ml	parsing.ml	StdlibModules	  \
+  camlinternalMod.mli   int64.mli	parsing.mli	stream.ml	  \
+  camlinternalOO.ml     lazy.ml		pervasives.ml	stream.mli	  \
+  camlinternalOO.mli    lazy.mli	pervasives.mli	stringLabels.ml	  \
+  char.ml	      lexing.ml		printexc.ml	stringLabels.mli  \
+  char.mli	      lexing.mli	printexc.mli	string.ml	  \
+  Compflags	      listLabels.ml	printf.ml	string.mli	  \
+  complex.ml	      listLabels.mli	printf.mli	sys.mli		  \
+  complex.mli	      list.ml		queue.ml	sys.mlp		  \
+  digest.ml	      list.mli		queue.mli	weak.ml		  \
+  digest.mli	      Makefile		random.ml	weak.mli	  \
+  filename.ml	      Makefile.nt	random.mli			  \
+  filename.mli	      Makefile.shared	scanf.ml .depend		  \
+  ocpstd.mli ocpstd.ml stringCompat.ml					  \
+									  \
+  arrayLabels.mli.ocpp gc.ml.ocpp marshal.ml.ocpp $(STDLIB_MORE_FILES)	  \
+  sys.mli.ocpp array.mli.ocpp int32.mli.ocpp nativeint.mli.ocpp		  \
+  random.ml.ocpp sys.ml.ocpp array.ml.ocpp int32.ml.ocpp		  \
+  nativeint.ml.ocpp scanf.ml.ocpp weak.ml.ocpp char.ml.ocpp		  \
+  int64.mli.ocpp obj.mli.ocpp digest.mli.ocpp	  \
+  int64.ml.ocpp obj.ml.ocpp stringLabels.mli.ocpp digest.ml.ocpp	  \
+  lazy.ml.ocpp pervasives.mli.ocpp string.mli.ocpp gc.mli.ocpp		  \
+  marshal.mli.ocpp pervasives.ml.ocpp string.ml.ocpp
+
+all: $(FILES) 
+	$(MAKE) -f Makefile.shared stdlib.cma std_exit.cmo RUNTIME=../../boot/ocamlrun COMPILER=../../boot/ocamlc
+
+$(FILES): %: ../../stdlib/%
+	rm -f $*
+	ln -s ../../stdlib/$* $*
+
+clean:
+	rm -f $(FILES)
+	rm -f *.cm? *.o *~ sys.ml
+#	$(MAKE) -f Makefile clean

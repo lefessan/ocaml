@@ -1,3 +1,5 @@
+# 1 "asmcomp/sparc/emit.mlp"
+
 (***********************************************************************)
 (*                                                                     *)
 (*                                OCaml                                *)
@@ -343,7 +345,7 @@ let rec emit_instr i dslot =
           `	jmp	%g1 + %lo({emit_symbol s})\n`;
           `	add	%sp, {emit_int n}, %sp\n` (* in delay slot *)
         end
-    | Lop(Iextcall(s, alloc)) ->
+    | Lop(Iextcall(s, alloc, _locid)) ->
         if alloc then begin
           `	sethi	%hi({emit_symbol s}), %g2\n`;
           `{record_frame i.live}	call	{emit_symbol "caml_c_call"}\n`;
@@ -637,7 +639,7 @@ let no_interference res arg =
 let rec emit_all i =
   match i with
     {desc = Lend} -> ()
-  | {next = {desc = Lop(Icall_imm _) | Lop(Iextcall(_, false)) | Lbranch _}}
+  | {next = {desc = Lop(Icall_imm _) | Lop(Iextcall(_, false, _)) | Lbranch _}}
     when is_one_instr i ->
       emit_instr i.next (Some i);
       emit_all i.next.next

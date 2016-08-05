@@ -1,0 +1,2 @@
+2014-10-02: Fabrice
+- PR#6585: fix memory leak in win32unix/createprocess.c

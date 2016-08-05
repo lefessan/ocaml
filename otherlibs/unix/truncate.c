@@ -16,7 +16,7 @@
 #include <memory.h>
 #include <fail.h>
 #include <signals.h>
-#include <io.h>
+#include <camlio.h>
 #include "unixsupport.h"
 #ifdef HAS_UNISTD
 #include <unistd.h>

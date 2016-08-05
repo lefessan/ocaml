@@ -13,9 +13,12 @@
 
 include ../config/Makefile
 
+OCP_OBJS=memprof.$(O) ocpwin.$(O)
+OCP_FILES=memprof.c ocpwin.c
+
 CC=$(NATIVECC)
-CFLAGS=-I../byterun -DNATIVE_CODE -DTARGET_$(ARCH) -DSYS_$(SYSTEM) \
-       $(NATIVECCCOMPOPTS)
+CFLAGS=-I../byterun -DCAML_NAME_SPACE -DNATIVE_CODE -DTARGET_$(ARCH) -DSYS_$(SYSTEM) \
+       $(NATIVECCCOMPOPTS) $(OTHER_INC)
 
 COBJS=startup.$(O) main.$(O) fail.$(O) roots.$(O) signals.$(O) signals_asm.$(O)\
   misc.$(O) freelist.$(O) major_gc.$(O) minor_gc.$(O) memory.$(O) alloc.$(O) \
@@ -23,13 +26,14 @@ COBJS=startup.$(O) main.$(O) fail.$(O) roots.$(O) signals.$(O) signals_asm.$(O)\
   intern.$(O) hash.$(O) sys.$(O) parsing.$(O) gc_ctrl.$(O) terminfo.$(O) \
   md5.$(O) obj.$(O) lexing.$(O) win32.$(O) printexc.$(O) callback.$(O) \
   weak.$(O) compact.$(O) finalise.$(O) custom.$(O) globroots.$(O) \
-  backtrace.$(O) natdynlink.$(O) debugger.$(O) meta.$(O) dynlink.$(O)
+  backtrace.$(O) natdynlink.$(O) debugger.$(O) meta.$(O) dynlink.$(O) \
+  $(OCP_OBJS) $(OTHER_OBJS)
 
 LINKEDFILES=misc.c freelist.c major_gc.c minor_gc.c memory.c alloc.c array.c \
   compare.c ints.c floats.c str.c io.c extern.c intern.c hash.c sys.c \
   parsing.c gc_ctrl.c terminfo.c md5.c obj.c lexing.c printexc.c callback.c \
   weak.c compact.c meta.c finalise.c custom.c main.c globroots.c \
-  dynlink.c signals.c debugger.c
+  dynlink.c signals.c debugger.c $(OCP_FILES) $(OTHER_FILES)
 
 ifeq ($(TOOLCHAIN),mingw)
 ASMOBJS=$(ARCH).o
@@ -66,7 +70,7 @@ $(LINKEDFILES): %.c: ../byterun/%.c
 
 # Need special compilation rule so as not to do -I../byterun
 win32.$(O): ../byterun/win32.c
-	$(CC) -c $(NATIVECCCOMPOPTS) -DNATIVE_CODE $(IFLEXDIR) ../byterun/win32.c
+	$(CC) -c $(NATIVECCCOMPOPTS) -DCAML_NAME_SPACE -DNATIVE_CODE $(IFLEXDIR) ../byterun/win32.c
 
 .SUFFIXES: .c .$(O)
 
@@ -81,5 +85,8 @@ clean::
 
 .depend.nt: .depend
 	sed -e 's/\.o/.$(O)/g' .depend > .depend.nt
+
+$(OCP_FILES): %.c: ../byterun/%.c
+	cp -f ../byterun/$*.c $*.c
 
 include .depend.nt

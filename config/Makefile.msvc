@@ -104,7 +104,7 @@ FLEXLINK=flexlink -merge-manifest -stack 16777216
 FLEXDIR:=$(shell $(FLEXLINK) -where)
 IFLEXDIR=-I"$(FLEXDIR)"
 MKDLL=$(FLEXLINK)
-MKEXE=$(FLEXLINK) -exe
+MKEXE=$(FLEXLINK) -exe -ocaml
 MKMAINDLL=$(FLEXLINK) -maindll
 
 ### How to build a static library
@@ -178,3 +178,9 @@ CANKILL=false
 FIND=/usr/bin/find
 SORT=/usr/bin/sort
 SET_LD_PATH=PATH="$(PATH):$(LD_PATH)"
+
+OCAMLLIBDIR=lib
+MKLIB1=link /lib /nologo /out:
+MKLIB2=
+WIN32_PREFIX=win32
+OCP_RELOCATABLE=true

@@ -851,6 +851,9 @@ let rec path_of_module mexp =
       path_of_module mexp
   | _ -> raise Not_a_path
 
+let path_of_module mexp =
+  try Some (path_of_module mexp) with Not_a_path -> None
+
 (* Check that all core type schemes in a structure are closed *)
 
 let rec closed_modtype = function
@@ -1105,7 +1108,8 @@ let rec type_module ?(alias=false) sttn funct_body anchor env smod =
       let mty = may_map (transl_modtype env) smty in
       let ty_arg = may_map (fun m -> m.mty_type) mty in
       let (id, newenv), funct_body =
-        match ty_arg with None -> (Ident.create "*", env), false
+        match ty_arg with
+        | None -> (Ident.create "*", env), false
         | Some mty -> Env.enter_module ~arg:true name.txt mty env, true in
       let body = type_module sttn funct_body None newenv sbody in
       rm { mod_desc = Tmod_functor(id, name, mty, body);
@@ -1115,7 +1119,7 @@ let rec type_module ?(alias=false) sttn funct_body anchor env smod =
            mod_loc = smod.pmod_loc }
   | Pmod_apply(sfunct, sarg) ->
       let arg = type_module true funct_body None env sarg in
-      let path = try Some (path_of_module arg) with Not_a_path -> None in
+      let path = path_of_module arg in
       let funct =
         type_module (sttn && path <> None) funct_body None env sfunct in
       begin match Env.scrape_alias env funct.mod_type with
@@ -1670,6 +1674,7 @@ let package_units initial_env objfiles cmifile modulename =
          let pref = chop_extensions f in
          let modname = String.capitalize(Filename.basename pref) in
          let sg = Env.read_signature modname (pref ^ ".cmi") in
+         Src_cache.register_pack_cmi (Env.crc_of_unit modname);
          if Filename.check_suffix f ".cmi" &&
             not(Mtype.no_code_needed_sig Env.initial_safe_string sg)
          then raise(Error(Location.none, Env.empty,

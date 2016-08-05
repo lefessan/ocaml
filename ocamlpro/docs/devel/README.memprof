@@ -1,0 +1,57 @@
+
+TODO:
+* handle memprof info in packed files (DONE)
+* handle memprof information in toploop.ml
+* handle memprof information in Dynlink
+* Merge with "memprof-more-compatible"
+* Remove allocations from memprof.c to remove any impact on GC
+
+Here is the format of bytecode instructions added by memprof:
+
+opPATCH_LOCID(slot_for_getglobal !locid_base, int ofs)
+opGRAB_WITH_LOCID(slot_for_getglobal !locid_base, int ofs, int n)
+
+"caml_memprof_register_table" "table_size"  table
+
+******************************************************
+
+Nouvelle version de memprof avec compatibilité bytecode (pas finie):
+
+* Suppression de l'instruction COPY_LOCID
+* Suppression de la génération des instructions avec locids (donc, 
+   compatibilité avec js_of_ocaml)
+* Ajout d'un champ cu_memprof : memprof_info list dans chaque fichier cmo
+* Ajout d'une section "MEMP" dans chaque fichier bytecode
+
+Format de memprof_info:
+
+type memprof_info = {
+  mp_table : string;  (* marshalled version of the .cmg table *)
+  mp_table_size : int; (* number of entries in the table *)
+  mp_locids : (int * Lambda.locid) list;
+    (* pairs [position, locid], where [position] is the position 
+       of an instruction that may allocate with that [locid] *)
+}
+
+Format of the MEMP section:
+
+  output_binary_int oc (List.length memprof_info);
+  List.iter (fun (position, mp) ->
+    output_binary_int oc position;
+    output_binary_int oc (String.length mp.mp_table);
+    output_string oc mp.mp_table;
+    output_binary_int oc mp.mp_table_size;
+    output_binary_int oc (List.length mp.mp_locids);
+    List.iter (fun (pos, locid) ->
+      output_binary_int oc pos;
+      match locid with
+      | Lambda.NoId -> output_binary_int oc 0
+      | Lambda.LocId n -> output_binary_int oc (n+1)
+    ) mp.mp_locids;
+  ) memprof_info
+
+Branch "memprof-more-compatible"
+TODO:
+* check that the locid is reset after a ccall to its previous version
+* check that the locid is reset after a try...with to its previous version ?
+* C_CALL1-N should set the locid for C allocations

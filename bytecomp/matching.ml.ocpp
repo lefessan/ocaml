@@ -1,0 +1,8 @@
+patch add_function_argument {
+  fun_new_argument = "loc"
+  fun_names = [ "split_or" ]
+}
+patch add_record_fields {
+  record_new_labels = [ "prim_memprof" ]
+  record_labels = [ "prim_alloc" ]
+}

@@ -444,7 +444,8 @@ FUNCTION(G(caml_c_call))
 CFI_STARTPROC
 LBL(caml_c_call):
     /* Record lowest stack address and return address */
-        popq    %r12; CFI_ADJUST(-8)
+/*        STORE_VAR(%r12, caml_memprof_ccall_locid)    memprof */
+        popq    %r12; CFI_ADJUST(-8)                /* memprof */
         STORE_VAR(%r12, caml_last_return_address)
         STORE_VAR(%rsp, caml_bottom_of_stack)
         subq    $8, %rsp; CFI_ADJUST(8) /* equivalent to pushq %r12 */
@@ -475,7 +476,8 @@ FUNCTION(G(caml_start_program))
     /* Common code for caml_start_program and caml_callback* */
 LBL(caml_start_program):
     /* Build a callback link */
-        subq    $8, %rsp; CFI_ADJUST (8)        /* stack 16-aligned */
+/*	subq    $8, %rsp; CFI_ADJUST (8)      memprof     stack 16-aligned */
+	PUSH_VAR(caml_memprof_ccall_locid) /* memprof */
         PUSH_VAR(caml_gc_regs)
         PUSH_VAR(caml_last_return_address)
         PUSH_VAR(caml_bottom_of_stack)
@@ -503,7 +505,8 @@ LBL(109):
         POP_VAR(caml_bottom_of_stack)
         POP_VAR(caml_last_return_address)
         POP_VAR(caml_gc_regs)
-        addq    $8, %rsp; CFI_ADJUST (-8);
+	POP_VAR(caml_memprof_ccall_locid)  /* memprof */
+        /* addq    $8, %rsp; CFI_ADJUST (-8); memprof */
     /* Restore callee-save registers. */
         POP_CALLEE_SAVE_REGS
     /* Return to caller. */
@@ -656,6 +659,7 @@ CFI_ENDPROC
 FUNCTION(G(caml_ml_array_bound_error))
 CFI_STARTPROC
         leaq    GCALL(caml_array_bound_error)(%rip), %rax
+	movq    $0, %r12          /* memprof for Iextcall */
         jmp     LBL(caml_c_call)
 CFI_ENDPROC
 

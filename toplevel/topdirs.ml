@@ -88,7 +88,7 @@ let load_compunit ic filename ppf compunit =
   Symtable.update_global_table();
   begin try
     may_trace := true;
-    ignore((Meta.reify_bytecode code code_size) ());
+    ignore((Meta.reify_bytecode code code_size (Bytes.create 0)) ());
     may_trace := false;
   with exn ->
     may_trace := false;

@@ -448,7 +448,7 @@ let emit_instr i =
           add_used_symbol s;
           `	jmp	{emit_symbol s}\n`
         end
-    | Lop(Iextcall(s, alloc)) ->
+    | Lop(Iextcall(s, alloc, _locid)) ->
         add_used_symbol s ;
         if alloc then begin
           `	mov	eax, OFFSET {emit_symbol s}\n`;

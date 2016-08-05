@@ -10,6 +10,8 @@
 (*                                                                     *)
 (***********************************************************************)
 
+let prim_memprof = false
+
 open Misc
 open Primitive
 open Asttypes
@@ -94,10 +96,10 @@ let prim_makearray =
     prim_native_name = ""; prim_native_float = false }
 
 (* Also use it for required globals *)
-let transl_label_init expr =
+let transl_label_init loc expr =
   let expr =
     Hashtbl.fold
-      (fun c id expr -> Llet(Alias, id, Lconst c, expr))
+      (fun c id expr -> Llet(Alias, id, loc, Lconst c, expr))
       consts expr
   in
   let expr =
@@ -109,19 +111,22 @@ let transl_label_init expr =
   reset_labels ();
   expr
 
-let transl_store_label_init glob size f arg =
+let transl_store_label_init loc module_name glob size f arg =
   method_cache := Lprim(Pfield size, [Lprim(Pgetglobal glob, [])]);
   let expr = f arg in
   let (size, expr) =
     if !method_count = 0 then (size, expr) else
+    let locid = Memprof.internal loc.l loc.p
+      (Printf.sprintf "methods(%s)" module_name) in
     (size+1,
      Lsequence(
      Lprim(Psetfield(size, false),
            [Lprim(Pgetglobal glob, []);
-            Lprim (Pccall prim_makearray, [int !method_count; int 0])]),
+            Lprim (Pccall (prim_makearray, Some locid),
+              [int !method_count; int 0])]),
      expr))
   in
-  (size, transl_label_init expr)
+  (size, transl_label_init loc expr)
 
 (* Share classes *)
 
@@ -130,11 +135,11 @@ let top_env = ref Env.empty
 let classes = ref []
 let method_ids = ref IdentSet.empty
 
-let oo_add_class id =
-  classes := id :: !classes;
+let oo_add_class id locid =
+  classes := (id, locid) :: !classes;
   (!top_env, !cache_required)
 
-let oo_wrap env req f x =
+let oo_wrap loc env req f x =
   if !wrapping then
     if !cache_required then f x else
     try cache_required := true; let lam = f x in cache_required := false; lam
@@ -148,9 +153,9 @@ let oo_wrap env req f x =
     let lambda = f x in
     let lambda =
       List.fold_left
-        (fun lambda id ->
-          Llet(StrictOpt, id,
-               Lprim(Pmakeblock(0, Mutable),
+        (fun lambda (id, locid) ->
+          Llet(StrictOpt, id, loc,
+               Lprim(Pmakeblock(0, Mutable, locid),
                      [lambda_unit; lambda_unit; lambda_unit]),
                lambda))
         lambda !classes

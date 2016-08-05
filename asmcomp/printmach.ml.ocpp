@@ -1,0 +1,4 @@
+patch add_constructor_arguments {
+  constr_names = [ "Iextcall" ]
+  constr_new_arguments = [ "_" ]
+}

@@ -21,6 +21,7 @@
 #include "signals.h"
 #include "signals_machdep.h"
 
+/* for signals.c */
 #ifndef NSIG
 #define NSIG 64
 #endif
@@ -56,7 +57,7 @@ static void handle_signal(int signal_number)
 #if !defined(POSIX_SIGNALS) && !defined(BSD_SIGNALS)
   signal(signal_number, handle_signal);
 #endif
-  if (signal_number < 0 || signal_number >= NSIG) return;
+  if (signal_number < 0 || signal_number >= CAML_NSIG) return;
   if (caml_try_leave_blocking_section_hook()) {
     caml_execute_signal(signal_number, 1);
     caml_enter_blocking_section_hook();
@@ -74,7 +75,12 @@ int caml_set_signal_action(int signo, int action)
 #endif
 
   switch (action) {
-  case 0:  act = SIG_DFL; break;
+  case 0:
+    if (signo == caml_hooked_signal)
+      act = handle_signal;
+    else
+      act = SIG_DFL;
+    break;
   case 1:  act = SIG_IGN; break;
   default: act = handle_signal; break;
   }

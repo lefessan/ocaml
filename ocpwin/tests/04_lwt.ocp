@@ -1,0 +1,14 @@
+
+begin
+ dirname += [ "lwt.2.4.5" "src" ]
+
+    begin library "lwt"
+ files = [
+  "core/lwt_sequence.ml" "core/lwt.ml" "core/lwt_mutex.ml"
+    "core/lwt_condition.ml" "core/lwt_list.ml" "core/lwt_mvar.ml"
+    "core/lwt_pool.ml" "core/lwt_stream.ml" "core/lwt_switch.ml"
+    "core/lwt_util.ml" "core/lwt_pqueue.ml"
+ ]
+
+   end
+end

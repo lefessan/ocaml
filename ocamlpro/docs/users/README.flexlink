@@ -1,0 +1,8 @@
+
+Modifications of flexlink:
+
+* New option -ocaml, to build an OCaml executable. Instead of linking only
+   flexdll_initer_XXX.o, it will also link flexdll_ocaml_XXX.o (containing
+   platform specific functions)
+* New variable FLEXLINK_VERBOSE that can be set to any number to set the
+   verbosity of flexlink.

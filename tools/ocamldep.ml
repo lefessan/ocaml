@@ -10,6 +10,18 @@
 (*                                                                     *)
 (***********************************************************************)
 
+module Depend = struct
+  include Depend
+
+  let add_implementation source_file bv impl =
+    let ast = Ocpp.apply_internal_implementation_rewriters source_file impl in
+    Depend.add_implementation bv ast
+  let add_signature source_file bv intf =
+    let ast = Ocpp.apply_internal_interface_rewriters source_file intf in
+    Depend.add_signature bv ast
+end
+
+
 open Compenv
 open Parsetree
 
@@ -224,13 +236,13 @@ let read_parse_and_extract parse_function extract_function magic source_file =
     begin try
       let ast =
         Pparse.file ~tool_name Format.err_formatter
-		    input_file parse_function magic
+          input_file parse_function magic
       in
       let bound_vars = Depend.StringSet.empty in
       List.iter (fun modname ->
-	Depend.open_module bound_vars (Longident.Lident modname)
+        Depend.open_module bound_vars (Longident.Lident modname)
       ) !Clflags.open_modules;
-      extract_function bound_vars ast;
+      extract_function source_file bound_vars ast;
       Pparse.remove_preprocessed input_file;
       !Depend.free_structure_names
     with x ->
@@ -416,6 +428,8 @@ let _ =
   Clflags.classic := false;
   add_to_list first_include_dirs Filename.current_dir_name;
   Compenv.readenv ppf Before_args;
+  Ocpp.register ();
+  Patch_main.register();
   Arg.parse [
      "-absname", Arg.Set Location.absname,
         " Show absolute filenames in error messages";

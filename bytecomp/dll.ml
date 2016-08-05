@@ -118,7 +118,16 @@ let ld_conf_contents () =
     let ic = open_in (Filename.concat Config.standard_library "ld.conf") in
     begin try
       while true do
-        path := input_line ic :: !path
+        let line = input_line ic in
+        let len = String.length line in
+        let line =
+          if len > 0 && line.[0] = '+' then
+            Filename.concat
+              Config.standard_library
+              (String.sub line 1 (len - 1))
+          else
+            line in
+        path := line :: !path
       done
     with End_of_file -> ()
     end;

@@ -1,0 +1,4 @@
+patch add_function_argument {
+  fun_new_argument = "Location.t"
+  fun_names =  "parse_declaration" 
+}

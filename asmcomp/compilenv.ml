@@ -100,6 +100,9 @@ let current_unit_infos () =
 let current_unit_name () =
   current_unit.ui_name
 
+let current_unit_path () =
+  Path.Pident (Ident.create_persistent (current_unit_name ()))
+
 let make_symbol ?(unitname = current_unit.ui_symbol) idopt =
   let prefix = "caml" ^ unitname in
   match idopt with
@@ -224,6 +227,8 @@ let write_unit_info info filename =
   output_value oc info;
   flush oc;
   let crc = Digest.file filename in
+  WatcherUtils.register_crc filename crc;
+  Src_cache.register_cmx crc;
   Digest.output oc crc;
   close_out oc
 
@@ -276,6 +281,113 @@ let structured_constants () =
     (fun (lbl, cst) ->
        (lbl, Hashtbl.mem exported_constants lbl, cst)
     ) (!structured_constants).strcst_all
+
+(** *)
+
+let wrap_locid locid = match Memprof.get_alloc locid.Lambda.id with
+  | Lambda.NoAlloc -> Clambda.NoAlloc
+  | Lambda.LocId ofs -> Clambda.LocId (
+    locid.Lambda.loc.Lambda.l,
+    make_symbol (Some "locid_base"), ofs)
+
+let wrap_prim =
+  let open Lambda in
+  function
+  | Pidentity -> Pidentity
+  | Pignore -> Pignore
+  | Prevapply loc -> Prevapply loc
+  | Pdirapply loc -> Pdirapply loc
+  | Ploc _ -> assert false
+  | Pgetglobal id -> Pgetglobal id
+  | Psetglobal id -> Psetglobal id
+  | Pmakeblock (sz, mut, locid) -> Pmakeblock (sz, mut, wrap_locid locid)
+  | Pfield ofs -> Pfield ofs
+  | Psetfield (ofs, ptr) -> Psetfield (ofs, ptr)
+  | Pfloatfield (ofs, locid) -> Pfloatfield (ofs, wrap_locid locid)
+  | Psetfloatfield ofs -> Psetfloatfield ofs
+  | Pduprecord (r, sz, locid) -> Pduprecord (r, sz, wrap_locid locid)
+  | Plazyforce -> Plazyforce
+  | Pccall (descr, None) -> Pccall (descr, None)
+  | Pccall (descr, Some locid) -> Pccall (descr, Some (wrap_locid locid))
+  | Praise kind -> Praise kind
+  | Psequand -> Psequand
+  | Psequor -> Psequor
+  | Pnot -> Pnot
+  | Pnegint -> Pnegint
+  | Paddint -> Paddint
+  | Psubint -> Psubint
+  | Pmulint -> Pmulint
+  | Pdivint -> Pdivint
+  | Pmodint -> Pmodint
+  | Pandint -> Pandint
+  | Porint -> Porint
+  | Pxorint -> Pxorint
+  | Plslint -> Plslint
+  | Plsrint -> Plsrint
+  | Pasrint -> Pasrint
+  | Pintcomp cmp -> Pintcomp cmp
+  | Poffsetint i -> Poffsetint i
+  | Poffsetref i -> Poffsetref i
+  | Pintoffloat -> Pintoffloat
+  | Pfloatofint locid -> Pfloatofint (wrap_locid locid)
+  | Pnegfloat locid -> Pnegfloat (wrap_locid locid)
+  | Pabsfloat locid -> Pabsfloat (wrap_locid locid)
+  | Paddfloat locid -> Paddfloat (wrap_locid locid)
+  | Psubfloat locid -> Psubfloat (wrap_locid locid)
+  | Pmulfloat locid -> Pmulfloat (wrap_locid locid)
+  | Pdivfloat locid -> Pdivfloat (wrap_locid locid)
+  | Pfloatcomp cmp -> Pfloatcomp cmp
+  | Pstringlength -> Pstringlength
+  | Pstringrefu -> Pstringrefu
+  | Pstringsetu -> Pstringsetu
+  | Pstringrefs -> Pstringrefs
+  | Pstringsets -> Pstringsets
+  | Pmakearray (kd, locid) -> Pmakearray (kd, wrap_locid locid)
+  | Parraylength kd -> Parraylength kd
+  | Parrayrefu (kd, locid) -> Parrayrefu (kd, wrap_locid locid)
+  | Parraysetu kd -> Parraysetu kd
+  | Parrayrefs (kd, locid) -> Parrayrefs (kd, wrap_locid locid)
+  | Parraysets kd -> Parraysets kd
+  | Pisint -> Pisint
+  | Pisout -> Pisout
+  | Pbittest -> Pbittest
+  | Pbintofint (bi, locid) -> Pbintofint (bi, wrap_locid locid)
+  | Pintofbint bi -> Pintofbint bi
+  | Pcvtbint (bi1, bi2, locid) -> Pcvtbint (bi1, bi2, wrap_locid locid)
+  | Pnegbint (bi, locid) -> Pnegbint (bi, wrap_locid locid)
+  | Paddbint (bi, locid) -> Paddbint (bi, wrap_locid locid)
+  | Psubbint (bi, locid) -> Psubbint (bi, wrap_locid locid)
+  | Pmulbint (bi, locid) -> Pmulbint (bi, wrap_locid locid)
+  | Pdivbint (bi, locid) -> Pdivbint (bi, wrap_locid locid)
+  | Pmodbint (bi, locid) -> Pmodbint (bi, wrap_locid locid)
+  | Pandbint (bi, locid) -> Pandbint (bi, wrap_locid locid)
+  | Porbint (bi, locid) -> Porbint (bi, wrap_locid locid)
+  | Pxorbint (bi, locid) -> Pxorbint (bi, wrap_locid locid)
+  | Plslbint (bi, locid) -> Plslbint (bi, wrap_locid locid)
+  | Plsrbint (bi, locid) -> Plsrbint (bi, wrap_locid locid)
+  | Pasrbint (bi, locid) -> Pasrbint (bi, wrap_locid locid)
+  | Pbintcomp (bi, cmp) -> Pbintcomp (bi, cmp)
+  | Pbigarrayref (unsafe, n, kind, layout, loc) ->
+      Pbigarrayref (unsafe, n, kind, layout, loc)
+  | Pbigarrayset (unsafe, n, kind, layout) ->
+      Pbigarrayset (unsafe, n, kind, layout)
+  | Pbigarraydim dim -> Pbigarraydim dim
+  | Pstring_load_16 b -> Pstring_load_16 b
+  | Pstring_load_32 (b, loc) -> Pstring_load_32 (b, loc)
+  | Pstring_load_64 (b, loc) -> Pstring_load_64 (b, loc)
+  | Pstring_set_16 b -> Pstring_set_16 b
+  | Pstring_set_32 b -> Pstring_set_32 b
+  | Pstring_set_64 b -> Pstring_set_64 b
+  | Pbigstring_load_16 b -> Pbigstring_load_16 b
+  | Pbigstring_load_32 (b,loc) -> Pbigstring_load_32 (b,loc)
+  | Pbigstring_load_64 (b,loc) -> Pbigstring_load_64 (b,loc)
+  | Pbigstring_set_16 b -> Pbigstring_set_16 b
+  | Pbigstring_set_32 b -> Pbigstring_set_32 b
+  | Pbigstring_set_64 b -> Pbigstring_set_64 b
+  | Pctconst cst -> Pctconst cst
+  | Pbswap16 -> Pbswap16
+  | Pbbswap (bi, locid) -> Pbbswap (bi, wrap_locid locid)
+  | Pint_as_pointer -> Pint_as_pointer
 
 (* Error report *)
 

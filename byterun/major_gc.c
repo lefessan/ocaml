@@ -33,6 +33,10 @@
 #undef NATIVE_CODE_AND_NO_NAKED_POINTERS
 #endif
 
+/* patch better epuration */
+uintnat caml_grayvals_ratio = 128;
+uintnat caml_heap_was_impure = 0;
+
 uintnat caml_percent_free;
 uintnat caml_major_heap_increment;
 CAMLexport char *caml_heap_start;
@@ -47,6 +51,7 @@ uintnat caml_allocated_words;
 uintnat caml_dependent_size, caml_dependent_allocated;
 double caml_extra_heap_resources;
 uintnat caml_fl_size_at_phase_change = 0;
+void (*caml_major_gc_hook)(void) = NULL;
 
 extern char *caml_fl_merge;  /* Defined in freelist.c. */
 
@@ -64,7 +69,9 @@ static void realloc_gray_vals (void)
   value *new;
 
   Assert (gray_vals_cur == gray_vals_end);
-  if (gray_vals_size < caml_stat_heap_size / 128){
+
+  /* patch better epuration */
+  if (gray_vals_size < caml_stat_heap_size / caml_grayvals_ratio){
     caml_gc_message (0x08, "Growing gray_vals to %"
                            ARCH_INTNAT_PRINTF_FORMAT "uk bytes\n",
                      (intnat) gray_vals_size * sizeof (value) / 512);
@@ -81,6 +88,12 @@ static void realloc_gray_vals (void)
       gray_vals_end = gray_vals + gray_vals_size;
     }
   }else{
+    /* patch better epuration */
+    /* if markhp != NULL, we should scan the gray list to remove any
+       gray pointer that is above markhp, since it will be rescanned
+       later. By the way, what's the point of keeping half the gray
+       vals since we are going to find them again while scanning the
+       heap ? */
     gray_vals_cur = gray_vals + gray_vals_size / 2;
     heap_is_pure = 0;
   }
@@ -109,6 +122,7 @@ void caml_darken (value v, value *p /* not used */)
     }
     CAMLassert (!Is_blue_hd (h));
     if (Is_white_hd (h)){
+      GCPROF_HEADER(h, MAJOR_DARKEN);
       if (t < No_scan_tag){
         Hd_val (v) = Grayhd_hd (h);
         *gray_vals_cur++ = v;
@@ -128,6 +142,7 @@ static void start_cycle (void)
   caml_darken_all_roots();
   caml_gc_phase = Phase_mark;
   caml_gc_subphase = Subphase_main;
+  GCPROF_GC_PHASE(caml_gc_phase, caml_gc_subphase);
   markhp = NULL;
 #ifdef DEBUG
   ++ major_gc_counter;
@@ -145,6 +160,7 @@ static void mark_slice (intnat work)
   int marking_closure = 0;
 #endif
 
+  GCPROF_GCTIME(GCPROF_GCTIME_MARK_BEGIN);
   caml_gc_message (0x40, "Marking %ld words\n", work);
   caml_gc_message (0x40, "Subphase = %ld\n", caml_gc_subphase);
   gray_vals_ptr = gray_vals_cur;
@@ -160,6 +176,7 @@ static void mark_slice (intnat work)
       Hd_val (v) = Blackhd_hd (hd);
       size = Wosize_hd (hd);
       if (Tag_hd (hd) < No_scan_tag){
+        GCPROF_HEADER(hd, MAJOR_SCANNED);
         for (i = 0; i < size; i++){
           child = Field (v, i);
 #ifdef NATIVE_CODE_AND_NO_NAKED_POINTERS
@@ -190,6 +207,7 @@ static void mark_slice (intnat work)
               hd = Hd_val(child);
             }
             if (Is_white_hd (hd)){
+              GCPROF_HEADER(hd, MAJOR_DARKEN);
               Hd_val (child) = Grayhd_hd (hd);
               *gray_vals_ptr++ = child;
               if (gray_vals_ptr >= gray_vals_end) {
@@ -203,6 +221,9 @@ static void mark_slice (intnat work)
       }
       work -= Whsize_wosize(size);
     }else if (markhp != NULL){
+      /* patch better epuration */
+      /* Not clear it is worth keeping these modifications */
+      while( markhp != NULL && gray_vals_ptr == gray_vals ){
       if (markhp == limit){
         chunk = Chunk_next (chunk);
         if (chunk == NULL){
@@ -218,7 +239,10 @@ static void mark_slice (intnat work)
         }
         markhp += Bhsize_hp (markhp);
       }
+      }
     }else if (!heap_is_pure){
+      /* patch better epuration */
+      caml_heap_was_impure++;
       heap_is_pure = 1;
       chunk = caml_heap_start;
       markhp = chunk;
@@ -229,6 +253,7 @@ static void mark_slice (intnat work)
         /* The main marking phase is over.  Start removing weak pointers to
            dead values. */
         caml_gc_subphase = Subphase_weak1;
+	GCPROF_GC_PHASE(caml_gc_phase, caml_gc_subphase);
         weak_prev = &caml_weak_list_head;
       }
         break;
@@ -272,6 +297,7 @@ static void mark_slice (intnat work)
           caml_final_update ();
           gray_vals_ptr = gray_vals_cur;
           caml_gc_subphase = Subphase_weak2;
+	  GCPROF_GC_PHASE(caml_gc_phase, caml_gc_subphase);
           weak_prev = &caml_weak_list_head;
         }
       }
@@ -293,6 +319,7 @@ static void mark_slice (intnat work)
         }else{
           /* Subphase_weak2 is done.  Go to Subphase_final. */
           caml_gc_subphase = Subphase_final;
+	  GCPROF_GC_PHASE(caml_gc_phase, caml_gc_subphase);
         }
       }
         break;
@@ -302,11 +329,13 @@ static void mark_slice (intnat work)
         caml_gc_sweep_hp = caml_heap_start;
         caml_fl_init_merge ();
         caml_gc_phase = Phase_sweep;
+	GCPROF_GC_PHASE(caml_gc_phase, caml_gc_subphase);
         chunk = caml_heap_start;
         caml_gc_sweep_hp = chunk;
         limit = chunk + Chunk_size (chunk);
         work = 0;
         caml_fl_size_at_phase_change = caml_fl_cur_size;
+        if (caml_major_gc_hook) (*caml_major_gc_hook)();
       }
         break;
       default: Assert (0);
@@ -314,6 +343,7 @@ static void mark_slice (intnat work)
     }
   }
   gray_vals_cur = gray_vals_ptr;
+  GCPROF_GCTIME(GCPROF_GCTIME_MARK_END);
 }
 
 static void sweep_slice (intnat work)
@@ -321,6 +351,7 @@ static void sweep_slice (intnat work)
   char *hp;
   header_t hd;
 
+  GCPROF_GCTIME(GCPROF_GCTIME_SWEEP_BEGIN);
   caml_gc_message (0x40, "Sweeping %ld words\n", work);
   while (work > 0){
     if (caml_gc_sweep_hp < limit){
@@ -334,6 +365,7 @@ static void sweep_slice (intnat work)
           void (*final_fun)(value) = Custom_ops_val(Val_hp(hp))->finalize;
           if (final_fun != NULL) final_fun(Val_hp(hp));
         }
+	GCPROF_HEADER(hd, MAJOR_FREE);
         caml_gc_sweep_hp = caml_fl_merge_block (Bp_hp (hp));
         break;
       case Caml_blue:
@@ -353,12 +385,14 @@ static void sweep_slice (intnat work)
         ++ caml_stat_major_collections;
         work = 0;
         caml_gc_phase = Phase_idle;
+	GCPROF_GC_PHASE(caml_gc_phase, caml_gc_subphase);
       }else{
         caml_gc_sweep_hp = chunk;
         limit = chunk + Chunk_size (chunk);
       }
     }
   }
+  GCPROF_GCTIME(GCPROF_GCTIME_SWEEP_END);
 }
 
 /* The main entry point for the GC.  Called after each minor GC.
@@ -540,6 +574,7 @@ void caml_init_major_heap (asize_t heap_size)
   caml_make_free_blocks ((value *) caml_heap_start,
                          Wsize_bsize (caml_stat_heap_size), 1, Caml_white);
   caml_gc_phase = Phase_idle;
+  GCPROF_GC_PHASE(caml_gc_phase, caml_gc_subphase);
   gray_vals_size = 2048;
   gray_vals = (value *) malloc (gray_vals_size * sizeof (value));
   if (gray_vals == NULL)

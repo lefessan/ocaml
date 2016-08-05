@@ -52,6 +52,7 @@ module type S =
   sig
     (* type of basic tests *)
     type primitive
+    type location
     (* basic tests themselves *)
     val eqint : primitive
     val neint : primitive
@@ -64,7 +65,7 @@ module type S =
 
     (* Various constructors, for making a binder,
         adding one integer, etc. *)
-    val bind : act -> (act -> act) -> act
+    val bind : location -> act -> (act -> act) -> act
     val make_const : int -> act
     val make_offset : act -> int -> act
     val make_prim : primitive -> act list -> act
@@ -78,7 +79,7 @@ module type S =
         act -> int array -> act array -> act
    (* Build last minute sharing of action stuff *)
    val make_catch : act -> int * (act -> act)
-   val make_exit : int -> act
+   val make_exit : location -> int -> act
 
   end
 
@@ -98,6 +99,7 @@ module Make :
     sig
 (* Standard entry point, sharing is tracked *)
       val zyva :
+        Arg.location ->
           (int * int) ->
            Arg.act ->
            (int * int * int) array ->
@@ -106,6 +108,7 @@ module Make :
 
 (* Output test sequence, sharing tracked *)
      val test_sequence :
+        Arg.location ->
            Arg.act ->
            (int * int * int) array ->
            Arg.act t_store ->

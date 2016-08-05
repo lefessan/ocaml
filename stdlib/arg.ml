@@ -16,7 +16,7 @@ type doc = string
 type usage_msg = string
 type anon_fun = (string -> unit)
 
-type spec =
+type spec = Ocpstd.Arg.spec =
   | Unit of (unit -> unit)     (* Call the function with unit argument *)
   | Bool of (bool -> unit)     (* Call the function with a bool argument *)
   | Set of bool ref            (* Set the reference to true *)
@@ -85,14 +85,64 @@ let add_help speclist =
   speclist @ (add1 @ add2)
 ;;
 
+let second_word s =
+  let len = String.length s in
+  let rec loop n =
+    if n >= len then len
+    else if s.[n] = ' ' then loop (n+1)
+    else n
+  in
+  try loop (String.index s ' ')
+  with Not_found -> len
+;;
+
+let max_arg_len cur (kwd, spec, doc) =
+  match spec with
+  | Symbol _ -> max cur (String.length kwd)
+  | _ -> max cur (String.length kwd + second_word doc)
+;;
+
+let add_padding len ksd =
+  match ksd with
+  | (_, _, "") ->
+      (* Do not pad undocumented options, so that they still don't show up when
+       * run through [usage] or [parse]. *)
+      ksd
+  | (kwd, (Symbol (l, _) as spec), msg) ->
+      let cutcol = second_word msg in
+      let spaces = String.make ((max 0 (len - cutcol)) + 3) ' ' in
+      (kwd, spec, "\n" ^ spaces ^ msg)
+  | (kwd, spec, msg) ->
+      let cutcol = second_word msg in
+      let kwd_len = String.length kwd in
+      let diff = len - kwd_len - cutcol in
+      if diff <= 0 then
+        (kwd, spec, msg)
+      else
+        let spaces = String.make diff ' ' in
+        let prefix = String.sub msg 0 cutcol in
+        let suffix = String.sub msg cutcol (String.length msg - cutcol) in
+        (kwd, spec, prefix ^ spaces ^ suffix)
+;;
+
+let align ?(limit=max_int) speclist =
+  let completed = add_help speclist in
+  let len = List.fold_left max_arg_len 0 completed in
+  let len = min len limit in
+  List.map (add_padding len) completed
+;;
+
+let aligned = ref false
+
 let usage_b buf speclist errmsg =
+  let speclist = if !aligned then align speclist else speclist in
   bprintf buf "%s\n" errmsg;
   List.iter (print_spec buf) (add_help speclist);
 ;;
 
 let usage_string speclist errmsg =
   let b = Buffer.create 200 in
-  usage_b b speclist errmsg;
+  usage_b b (speclist@ !Ocpstd.Arg.default_arglist) errmsg;
   Buffer.contents b;
 ;;
 
@@ -211,7 +261,8 @@ let parse_argv_dynamic ?(current=current) argv speclist anonfun errmsg =
 ;;
 
 let parse_argv ?(current=current) argv speclist anonfun errmsg =
-  parse_argv_dynamic ~current:current argv (ref speclist) anonfun errmsg;
+  parse_argv_dynamic ~current:current argv
+    (ref (speclist @ !Ocpstd.Arg.default_arglist)) anonfun errmsg;
 ;;
 
 let parse l f msg =
@@ -228,51 +279,4 @@ let parse_dynamic l f msg =
   with
   | Bad msg -> eprintf "%s" msg; exit 2;
   | Help msg -> printf "%s" msg; exit 0;
-;;
-
-let second_word s =
-  let len = String.length s in
-  let rec loop n =
-    if n >= len then len
-    else if s.[n] = ' ' then loop (n+1)
-    else n
-  in
-  try loop (String.index s ' ')
-  with Not_found -> len
-;;
-
-let max_arg_len cur (kwd, spec, doc) =
-  match spec with
-  | Symbol _ -> max cur (String.length kwd)
-  | _ -> max cur (String.length kwd + second_word doc)
-;;
-
-let add_padding len ksd =
-  match ksd with
-  | (_, _, "") ->
-      (* Do not pad undocumented options, so that they still don't show up when
-       * run through [usage] or [parse]. *)
-      ksd
-  | (kwd, (Symbol (l, _) as spec), msg) ->
-      let cutcol = second_word msg in
-      let spaces = String.make ((max 0 (len - cutcol)) + 3) ' ' in
-      (kwd, spec, "\n" ^ spaces ^ msg)
-  | (kwd, spec, msg) ->
-      let cutcol = second_word msg in
-      let kwd_len = String.length kwd in
-      let diff = len - kwd_len - cutcol in
-      if diff <= 0 then
-        (kwd, spec, msg)
-      else
-        let spaces = String.make diff ' ' in
-        let prefix = String.sub msg 0 cutcol in
-        let suffix = String.sub msg cutcol (String.length msg - cutcol) in
-        (kwd, spec, prefix ^ spaces ^ suffix)
-;;
-
-let align ?(limit=max_int) speclist =
-  let completed = add_help speclist in
-  let len = List.fold_left max_arg_len 0 completed in
-  let len = min len limit in
-  List.map (add_padding len) completed
 ;;

@@ -29,6 +29,8 @@ CAMLextern void caml_do_local_roots (scanning_action, value *, value *,
 CAMLextern void caml_do_local_roots(scanning_action f, char * bottom_of_stack,
                                     uintnat last_retaddr, value * gc_regs,
                                     struct caml__roots_block * local_roots);
+typedef void (*dyn_scanning_action) (char *, value);
+CAMLextern void caml_iterate_dynglobals (dyn_scanning_action);
 #endif
 
 CAMLextern void (*caml_scan_roots_hook) (scanning_action);

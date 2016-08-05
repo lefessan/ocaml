@@ -15,6 +15,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#define OCP_NEED_LOCINFO
 #include "callback.h"
 #include "backtrace.h"
 #include "custom.h"
@@ -25,12 +26,15 @@
 #include "gc_ctrl.h"
 #include "intext.h"
 #include "memory.h"
+#include "memprof.h"
 #include "misc.h"
 #include "mlvalues.h"
 #include "osdeps.h"
 #include "printexc.h"
 #include "stack.h"
 #include "sys.h"
+#include "memprof.h"
+#include "signals.h"
 #ifdef HAS_UI
 #include "ui.h"
 #endif
@@ -118,6 +122,7 @@ static void parse_camlrunparam(void)
 {
   char *opt = getenv ("OCAMLRUNPARAM");
   uintnat p;
+  value backtrace = Val_true; // always true
 
   if (opt == NULL) opt = getenv ("CAMLRUNPARAM");
 
@@ -131,12 +136,14 @@ static void parse_camlrunparam(void)
       case 'o': scanmult (opt, &percent_free_init); break;
       case 'O': scanmult (opt, &max_percent_free_init); break;
       case 'v': scanmult (opt, &caml_verb_gc); break;
-      case 'b': caml_record_backtrace(Val_true); break;
+        //      case 'b': backtrace = Val_true; break;
       case 'p': caml_parser_trace = 1; break;
       case 'a': scanmult (opt, &p); caml_set_allocation_policy (p); break;
+      MEMPROF_PARSE_OCAMLRUNPARAM();
       }
     }
   }
+  caml_record_backtrace(backtrace);
 }
 
 /* These are termination hooks used by the systhreads library */
@@ -147,7 +154,8 @@ extern value caml_start_program (void);
 extern void caml_init_ieee_floats (void);
 extern void caml_init_signals (void);
 
-#ifdef _MSC_VER
+#ifdef _WIN32
+// _MSC_VER
 
 /* PR 4887: avoid crash box of windows runtime on some system calls */
 extern void caml_install_invalid_parameter_handler();
@@ -162,8 +170,10 @@ void caml_main(char **argv)
   value res;
   char tos;
 
+  caml_memprof_ccall_locid = PROF_STARTUP;
   caml_init_ieee_floats();
-#ifdef _MSC_VER
+#ifdef _WIN32
+  // _MSC_VER
   caml_install_invalid_parameter_handler();
 #endif
   caml_init_custom_operations();
@@ -184,11 +194,14 @@ void caml_main(char **argv)
   else
     exe_name = caml_search_exe_in_path(exe_name);
   caml_sys_init(exe_name, argv);
+  MEMPROF_INIT();
   if (sigsetjmp(caml_termination_jmpbuf.buf, 0)) {
     if (caml_termination_hook != NULL) caml_termination_hook(NULL);
     return;
   }
+  caml_memprof_ccall_locid = PROF_DUMMY;
   res = caml_start_program();
+  MEMPROF_EXIT();
   if (Is_exception_result(res))
     caml_fatal_uncaught_exception(Extract_exception(res));
 }
