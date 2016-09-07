@@ -65,6 +65,9 @@ Next version (4.05.0):
 - PR#7137, GPR#960: "-open" command line flag now accepts a module path
   (not a module name) (Arseniy Alekseyev and Leo White)
 
+- GPR#796: allow compiler plugins to declare their own arguments.
+  (Fabrice Le Fessant)
+
 ### Standard library:
 
 - PR#6975, GPR#902: Truncate function added to stdlib Buffer module

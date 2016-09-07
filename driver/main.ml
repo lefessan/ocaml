@@ -126,9 +126,10 @@ module Options = Main_args.Make_bytecomp_options (struct
 end)
 
 let main () =
+  Clflags.add_arguments __LOC__ Options.list;
   try
     readenv ppf Before_args;
-    Arg.parse_expand Options.list anonymous usage;
+    Clflags.parse_arguments anonymous usage;
     Compenv.process_deferred_actions
       (ppf,
        Compile.implementation,

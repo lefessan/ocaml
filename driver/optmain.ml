@@ -233,10 +233,11 @@ end);;
 
 let main () =
   native_code := true;
+  Clflags.add_arguments __LOC__ (Arch.command_line_options @ Options.list);
   let ppf = Format.err_formatter in
   try
     readenv ppf Before_args;
-    Arg.parse_expand (Arch.command_line_options @ Options.list) anonymous usage;
+    Clflags.parse_arguments anonymous usage;
     if !gprofile && not Config.profiling then
       fatal "Profiling with \"gprof\" is not supported on this platform.";
     Compenv.process_deferred_actions
