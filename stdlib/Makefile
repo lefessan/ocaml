@@ -14,6 +14,13 @@
 #**************************************************************************
 
 include ../config/Makefile
+
+.PHONY: all
+all: stdlib.cma std_exit.cmo camlheader target_camlheader camlheader_ur
+
+include ../Makefile.root
+-include $(OCAMLPRO)/stdlib/Makefile
+
 CAMLRUN ?= ../boot/ocamlrun
 CAMLYACC ?= ../boot/ocamlyacc
 TARGET_BINDIR ?= $(BINDIR)
@@ -48,10 +55,7 @@ OTHERS=list.cmo char.cmo bytes.cmo string.cmo sys.cmo \
   filename.cmo complex.cmo \
   arrayLabels.cmo listLabels.cmo bytesLabels.cmo \
   stringLabels.cmo moreLabels.cmo stdLabels.cmo \
-  spacetime.cmo
-
-.PHONY: all
-all: stdlib.cma std_exit.cmo camlheader target_camlheader camlheader_ur
+  spacetime.cmo $(OCPSTD_CMOS)
 
 ifeq "$(RUNTIMED)" "true"
 all: camlheaderd

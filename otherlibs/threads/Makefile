@@ -16,6 +16,10 @@
 # FIXME reduce redundancy by including ../Makefile
 
 include ../../config/Makefile
+
+include ../../Makefile.root
+-include $(OCAMLPRO)/otherlibs/threads/Makefile
+
 CAMLRUN ?= ../../boot/ocamlrun
 CAMLYACC ?= ../../boot/ocamlyacc
 
@@ -48,7 +52,7 @@ LIB_OBJS=$(LIB)/camlinternalFormatBasics.cmo pervasives.cmo		\
   $(LIB)/weak.cmo $(LIB)/ephemeron.cmo $(LIB)/filename.cmo		\
   $(LIB)/complex.cmo $(LIB)/arrayLabels.cmo $(LIB)/listLabels.cmo	\
   $(LIB)/bytesLabels.cmo $(LIB)/stringLabels.cmo			\
-  $(LIB)/moreLabels.cmo $(LIB)/stdLabels.cmo
+  $(LIB)/moreLabels.cmo $(LIB)/stdLabels.cmo $(OCPSTD_CMOS)
 
 UNIXLIB=../unix
 

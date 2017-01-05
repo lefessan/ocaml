@@ -1,0 +1,21 @@
+#OCAMLPRO:=$(ROOTDIR)/ocamlpro
+
+# by default, support for conditional compilation will be included
+
+# Change this line to "true" once you have compiled and bootstrapped ocamlc
+HAS_OCPP=false
+
+# now, .ocpp files will be taken into account
+
+HAS_STRINGCOMPAT=false
+
+# now, sempatch is going to be built inside...
+
+# Change this line to "true" once you have compiled and bootstrapped ocamlc
+# with HAS_OCPP=true
+HAS_SEMPATCH=false
+
+
+WANT_OCPWIN=true
+WANT_MEMPROF_RUNTIME=true
+WANT_OCPWIN_RUNTIME=true

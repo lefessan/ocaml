@@ -15,6 +15,10 @@
 
 include ../config/Makefile
 
+include ../Makefile.root
+-include $(OCAMLPRO)/ocpwin/Makefile.byterun
+-include $(OCAMLPRO)/memprof/Makefile.byterun
+
 INSTALL_BINDIR=$(DESTDIR)$(BINDIR)
 INSTALL_LIBDIR=$(DESTDIR)$(LIBDIR)
 
@@ -88,7 +92,9 @@ PRIMS=\
   alloc.c array.c compare.c extern.c floats.c gc_ctrl.c hash.c \
   intern.c interp.c ints.c io.c lexing.c md5.c meta.c obj.c parsing.c \
   signals.c str.c sys.c terminfo.c callback.c weak.c finalise.c stacks.c \
-  dynlink.c backtrace_prim.c backtrace.c spacetime.c afl.c
+  dynlink.c backtrace_prim.c backtrace.c spacetime.c afl.c \
+  $(OCPWIN_SRCS) $(MEMPROF_SRCS)
+
 
 OBJS=$(addsuffix .$(O), \
   interp misc stacks fix_code startup_aux startup \
@@ -97,7 +103,8 @@ OBJS=$(addsuffix .$(O), \
   compare ints floats str array io extern intern \
   hash sys meta parsing gc_ctrl terminfo md5 obj \
   lexing callback debugger weak compact finalise custom \
-  dynlink spacetime afl $(UNIX_OR_WIN32) main)
+  dynlink spacetime afl cplugins $(UNIX_OR_WIN32) main) \
+  $(OCPWIN_OBJS) $(MEMPROF_OBJS)
 
 DOBJS=$(OBJS:.$(O)=.$(DBGO)) instrtrace.$(DBGO)
 IOBJS=$(OBJS:.$(O)=.i.$(O))
@@ -173,7 +180,7 @@ caml/version.h : ../VERSION ../tools/make-version-header.sh
 	../tools/make-version-header.sh ../VERSION > caml/version.h
 
 .PHONY: clean
-clean:
+clean::
 	rm -f $(LIBRARIES) $(PROGRAMS) *.$(O) *.$(A) *.$(SO)
 	rm -f primitives prims.c caml/opnames.h caml/jumptbl.h
 	rm -f caml/version.h

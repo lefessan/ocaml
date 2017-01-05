@@ -18,6 +18,7 @@ defaultentry:
 
 # The main Makefile, fragments shared between Makefile and Makefile.nt
 include config/Makefile
+
 CAMLRUN ?= boot/ocamlrun
 CAMLYACC ?= boot/ocamlyacc
 include stdlib/StdlibModules
@@ -28,6 +29,9 @@ COMPFLAGS=-strict-sequence -principal -absname -w +a-4-9-41-42-44-45-48 \
 	  -warn-error A \
           -bin-annot -safe-string -strict-formats $(INCLUDES)
 LINKFLAGS=
+
+include Makefile.root
+include $(OCAMLPRO)/Makefile
 
 YACCFLAGS=-v --strict
 CAMLLEX=$(CAMLRUN) boot/ocamllex
@@ -81,7 +85,8 @@ COMP=bytecomp/lambda.cmo bytecomp/printlambda.cmo \
   bytecomp/translclass.cmo bytecomp/translmod.cmo \
   bytecomp/simplif.cmo bytecomp/runtimedef.cmo \
   driver/pparse.cmo driver/main_args.cmo \
-  driver/compenv.cmo driver/compmisc.cmo
+  driver/compenv.cmo driver/compmisc.cmo \
+  $(COMP_OCP)
 
 COMMON=$(UTILS) $(PARSING) $(TYPING) $(COMP)
 

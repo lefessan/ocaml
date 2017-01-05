@@ -15,6 +15,10 @@
 
 include ../config/Makefile
 
+include ../Makefile.root
+-include $(OCAMLPRO)/ocpwin/Makefile.byterun
+-include $(OCAMLPRO)/memprof/Makefile.byterun
+
 LINKEDFILES=misc.c freelist.c major_gc.c minor_gc.c memory.c alloc.c array.c \
   compare.c ints.c floats.c str.c io.c extern.c intern.c hash.c sys.c \
   parsing.c gc_ctrl.c terminfo.c md5.c obj.c lexing.c printexc.c callback.c \
@@ -77,7 +81,8 @@ COBJS=startup_aux.$(O) startup.$(O) main.$(O) fail.$(O)		\
   custom.$(O) globroots.$(O) backtrace_prim.$(O) backtrace.$(O)		\
   natdynlink.$(O) debugger.$(O) meta.$(O) dynlink.$(O)			\
   clambda_checks.$(O) spacetime.$(O) spacetime_snapshot.$(O)		\
-  spacetime_offline.$(O) afl.$(O)
+  spacetime_offline.$(O) afl.$(O) \
+  $(OCPWIN_OBJS) $(MEMPROF_OBJS)
 
 OBJS=$(COBJS) $(ASMOBJS)
 
@@ -169,12 +174,12 @@ $(LINKEDFILES): %.c: ../byterun/%.c
 	$(ASM)$@ $<
 
 .PHONY: clean
-clean:
+clean::
 	rm -f $(LINKEDFILES)
 	rm -f *.$(O) *.$(A) *.$(SO)
 
 .PHONY: distclean
-distclean: clean
+distclean:: clean
 	rm -r *~
 
 ifneq "$(TOOLCHAIN)" "msvc"

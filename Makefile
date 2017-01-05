@@ -131,10 +131,13 @@ backup:
 # Promote the newly compiled system to the rank of cross compiler
 # (Runs on the old runtime, produces code for the new runtime)
 promote-cross:
-	$(CAMLRUN) tools/stripdebug ocamlc boot/ocamlc
-	$(CAMLRUN) tools/stripdebug lex/ocamllex boot/ocamllex
+	$(CAMLRUN) tools/stripdebug ocamlc boot/ocamlc \
+		|| cp -f ocamlc boot/ocamlc
+	$(CAMLRUN) tools/stripdebug lex/ocamllex boot/ocamllex \
+		|| cp -f lex/ocamllex boot/ocamllex
 	cp yacc/ocamlyacc$(EXE) boot/ocamlyacc$(EXE)
-	$(CAMLRUN) tools/stripdebug tools/ocamldep boot/ocamldep
+	$(CAMLRUN) tools/stripdebug tools/ocamldep boot/ocamldep || \
+		cp -f tools/ocamldep boot/ocamldep
 	cd stdlib; cp $(LIBFILES) ../boot
 
 # Promote the newly compiled system to the rank of bootstrap compiler
@@ -405,7 +408,7 @@ otherlibs/dynlink/dynlink.cmxa: otherlibs/dynlink/natdynlink.ml
 
 # The configuration file
 
-utils/config.ml: utils/config.mlp config/Makefile
+utils/config.ml: utils/config.mlp config/Makefile $(OCAMLPRO)/utils/config.ml
 	@rm -f utils/config.ml
 	sed -e 's|%%LIBDIR%%|$(LIBDIR)|' \
 	    -e 's|%%BYTERUN%%|$(BINDIR)/ocamlrun|' \
@@ -444,6 +447,14 @@ utils/config.ml: utils/config.mlp config/Makefile
 	    -e 's|%%FLAMBDA%%|$(FLAMBDA)|' \
 	    -e 's|%%PROFILING%%|$(PROFILING)|' \
 	    -e 's|%%SAFE_STRING%%|$(SAFE_STRING)|' \
+            -e "s|%%BINDIR%%|$(BINDIR)|" \
+            -e "s|%%SUPPORTS_SHARED_LIBRARIES%%|$(SUPPORTS_SHARED_LIBRARIES)|" \
+            -e "s|%%MKSHAREDLIB%%|$(MKSHAREDLIB)|" \
+            -e "s|%%BYTECCRPATH%%|$(BYTECCRPATH)|" \
+            -e "s|%%NATIVECCRPATH%%|$(NATIVECCRPATH)|" \
+            -e "s|%%MKSHAREDLIBRPATH%%|$(MKSHAREDLIBRPATH)|" \
+            -e "s|%%MKLIB1%%|$(MKLIB1)|" \
+            -e "s|%%MKLIB2%%|$(MKLIB2)|" \
 	    -e 's|%%AFL_INSTRUMENT%%|$(AFL_INSTRUMENT)|' \
 	    utils/config.mlp > utils/config.ml
 
