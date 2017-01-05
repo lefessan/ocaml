@@ -3,7 +3,7 @@
 # by default, support for conditional compilation will be included
 
 # Change this line to "true" once you have compiled and bootstrapped ocamlc
-HAS_OCPP=false
+HAS_OCPP=true
 
 # now, .ocpp files will be taken into account
 
