@@ -455,6 +455,7 @@ utils/config.ml: utils/config.mlp config/Makefile $(OCAMLPRO)/utils/config.ml
             -e "s|%%MKSHAREDLIBRPATH%%|$(MKSHAREDLIBRPATH)|" \
             -e "s|%%MKLIB1%%|$(MKLIB1)|" \
             -e "s|%%MKLIB2%%|$(MKLIB2)|" \
+            -e "s|%%WANT_OCP_MAGIC%%|$(WANT_OCP_MAGIC)|" \
 	    -e 's|%%AFL_INSTRUMENT%%|$(AFL_INSTRUMENT)|' \
 	    utils/config.mlp > utils/config.ml
 

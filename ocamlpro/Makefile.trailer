@@ -15,6 +15,9 @@ HAS_STRINGCOMPAT=false
 # with HAS_OCPP=true
 HAS_SEMPATCH=false
 
+# if you set this, you will need to bootstrap, and then set
+# HAS_OCP_MAGIC in config-ocp.h
+WANT_OCP_MAGIC=false
 
 WANT_OCPWIN=true
 WANT_MEMPROF_RUNTIME=true

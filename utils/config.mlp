@@ -117,6 +117,7 @@ let mksharedlibrpath = "%%MKSHAREDLIBRPATH%%"
 let mklib1 =  "%%MKLIB1%%"
 let mklib2 =  "%%MKLIB2%%"
 let ext_cc_obj =  "%%EXT_OBJ%%"
+let want_ocp_magic = %%WANT_OCP_MAGIC%%
 
 let ext_exe = "%%EXT_EXE%%"
 let ext_obj = "%%EXT_OBJ%%"
