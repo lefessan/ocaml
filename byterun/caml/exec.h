@@ -58,7 +58,12 @@ struct exec_trailer {
 
 /* Magic number for this release */
 
+#include "../../config-ocp.h"
+#if HAS_OCP_MAGIC
+#define EXEC_MAGIC "OCP-1999X011"
+#else
 #define EXEC_MAGIC "Caml1999X011"
+#endif
 
 #endif /* CAML_INTERNALS */
 

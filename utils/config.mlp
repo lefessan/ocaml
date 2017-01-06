@@ -109,6 +109,15 @@ let libunwind_link_flags = "%%LIBUNWIND_LINK_FLAGS%%"
 let profinfo = %%WITH_PROFINFO%%
 let profinfo_width = %%PROFINFO_WIDTH%%
 
+let supports_shared_libraries =  %%SUPPORTS_SHARED_LIBRARIES%%
+let mksharedlib = "%%MKSHAREDLIB%%"
+let byteccrpath = "%%BYTECCRPATH%%"
+let nativeccrpath = "%%NATIVECCRPATH%%"
+let mksharedlibrpath = "%%MKSHAREDLIBRPATH%%"
+let mklib1 =  "%%MKLIB1%%"
+let mklib2 =  "%%MKLIB2%%"
+let ext_cc_obj =  "%%EXT_OBJ%%"
+
 let ext_exe = "%%EXT_EXE%%"
 let ext_obj = "%%EXT_OBJ%%"
 let ext_asm = "%%EXT_ASM%%"
@@ -125,6 +134,8 @@ let default_executable_name =
   | _ -> "camlprog"
 
 let systhread_supported = %%SYSTHREAD_SUPPORT%%;;
+
+#include "ocamlpro/utils/config.ml"
 
 let print_config oc =
   let p name valu = Printf.fprintf oc "%s: %s\n" name valu in
@@ -176,6 +187,8 @@ let print_config oc =
   p "ast_intf_magic_number" ast_intf_magic_number;
   p "cmxs_magic_number" cmxs_magic_number;
   p "cmt_magic_number" cmt_magic_number;
+
+  print_extended_config oc;
 
   flush oc;
 ;;
