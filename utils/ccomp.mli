@@ -31,3 +31,7 @@ type link_mode =
   | Partial
 
 val call_linker: link_mode -> string -> string list -> string -> bool
+
+(* Some hooks *)
+val external_command : (string -> int) ref
+val internal_compile_file : (string -> int) ref

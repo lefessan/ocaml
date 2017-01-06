@@ -15,13 +15,15 @@
 
 (* Compiling C files and building C libraries *)
 
+let external_command = ref Sys.command
+
 let command cmdline =
   if !Clflags.verbose then begin
     prerr_string "+ ";
     prerr_string cmdline;
     prerr_newline()
   end;
-  Sys.command cmdline
+  !external_command cmdline
 
 let run_command cmdline = ignore(command cmdline)
 
@@ -100,6 +102,9 @@ let compile_file name =
   if pipe <> ""
   then display_msvc_output file name;
   exit
+
+let internal_compile_file = ref compile_file
+let compile_file name = !internal_compile_file name
 
 let create_archive archive file_list =
   Misc.remove_file archive;
