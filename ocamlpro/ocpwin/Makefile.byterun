@@ -1,0 +1,26 @@
+
+ifeq "$(WANT_OCPWIN_RUNTIME)" "true"
+
+OCPWIN_DIR := $(OCAMLPRO)/ocpwin
+
+OCPWIN_OBJS := ocpwin.$(O)
+OCPWIN_SRCS := ocpwin.c
+OCPWIN_H := caml/ocpwin.h
+
+ocpwin.c: $(OCPWIN_DIR)/ocpwin.c
+	$(OCAMLPRO)/copy.sh $(OCPWIN_DIR)/ocpwin.c ocpwin.c
+
+ifeq "$(IS_BYTECODE)" "true"
+
+caml/ocpwin.h: $(OCPWIN_DIR)/ocpwin.h
+	$(OCAMLPRO)/copy.sh $(OCPWIN_DIR)/ocpwin.h caml/ocpwin.h
+
+ocpwin.$(O): caml/ocpwin.h
+dynlink.$(O): caml/ocpwin.h
+
+endif
+
+clean::
+	rm -f $(OCPWIN_SRCS) $(OCPWIN_H)
+
+endif
