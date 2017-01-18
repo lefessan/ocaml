@@ -77,6 +77,10 @@ Next version (4.05.0):
 - GPR#796: allow compiler plugins to declare their own arguments.
   (Fabrice Le Fessant)
 
+- GPR#1015: add option "-plugin PLUGIN" to ocamldep too. Use compilerlibs
+  to build ocamldep.
+  (Fabrice Le Fessant)
+
 ### Standard library:
 
 - PR#6975, GPR#902: Truncate function added to stdlib Buffer module
