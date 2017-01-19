@@ -19,6 +19,10 @@
 
 #include "mlvalues.h"
 
+/* Used by memprof to store locids to be used during C calls. */
+extern uintnat caml_memprof_ccall_locid;
+extern uintnat caml_memprof_exception_locid;
+
 #define Caml_white (0 << 8)
 #define Caml_gray  (1 << 8)
 #define Caml_blue  (2 << 8)
@@ -38,6 +42,21 @@
 #define Blackhd_hd(hd) (((hd)/*& ~Caml_black*/)| Caml_black)
 #define Bluehd_hd(hd)  (((hd)  & ~Caml_black)  | Caml_blue)
 
+#ifdef WITH_PROFINFO
+/* This depends on the layout of the header.  See [mlvalues.h]. */
+#define Make_header_with_profinfo(wosize, tag, color, profinfo)               \
+      (/*Assert ((wosize) <= Max_wosize),*/                                   \
+       ((header_t) (((header_t) (wosize) << 10)                               \
+                    + (color)                                                 \
+                    + (tag_t) (tag)))                                         \
+        | ((((intnat) profinfo) & PROFINFO_MASK) << PROFINFO_SHIFT)           \
+      )
+
+#define Make_header(wosize, tag, color)                                       \
+  Make_header_with_profinfo(wosize, tag, color, caml_memprof_ccall_locid)
+
+#else
+
 /* This depends on the layout of the header.  See [mlvalues.h]. */
 #define Make_header(wosize, tag, color)                                       \
       (/*Assert ((wosize) <= Max_wosize),*/                                   \
@@ -45,13 +64,6 @@
                     + (color)                                                 \
                     + (tag_t) (tag)))                                         \
       )
-
-#ifdef WITH_PROFINFO
-#define Make_header_with_profinfo(wosize, tag, color, profinfo)               \
-      (Make_header(wosize, tag, color)                                        \
-        | ((((intnat) profinfo) & PROFINFO_MASK) << PROFINFO_SHIFT)           \
-      )
-#else
 #define Make_header_with_profinfo(wosize, tag, color, profinfo) \
   Make_header(wosize, tag, color)
 #endif

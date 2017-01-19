@@ -32,6 +32,8 @@
 #include "caml/prims.h"
 #include "caml/stacks.h"
 
+#include "caml/ocp_bytecode.h"
+
 #ifndef NATIVE_CODE
 
 CAMLprim value caml_get_global_data(value unit)
@@ -49,25 +51,39 @@ CAMLprim value caml_get_section_table(value unit)
                                      caml_section_table_size);
 }
 
-CAMLprim value caml_reify_bytecode(value prog, value len)
+CAMLprim value caml_prepare_reify_bytecode(value memprof_info_v)
+{
+  caml_ocp_bytecode_init(String_val(memprof_info_v));
+  return Val_unit;
+}
+
+/* We expect "ocaml" to call caml_ocp_bytecode_init() before
+   calling this function !!! */
+
+CAMLprim value caml_reify_bytecode(value prog_v, value len_v)
 {
   struct code_fragment * cf = caml_stat_alloc(sizeof(struct code_fragment));
   value clos;
-
+  asize_t len = Long_val(len_v);
+  code_t prog = (code_t) prog_v;
+  
   cf->code_start = (char *) prog;
-  cf->code_end = (char *) prog + Long_val(len);
+  cf->code_end = (char *) prog + len;
   cf->digest_computed = 0;
   caml_ext_table_add(&caml_code_fragments_table, cf);
 
 #ifdef ARCH_BIG_ENDIAN
-  caml_fixup_endianness((code_t) prog, (asize_t) Long_val(len));
+  caml_fixup_endianness(prog, len);
 #endif
+
+  prog = caml_ocp_bytecode_fix_locids(prog, &len);
+
 #ifdef THREADED_CODE
-  caml_thread_code((code_t) prog, (asize_t) Long_val(len));
+  caml_thread_code(prog, len);
 #endif
-  caml_prepare_bytecode((code_t) prog, (asize_t) Long_val(len));
+  caml_prepare_bytecode(prog, len);
   clos = caml_alloc_small (1, Closure_tag);
-  Code_val(clos) = (code_t) prog;
+  Code_val(clos) = prog;
   return clos;
 }
 
@@ -206,6 +222,11 @@ value caml_invoke_traced_function(value codeptr, value env, value arg)
 {
   caml_invalid_argument("Meta.invoke_traced_function");
   return Val_unit; /* not reached */
+}
+
+value caml_prepare_reify_bytecode(value memprof_info_v)
+{
+  return Val_unit;
 }
 
 value caml_reify_bytecode(value prog, value len)

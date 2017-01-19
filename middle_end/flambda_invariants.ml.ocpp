@@ -1,0 +1,5 @@
+
+include "../bytecomp/lambda_lambda_exp.sempatch"
+include "../bytecomp/lambda_lambda_patany.sempatch"
+include "../bytecomp/lambda_prims_exp.sempatch"
+include "../bytecomp/lambda_prims_patany.sempatch"

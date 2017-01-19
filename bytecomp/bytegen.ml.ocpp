@@ -1,0 +1,48 @@
+include "lambda_lambda_pat.sempatch"
+include "lambda_prims_pat.sempatch"
+
+include "lambda_lambda_exp.sempatch"
+include "lambda_prims_exp.sempatch"
+
+patch add_record_fields {
+  record_labels = [ "ap_loc" ]
+  record_new_labels = [ "ap_lp" ]
+}
+
+patch add_function_argument {
+  fun_new_argument = "lp"
+  fun_names = [
+    "Matching.expand_stringswitch"
+  ]
+}
+
+
+patch add_constructor_arguments_exp {
+   constr_names = [
+   "Kgrab"
+   "Kclosure"
+   "Kclosurerec"
+   "Kmakeblock"
+   "Kmakefloatblock"
+   "Kgetfloatfield"
+   ]
+   constr_position = "end"
+   constr_new_arguments = [ "Memprof.get_alloc locid.id" ]
+}
+
+patch add_constructor_arguments_exp {
+   constr_names = [
+   "Kccall"
+   ]
+   constr_position = "end"
+   constr_new_arguments = [ "Memprof.get_alloc locid.id" ]
+   constr_prev_nargs = 2;
+}
+
+
+patch add_function_argument {
+  fun_new_argument = "locid"
+  fun_names = [
+    "comp_bint_primitive"
+  ]
+}

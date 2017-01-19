@@ -16,10 +16,19 @@
 include ../config/Makefile
 CAMLRUN ?= ../boot/ocamlrun
 CAMLYACC ?= ../boot/ocamlyacc
+BOOTDIR ?= boot2
+HAS_MEMPROF ?= -D HAS_MEMPROF
 TARGET_BINDIR ?= $(BINDIR)
 
+PLUGINDIR ?= ../$(BOOTDIR)
+PLUGINS=\
+  -plugin $(PLUGINDIR)/ocpp-plugin.cma \
+  -plugin $(PLUGINDIR)/sempatch-plugin.cma \
+  -plugin $(PLUGINDIR)/last-plugin.cma \
+  $(HAS_MEMPROF)
+
 COMPILER=../ocamlc
-CAMLC=$(CAMLRUN) $(COMPILER)
+CAMLC=$(CAMLRUN) $(COMPILER) $(PLUGINS)
 COMPFLAGS=-strict-sequence -absname -w +a-4-9-41-42-44-45-48 \
           -g -warn-error A -bin-annot -nostdlib \
           -safe-string -strict-formats
@@ -29,8 +38,8 @@ else
 OPTCOMPFLAGS=
 endif
 OPTCOMPILER=../ocamlopt
-CAMLOPT=$(CAMLRUN) $(OPTCOMPILER)
-CAMLDEP=$(CAMLRUN) ../tools/ocamldep
+CAMLOPT=$(CAMLRUN) $(OPTCOMPILER) $(PLUGINS)
+CAMLDEP=$(CAMLRUN) ../tools/ocamldep $(PLUGINS)
 
 OBJS=camlinternalFormatBasics.cmo pervasives.cmo $(OTHERS)
 OTHERS=list.cmo char.cmo bytes.cmo string.cmo sys.cmo \
@@ -48,7 +57,8 @@ OTHERS=list.cmo char.cmo bytes.cmo string.cmo sys.cmo \
   filename.cmo complex.cmo \
   arrayLabels.cmo listLabels.cmo bytesLabels.cmo \
   stringLabels.cmo moreLabels.cmo stdLabels.cmo \
-  spacetime.cmo camlinternalBigarray.cmo
+  spacetime.cmo camlinternalBigarray.cmo \
+  ocpstd.cmo
 
 .PHONY: all
 all: stdlib.cma std_exit.cmo camlheader target_camlheader camlheader_ur
@@ -239,12 +249,20 @@ clean::
 	rm -f *~
 	rm -f camlheader*
 
-include .depend
+include .depend.memprof
 
 # Note that .p.cmx targets do not depend (for compilation) upon other
 # .p.cmx files.  When the compiler imports another compilation unit,
 # it looks for the .cmx file (not .p.cmx).
 .PHONY: depend
+
+
+BOOTPLUGINS=\
+   -plugin ../boot/ocpp-plugin.cma \
+   -plugin ../boot/sempatch-plugin.cma \
+   -plugin ../boot/last-plugin.cma 
+BOOTCAMLDEP=../boot/ocamlrun ../boot/ocamldep $(BOOTPLUGINS)
+
 depend:
-	$(CAMLDEP) -slash *.mli *.ml > .depend
-	$(CAMLDEP) -slash *.ml | sed -e 's/\.cmx : /.p.cmx : /g' >>.depend
+	$(BOOTCAMLDEP) -slash *.mli *.ml > .depend.memprof
+	$(BOOTCAMLDEP) -slash *.ml | sed -e 's/\.cmx : /.p.cmx : /g' >>.depend.memprof

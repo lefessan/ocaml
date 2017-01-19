@@ -1,0 +1,70 @@
+
+PRE ?= boot2
+POST ?= .
+
+ROOTDIR=../..
+PLUGINDIR=../../$(PRE)
+
+INCLUDES=-I ../$(POST)/stdlib -I ../$(POST)/compiler -I ../$(POST)
+CAMLRUN=$(ROOTDIR)/boot/ocamlrun
+CAMLFLAGS= $(INCLUDES) -plugin $(PLUGINDIR)/ocpp-plugin.cma $(HAS_MEMPROF)
+CAMLC=$(CAMLRUN) $(ROOTDIR)/$(PRE)/ocamlc $(CAMLFLAGS)
+CAMLDEP=$(CAMLRUN) $(ROOTDIR)/boot/ocamldep $(CAMLFLAGS)
+CAMLLEX=$(CAMLRUN) $(ROOTDIR)/boot/ocamllex
+CAMLYACC=../../yacc/ocamlyacc
+
+
+SEMPATCH_CMOS:= \
+  parsetree_iter.cmo \
+  parsetree_map.cmo \
+  patch_types.cmo \
+  patch_lexer.cmo		\
+  patch_parser.cmo \
+  patch_engine.cmo	\
+  ocpstd.cmo \
+  patch_main.cmo \
+  sempatch_plugin.cmo
+
+SEMPATCH_MLS:=$(SEMPATCH_CMOS:.cmo=.ml)
+
+PLUGIN_CMA=../../$(POST)/sempatch-plugin.cma
+
+all: $(PLUGIN_CMA)
+
+$(PLUGIN_CMA):  \
+   $(ROOTDIR)/$(PRE)/ocamlc $(SEMPATCH_MLS) $(PLUGINDIR)/ocpp-plugin.cma
+	$(MAKE) -f Makefile.plugin $(SEMPATCH_CMOS)
+	$(CAMLC) -a -o $(PLUGIN_CMA) $(SEMPATCH_CMOS)
+	rm -f *.cmi *.cmti *.cmo *.cmt
+
+.SUFFIXES: .ml .mli .cmo .cmi .cmx
+
+.ml.cmo:
+	$(CAMLC) $(COMPFLAGS) -c $<
+
+.mli.cmi:
+	$(CAMLC) $(COMPFLAGS) -c $<
+
+beforedepend:: $(SEMPATCH_MLS)
+
+partialclean::
+	rm -f patch_parser.mli patch_parser.ml
+	rm -f patch_lexer.ml
+	rm -f *.cm?? *.cm? *~
+
+patch_parser.cmi: patch_parser.ml
+patch_parser.ml patch_parser.mli: patch_parser.mly
+	$(CAMLYACC) patch_parser.mly
+patch_lexer.ml: patch_lexer.mll
+	$(CAMLLEX) patch_lexer.mll
+
+depend: beforedepend
+	$(CAMLDEP) *.ml *.mli > .depend.$(PRE)$(POST)
+
+-include .depend.$(PRE)$(POST)
+
+parsetree_iter.cmo: parsetree_iter.cmi
+parsetree_map.cmo: parsetree_map.cmi
+patch_parser.cmo: patch_parser.cmi
+ocpstd.cmo: ocpstd.cmi
+

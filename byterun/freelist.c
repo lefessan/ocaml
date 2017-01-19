@@ -47,7 +47,7 @@ static struct {
   header_t h;
   value first_field;
   value filler2; /* Make sure the sentinel is never adjacent to any block. */
-} sentinel = {0, Make_header (0, 0, Caml_blue), Val_NULL, 0};
+} sentinel = {0, Make_header_with_profinfo (0, 0, Caml_blue, 0), Val_NULL, 0};
 
 #define Fl_head (Val_bp (&(sentinel.first_field)))
 static value fl_prev = Fl_head;  /* Current allocation pointer. */

@@ -81,14 +81,14 @@ type instruction =
   | Kappterm of int * int               (* number of arguments, slot size *)
   | Kreturn of int                      (* slot size *)
   | Krestart
-  | Kgrab of int                        (* number of arguments *)
+  | Kgrab of int                (* number of arguments *)
   | Kclosure of label * int
   | Kclosurerec of label list * int
   | Koffsetclosure of int
   | Kgetglobal of Ident.t
   | Ksetglobal of Ident.t
   | Kconst of structured_constant
-  | Kmakeblock of int * int             (* size, tag *)
+  | Kmakeblock of int * int     (* size, tag *)
   | Kmakefloatblock of int
   | Kgetfield of int
   | Ksetfield of int

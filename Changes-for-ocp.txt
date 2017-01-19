@@ -1,0 +1,123 @@
+2017-01-18:
+* use plugins on bootstrap compiler to build ocaml with preprocessor and
+semantic patches
+
+2017-01-19:
+* two-step bootstrap with boot.ocp/ocamlc
+
+2017-01-20: in byterun/
+* byterun: rename caml/io.h in caml/caml_io.h
+
+2017-01-21: in byterun/ mostly
+* caml_alloc_loc est remplacé par caml_alloc_with_profinfo
+* les fonctions caml_alloc_*_loc ne vont être définies qu'à la demande
+* alloc.c:
+  * caml_alloc devient caml_alloc_with_profinfo, BUG in ocaml ?
+* memory.h:
+  * Alloc_small utilise caml_memprof_ccall_locid
+* memory.c:
+  * caml_alloc_shr et caml_alloc_shr_no_raise utilise caml_memprof_ccall_locid
+* configure:
+  * WITH_PROFINFO=true, PROFINFO_WIDTH=22
+* add byterun/ocp_memprof.c, byterun/caml/ocp_memprof.h, byterun/ocpwin.c
+* make install: install *.h content of ../config/
+
+2017-01-23:
+* byterun/caml/mlvalues: WITH_MEMPROF defined when WITH_PROFINFO
+    without WITH_SPACETIME
+* byterun/dynlink.c:
+  * OCAML_ALLOWS_UNKNOWN_PRIM env var can be used to avoid
+     "Fatal error: unknown C primitive" for a primitive known not to be used
+* byterun/hash.c:
+  * No modification: hash only the lower 32 bits of the header, i.e. without
+    Profinfo_hd
+* byterun/caml/config.h:
+  * New macro CAML_HAS_INTERNALS to tell Coq to use CAML_INTERNALS to define
+    Make_header
+* byterun/major_gc.c:
+  * Adds only GCPPROF_GC_PHASE macros, no GCPPROF_GCTIME nor
+     GCPROF_HEADER
+* add new files byterun/ocp_utils.c (for stubs and dynlink) and
+   byterun/ocp_gcprof.c (code for gcprof), with their corresponding
+   header files.
+* byterun/caml/spacetime.h:
+  * uses caml_memprof_ccall_locid in Get_my_profinfo_with_cached_backtrace
+* byterun/obj.c:
+  * caml_obj_dup reuses locid when available
+
+2017-01-24:
+* byterun/ocp_utils.c: utilise l'ancien mécanisme de chargement du plugin
+   memprof.c, on fera mieux plus tard...
+* byterun/signals_byt.c: interception de caml_hooked_signal
+* byterun/win32.c: some code for signals, depending on proper
+   flexdll_ocamlc.
+* byterun/ocp_bytecode.c: fix bytecode to add a locid to all instructions
+   allocating
+
+2017-01-25:
+* ocamlpro/boot{.ocp}: build a file compiler/witness after changing any
+   .cmi, to force recompilation of plugins
+* tout parsing/
+
+2017-01-26:
+* build with PRE and POST to create different plugins for boot/ocamlc,
+   boot2/ocamlc and ./ocamlc
+* Use .depend.memprof instead of .depend to avoid conflicts on .depend
+  (we need to restore .depend from trunk)
+* Tout typing/
+
+A VERIFIER:
+===========
+* dynlink natdynlink
+* weak pointers
+* threads
+* caml_alloc_shr_no_raise fournit un profinfo = 0, pourquoi ?
+	 (utiliser dans intern.c)
+* byterun/caml/memory.h:
+  ALLOCPROF_SMALL_ALLOC dans Alloc_small_with_profinfo a été remplacé
+  par un appel à CAML_ALLOC_SMALL_HOOK(wosize), qui n'est utilisé que
+  avec --gc-hooks
+* Pour etre sur de n'oublier aucune primitive, on pourrait les lister
+  toutes, de facon a avoir un warning quand on en rajoute une
+* dans bytecomp/matching.ml, vérifier les endroits où un "locid" ou
+   un "lp" doit être généré
+
+BYTECODE:
+=========
+
+Tous les fichiers sont dans PATCHES/byterun/BYTECODE/. Je pense qu'on
+pourrait faire plus simple: ne pas ajouter de nouveaux OPCODEs, mais
+changer l'arité des OPCODEs précédents pour rajouter le LOCID.
+
+COQ:
+====
+
+Pour être compatible avec Coq, il faudrait que Coq puisse utiliser
+le Make_header d'OCaml. Cela peut se faire via CAML_INTERNALS
+
+
+Format of the MEMP section:
+===========================
+
+nlocids: uint32; // total number of locids to add
+ntables: uint32; // number of tables to read
+tables[ntables]: TABLE
+
+TABLE:
+position: uint32; // initial position in bytecode section
+table_string_size: uint32;
+table_string: char[table_string_size]; // marshaled version of memprof info
+table_string_terminator: char; // 0
+table_size: uint32;
+table_nlocids: uint32;
+table_locids: LOCID[table_nlocids];
+
+LOCID:
+locid_pos: uint32;
+locid: uint32; // locid+1
+
+
+
+TODO sempatch:
+==============
+Permettre de rajouter plusieurs arguments au type d'une fonction dans le .mli

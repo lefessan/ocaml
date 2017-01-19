@@ -1,0 +1,42 @@
+
+ROOTDIR=../..
+
+INCLUDES=-I ../$(POST)/stdlib -I ../$(POST)/compiler
+CAMLRUN=$(ROOTDIR)/boot/ocamlrun
+CAMLC=$(CAMLRUN) $(ROOTDIR)/$(PRE)/ocamlc $(INCLUDES)
+CAMLDEP=$(CAMLRUN) $(ROOTDIR)/boot/ocamldep
+CAMLLEX=$(CAMLRUN) $(ROOTDIR)/boot/ocamllex
+CAMLYACC=../../yacc/ocamlyacc
+
+LAST_CMOS:= last_plugin.cmo
+
+LAST_MLS:=$(LAST_CMOS:.cmo=.ml)
+
+PLUGIN_CMA=../../$(POST)/last-plugin.cma
+
+all: $(PLUGIN_CMA)
+
+$(PLUGIN_CMA): \
+   $(ROOTDIR)/$(PRE)/ocamlc ../$(PRE)/compiler/witness $(LAST_CMOS)
+	$(CAMLC) -a -o $(PLUGIN_CMA) $(LAST_CMOS)
+	rm -f *.cmi *.cmti *.cmo *.cmt
+
+beforedepend:: $(LAST_MLS)
+
+partialclean::
+	rm -f *.cm? *.cm?? *~
+
+depend: beforedepend
+	$(CAMLDEP) $(INCLUDES) *.ml *.mli > .depend.plugin
+
+.SUFFIXES: .ml .mli .cmo .cmi .cmx
+
+.ml.cmo:
+	$(CAMLC) $(COMPFLAGS) -c $<
+
+.mli.cmi:
+	$(CAMLC) $(COMPFLAGS) -c $<
+
+include .depend.plugin
+
+

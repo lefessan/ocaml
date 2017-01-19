@@ -17,6 +17,8 @@ open Typedtree
 open Lambda
 
 val transl_class :
+  Lambda.locid -> (* memprof *)
+  Ident.t -> (* memprof: class_type id *)
   Ident.t list -> Ident.t ->
   string list -> class_expr -> Asttypes.virtual_flag -> lambda;;
 

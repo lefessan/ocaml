@@ -1,0 +1,4 @@
+patch add_function_argument {
+  fun_new_argument = "bool"
+  fun_names = [ "tree_of_typexp" ]
+}

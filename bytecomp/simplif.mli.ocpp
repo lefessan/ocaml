@@ -1,0 +1,7 @@
+
+patch add_function_argument {
+  fun_new_argument = "Memprof.locid"
+  fun_names = [
+    "split_default_wrapper"
+  ]
+}

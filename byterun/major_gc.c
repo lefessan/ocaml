@@ -34,6 +34,8 @@
 #include "caml/weak.h"
 #include "caml/hooks.h"
 
+#include "caml/ocp_gcprof.h"
+
 #if defined (NATIVE_CODE) && defined (NO_NAKED_POINTERS)
 #define NATIVE_CODE_AND_NO_NAKED_POINTERS
 #else
@@ -190,6 +192,7 @@ static void start_cycle (void)
   caml_darken_all_roots_start ();
   caml_gc_phase = Phase_mark;
   caml_gc_subphase = Subphase_mark_roots;
+  GCPROF_GC_PHASE(caml_gc_phase, caml_gc_subphase);
   markhp = NULL;
   ephe_list_pure = 1;
   ephes_checked_if_pure = &caml_ephe_list_head;
@@ -221,6 +224,7 @@ static void init_sweep_phase(void)
   caml_gc_sweep_hp = caml_heap_start;
   caml_fl_init_merge ();
   caml_gc_phase = Phase_sweep;
+  GCPROF_GC_PHASE(caml_gc_phase, caml_gc_subphase);
   chunk = caml_heap_start;
   caml_gc_sweep_hp = chunk;
   limit = chunk + Chunk_size (chunk);
@@ -456,6 +460,7 @@ static void mark_slice (intnat work)
       gray_vals_ptr = gray_vals_cur;
       if (work > 0){
         caml_gc_subphase = Subphase_mark_main;
+        GCPROF_GC_PHASE(caml_gc_phase, caml_gc_subphase);
       }
     } else if (*ephes_to_check != (value) NULL) {
       /* Continue to scan the list of ephe */
@@ -479,12 +484,14 @@ static void mark_slice (intnat work)
           /* Complete the marking */
           ephes_to_check = ephes_checked_if_pure;
           caml_gc_subphase = Subphase_mark_final;
+          GCPROF_GC_PHASE(caml_gc_phase, caml_gc_subphase);
       }
         break;
       case Subphase_mark_final: {
         /** The set of unreachable value will not change anymore for
             this cycle. Start clean phase. */
         caml_gc_phase = Phase_clean;
+        GCPROF_GC_PHASE(caml_gc_phase, caml_gc_subphase);
         caml_final_update_clean_phase ();
         if (caml_ephe_list_head != (value) NULL){
           /* Initialise the clean phase. */
@@ -571,6 +578,7 @@ static void sweep_slice (intnat work)
         ++ caml_stat_major_collections;
         work = 0;
         caml_gc_phase = Phase_idle;
+        GCPROF_GC_PHASE(caml_gc_phase, caml_gc_subphase);
         caml_request_minor_gc ();
       }else{
         caml_gc_sweep_hp = chunk;
@@ -876,6 +884,7 @@ void caml_init_major_heap (asize_t heap_size)
   caml_make_free_blocks ((value *) caml_heap_start,
                          caml_stat_heap_wsz, 1, Caml_white);
   caml_gc_phase = Phase_idle;
+  GCPROF_GC_PHASE(caml_gc_phase, caml_gc_subphase);
   gray_vals_size = 2048;
   gray_vals = (value *) malloc (gray_vals_size * sizeof (value));
   if (gray_vals == NULL)

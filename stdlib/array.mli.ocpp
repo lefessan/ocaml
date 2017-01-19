@@ -1,0 +1,4 @@
+patch add_primitive_flags {
+  prim_flags = [ "memprof" ]
+  prim_names = [ "caml_make_vect" ]
+}

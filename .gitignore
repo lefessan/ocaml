@@ -372,3 +372,4 @@
 /yacc/version.h
 /yacc/.gdb_history
 /asmrun/cplugins.c
+*.log

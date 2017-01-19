@@ -20,7 +20,8 @@ LINKEDFILES=misc.c freelist.c major_gc.c minor_gc.c memory.c alloc.c array.c \
   parsing.c gc_ctrl.c terminfo.c md5.c obj.c lexing.c printexc.c callback.c \
   weak.c compact.c finalise.c meta.c custom.c main.c globroots.c cplugins.c \
   $(UNIX_OR_WIN32).c dynlink.c signals.c debugger.c startup_aux.c \
-  backtrace.c afl.c
+  backtrace.c afl.c \
+  ocp_memprof.c ocp_utils.c ocp_gcprof.c ocp_win.c
 
 INSTALL_LIBDIR=$(DESTDIR)$(LIBDIR)
 
@@ -77,7 +78,8 @@ COBJS=startup_aux.$(O) startup.$(O) main.$(O) fail.$(O)		\
   custom.$(O) globroots.$(O) backtrace_prim.$(O) backtrace.$(O)		\
   natdynlink.$(O) debugger.$(O) meta.$(O) dynlink.$(O) cplugins.$(O)    \
   clambda_checks.$(O) spacetime.$(O) spacetime_snapshot.$(O)		\
-  spacetime_offline.$(O) afl.$(O)
+  spacetime_offline.$(O) afl.$(O) \
+  ocp_memprof.$(O) ocp_utils.$(O) ocp_gcprof.$(O) ocp_win.$(O)
 
 OBJS=$(COBJS) $(ASMOBJS)
 
@@ -180,10 +182,10 @@ distclean: clean
 ifneq "$(TOOLCHAIN)" "msvc"
 .PHONY: depend
 depend: $(COBJS:.$(O)=.c) $(LINKEDFILES)
-	$(CC) -MM $(FLAGS) *.c > .depend
-	$(CC) -MM $(FLAGS) -DPROFILING *.c | sed -e 's/\.o/.p.o/' >> .depend
-	$(CC) -MM $(FLAGS) -DDEBUG *.c | sed -e 's/\.o/.d.o)/' >> .depend
-	$(CC) -MM $(FLAGS) -DCAML_INSTR *.c | sed -e 's/\.o/.i.o' >> .depend
+	$(CC) -MM $(FLAGS) *.c > .depend.memprof
+	$(CC) -MM $(FLAGS) -DPROFILING *.c | sed -e 's/\.o/.p.o/' >> .depend.memprof
+	$(CC) -MM $(FLAGS) -DDEBUG *.c | sed -e 's/\.o/.d.o)/' >> .depend.memprof
+	$(CC) -MM $(FLAGS) -DCAML_INSTR *.c | sed -e 's/\.o/.i.o/' >> .depend.memprof
 endif
 
 ifeq "$(UNIX_OR_WIN32)" "win32"
@@ -193,5 +195,5 @@ ifeq "$(UNIX_OR_WIN32)" "win32"
 include .depend.nt
 
 else
-include .depend
+include .depend.memprof
 endif

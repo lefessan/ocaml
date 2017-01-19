@@ -25,7 +25,7 @@
 #include "mlvalues.h"
 
 #ifdef CAML_INTERNALS
-#include "io.h"
+#include "caml_io.h"
 
 /* Magic number */
 

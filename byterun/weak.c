@@ -286,7 +286,8 @@ CAMLprim value caml_ephe_get_key_copy (value ar, value n)
   if (is_ephe_key_none(ar, offset)) CAMLreturn (None_val);
   v = Field (ar, offset);
   if (Is_block (v) && Is_in_heap_or_young(v)) {
-    elt = caml_alloc (Wosize_val (v), Tag_val (v));
+    elt = caml_alloc_with_profinfo (Wosize_val (v), Tag_val (v),
+                                    Profinfo_val(v) );
           /* The GC may erase or move v during this call to caml_alloc. */
     v = Field (ar, offset);
     if (is_ephe_key_none(ar, offset)) CAMLreturn (None_val);
@@ -327,7 +328,8 @@ CAMLprim value caml_ephe_get_data_copy (value ar)
   if (caml_gc_phase == Phase_clean) caml_ephe_clean(ar);
   if (v == caml_ephe_none) CAMLreturn (None_val);
   if (Is_block (v) && Is_in_heap_or_young(v)) {
-    elt = caml_alloc (Wosize_val (v), Tag_val (v));
+    elt = caml_alloc_with_profinfo (Wosize_val (v), Tag_val (v),
+                                    Profinfo_val(v) );
           /* The GC may erase or move v during this call to caml_alloc. */
     v = Field (ar, offset);
     if (caml_gc_phase == Phase_clean) caml_ephe_clean(ar);

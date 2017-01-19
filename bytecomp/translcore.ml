@@ -24,6 +24,10 @@ open Typedtree
 open Typeopt
 open Lambda
 
+let nolocid = Memprof.nolocid
+let locid = Memprof.nolocid
+let flocid = locid
+
 type error =
     Illegal_letrec_pat
   | Illegal_letrec_expr
@@ -37,17 +41,20 @@ let use_dup_for_constant_arrays_bigger_than = 4
 
 (* Forward declaration -- to be filled in by Translmod.transl_module *)
 let transl_module =
-  ref((fun _cc _rootpath _modl -> assert false) :
+  ref((fun _lp _cc _rootpath _modl -> assert false) :
+         Lambda.location ->
       module_coercion -> Path.t option -> module_expr -> lambda)
 
 let transl_object =
-  ref (fun _id _s _cl -> assert false :
+  ref (fun _locid _id _s _cl -> assert false :
+    Lambda.locid ->
        Ident.t -> string list -> class_expr -> lambda)
 
 (* Compile an exception/extension definition *)
 
 let prim_fresh_oo_id =
-  Pccall (Primitive.simple ~name:"caml_fresh_oo_id" ~arity:1 ~alloc:false)
+  Pccall (Primitive.simple ~name:"caml_fresh_oo_id" ~arity:1 ~alloc:false,
+  nolocid)
 
 let transl_extension_constructor env path ext =
   let name =
@@ -57,6 +64,12 @@ let transl_extension_constructor env path ext =
     | Some p, Some pack -> Printf.sprintf "%s.%s" pack (Path.name p)
   in
   let loc = ext.ext_loc in
+  let locid =
+    let path = match path with
+      | None -> Path.Pident (Ident.create "<local>")
+      | Some path -> path
+    in
+    Memprof.internal loc path "extension_constructor" in
   match ext.ext_kind with
     Text_decl _ ->
       Lprim (Pmakeblock (Obj.object_tag, Immutable, None),
@@ -162,200 +175,207 @@ let comparisons_table = create_hashtable 11 [
        false)
 ]
 
-let primitives_table = create_hashtable 57 [
-  "%identity", Pidentity;
-  "%bytes_to_string", Pbytes_to_string;
-  "%bytes_of_string", Pbytes_of_string;
-  "%ignore", Pignore;
-  "%revapply", Prevapply;
-  "%apply", Pdirapply;
-  "%loc_LOC", Ploc Loc_LOC;
-  "%loc_FILE", Ploc Loc_FILE;
-  "%loc_LINE", Ploc Loc_LINE;
-  "%loc_POS", Ploc Loc_POS;
-  "%loc_MODULE", Ploc Loc_MODULE;
-  "%field0", Pfield 0;
-  "%field1", Pfield 1;
-  "%setfield0", Psetfield(0, Pointer, Assignment);
-  "%makeblock", Pmakeblock(0, Immutable, None);
-  "%makemutable", Pmakeblock(0, Mutable, None);
-  "%raise", Praise Raise_regular;
-  "%reraise", Praise Raise_reraise;
-  "%raise_notrace", Praise Raise_notrace;
-  "%sequand", Psequand;
-  "%sequor", Psequor;
-  "%boolnot", Pnot;
-  "%big_endian", Pctconst Big_endian;
-  "%backend_type", Pctconst Backend_type;
-  "%word_size", Pctconst Word_size;
-  "%int_size", Pctconst Int_size;
-  "%max_wosize", Pctconst Max_wosize;
-  "%ostype_unix", Pctconst Ostype_unix;
-  "%ostype_win32", Pctconst Ostype_win32;
-  "%ostype_cygwin", Pctconst Ostype_cygwin;
-  "%negint", Pnegint;
-  "%succint", Poffsetint 1;
-  "%predint", Poffsetint(-1);
-  "%addint", Paddint;
-  "%subint", Psubint;
-  "%mulint", Pmulint;
-  "%divint", Pdivint Safe;
-  "%modint", Pmodint Safe;
-  "%andint", Pandint;
-  "%orint", Porint;
-  "%xorint", Pxorint;
-  "%lslint", Plslint;
-  "%lsrint", Plsrint;
-  "%asrint", Pasrint;
-  "%eq", Pintcomp Ceq;
-  "%noteq", Pintcomp Cneq;
-  "%ltint", Pintcomp Clt;
-  "%leint", Pintcomp Cle;
-  "%gtint", Pintcomp Cgt;
-  "%geint", Pintcomp Cge;
-  "%incr", Poffsetref(1);
-  "%decr", Poffsetref(-1);
-  "%intoffloat", Pintoffloat;
-  "%floatofint", Pfloatofint;
-  "%negfloat", Pnegfloat;
-  "%absfloat", Pabsfloat;
-  "%addfloat", Paddfloat;
-  "%subfloat", Psubfloat;
-  "%mulfloat", Pmulfloat;
-  "%divfloat", Pdivfloat;
-  "%eqfloat", Pfloatcomp Ceq;
-  "%noteqfloat", Pfloatcomp Cneq;
-  "%ltfloat", Pfloatcomp Clt;
-  "%lefloat", Pfloatcomp Cle;
-  "%gtfloat", Pfloatcomp Cgt;
-  "%gefloat", Pfloatcomp Cge;
-  "%string_length", Pstringlength;
-  "%string_safe_get", Pstringrefs;
-  "%string_unsafe_get", Pstringrefu;
-  "%bytes_length", Pbyteslength;
-  "%bytes_safe_get", Pbytesrefs;
-  "%bytes_safe_set", Pbytessets;
-  "%bytes_unsafe_get", Pbytesrefu;
-  "%bytes_unsafe_set", Pbytessetu;
-  "%array_length", Parraylength Pgenarray;
-  "%array_safe_get", Parrayrefs Pgenarray;
-  "%array_safe_set", Parraysets Pgenarray;
-  "%array_unsafe_get", Parrayrefu Pgenarray;
-  "%array_unsafe_set", Parraysetu Pgenarray;
-  "%obj_size", Parraylength Pgenarray;
-  "%obj_field", Parrayrefu Pgenarray;
-  "%obj_set_field", Parraysetu Pgenarray;
-  "%obj_is_int", Pisint;
-  "%lazy_force", Plazyforce;
-  "%nativeint_of_int", Pbintofint Pnativeint;
-  "%nativeint_to_int", Pintofbint Pnativeint;
-  "%nativeint_neg", Pnegbint Pnativeint;
-  "%nativeint_add", Paddbint Pnativeint;
-  "%nativeint_sub", Psubbint Pnativeint;
-  "%nativeint_mul", Pmulbint Pnativeint;
-  "%nativeint_div", Pdivbint { size = Pnativeint; is_safe = Safe };
-  "%nativeint_mod", Pmodbint { size = Pnativeint; is_safe = Safe };
-  "%nativeint_and", Pandbint Pnativeint;
-  "%nativeint_or",  Porbint Pnativeint;
-  "%nativeint_xor", Pxorbint Pnativeint;
-  "%nativeint_lsl", Plslbint Pnativeint;
-  "%nativeint_lsr", Plsrbint Pnativeint;
-  "%nativeint_asr", Pasrbint Pnativeint;
-  "%int32_of_int", Pbintofint Pint32;
-  "%int32_to_int", Pintofbint Pint32;
-  "%int32_neg", Pnegbint Pint32;
-  "%int32_add", Paddbint Pint32;
-  "%int32_sub", Psubbint Pint32;
-  "%int32_mul", Pmulbint Pint32;
-  "%int32_div", Pdivbint { size = Pint32; is_safe = Safe };
-  "%int32_mod", Pmodbint { size = Pint32; is_safe = Safe };
-  "%int32_and", Pandbint Pint32;
-  "%int32_or",  Porbint Pint32;
-  "%int32_xor", Pxorbint Pint32;
-  "%int32_lsl", Plslbint Pint32;
-  "%int32_lsr", Plsrbint Pint32;
-  "%int32_asr", Pasrbint Pint32;
-  "%int64_of_int", Pbintofint Pint64;
-  "%int64_to_int", Pintofbint Pint64;
-  "%int64_neg", Pnegbint Pint64;
-  "%int64_add", Paddbint Pint64;
-  "%int64_sub", Psubbint Pint64;
-  "%int64_mul", Pmulbint Pint64;
-  "%int64_div", Pdivbint { size = Pint64; is_safe = Safe };
-  "%int64_mod", Pmodbint { size = Pint64; is_safe = Safe };
-  "%int64_and", Pandbint Pint64;
-  "%int64_or",  Porbint Pint64;
-  "%int64_xor", Pxorbint Pint64;
-  "%int64_lsl", Plslbint Pint64;
-  "%int64_lsr", Plsrbint Pint64;
-  "%int64_asr", Pasrbint Pint64;
-  "%nativeint_of_int32", Pcvtbint(Pint32, Pnativeint);
-  "%nativeint_to_int32", Pcvtbint(Pnativeint, Pint32);
-  "%int64_of_int32", Pcvtbint(Pint32, Pint64);
-  "%int64_to_int32", Pcvtbint(Pint64, Pint32);
-  "%int64_of_nativeint", Pcvtbint(Pnativeint, Pint64);
-  "%int64_to_nativeint", Pcvtbint(Pint64, Pnativeint);
-  "%caml_ba_ref_1",
+  (*
+let create_hashtable3 n l =
+  create_hashtable n (List.map (fun (x,y,z) -> x, (y,z)) l)
+  *)
+
+let primitives_table prim_name =
+  let lp = locid.Memprof.loc in
+  match prim_name with
+| "%identity" -> Pidentity
+| "%bytes_to_string" -> Pbytes_to_string
+| "%bytes_of_string" -> Pbytes_of_string
+| "%ignore" -> Pignore
+| "%revapply" -> Prevapply
+| "%apply" -> Pdirapply
+| "%loc_LOC" -> Ploc Loc_LOC
+| "%loc_FILE" -> Ploc Loc_FILE
+| "%loc_LINE" -> Ploc Loc_LINE
+| "%loc_POS" -> Ploc Loc_POS
+| "%loc_MODULE" -> Ploc Loc_MODULE
+| "%field0" -> Pfield 0;
+| "%field1" -> Pfield 1;
+| "%setfield0" -> Psetfield(0, Pointer, Assignment);
+| "%makeblock" -> Pmakeblock(0, Immutable, None);
+| "%makemutable" -> Pmakeblock(0, Mutable, None);
+| "%raise" -> Praise Raise_regular;
+| "%reraise" -> Praise Raise_reraise;
+| "%raise_notrace" -> Praise Raise_notrace;
+| "%sequand" -> Psequand;
+| "%sequor" -> Psequor;
+| "%boolnot" -> Pnot;
+| "%big_endian" -> Pctconst Big_endian;
+| "%backend_type" -> Pctconst Backend_type;
+| "%word_size" -> Pctconst Word_size;
+| "%int_size" -> Pctconst Int_size;
+| "%max_wosize" -> Pctconst Max_wosize;
+| "%ostype_unix" -> Pctconst Ostype_unix;
+| "%ostype_win32" -> Pctconst Ostype_win32;
+| "%ostype_cygwin" -> Pctconst Ostype_cygwin;
+| "%negint" -> Pnegint;
+| "%succint" -> Poffsetint 1;
+| "%predint" -> Poffsetint(-1);
+| "%addint" -> Paddint;
+| "%subint" -> Psubint;
+| "%mulint" -> Pmulint;
+| "%divint" -> Pdivint Safe;
+| "%modint" -> Pmodint Safe;
+| "%andint" -> Pandint;
+| "%orint" -> Porint;
+| "%xorint" -> Pxorint;
+| "%lslint" -> Plslint;
+| "%lsrint" -> Plsrint;
+| "%asrint" -> Pasrint;
+| "%eq" -> Pintcomp Ceq;
+| "%noteq" -> Pintcomp Cneq;
+| "%ltint" -> Pintcomp Clt;
+| "%leint" -> Pintcomp Cle;
+| "%gtint" -> Pintcomp Cgt;
+| "%geint" -> Pintcomp Cge;
+| "%incr" -> Poffsetref(1);
+| "%decr" -> Poffsetref(-1);
+| "%intoffloat" -> Pintoffloat;
+| "%floatofint" -> Pfloatofint;
+| "%negfloat" -> Pnegfloat;
+| "%absfloat" -> Pabsfloat;
+| "%addfloat" -> Paddfloat;
+| "%subfloat" -> Psubfloat;
+| "%mulfloat" -> Pmulfloat;
+| "%divfloat" -> Pdivfloat;
+| "%eqfloat" -> Pfloatcomp Ceq;
+| "%noteqfloat" -> Pfloatcomp Cneq;
+| "%ltfloat" -> Pfloatcomp Clt;
+| "%lefloat" -> Pfloatcomp Cle;
+| "%gtfloat" -> Pfloatcomp Cgt;
+| "%gefloat" -> Pfloatcomp Cge;
+| "%string_length" -> Pstringlength;
+| "%string_safe_get" -> Pstringrefs;
+| "%string_unsafe_get" -> Pstringrefu;
+| "%bytes_length" -> Pbyteslength;
+| "%bytes_safe_get" -> Pbytesrefs;
+| "%bytes_safe_set" -> Pbytessets;
+| "%bytes_unsafe_get" -> Pbytesrefu;
+| "%bytes_unsafe_set" -> Pbytessetu;
+| "%array_length" -> Parraylength Pgenarray;
+| "%array_safe_get" -> Parrayrefs Pgenarray;
+| "%array_safe_set" -> Parraysets Pgenarray;
+| "%array_unsafe_get" -> Parrayrefu Pgenarray;
+| "%array_unsafe_set" -> Parraysetu Pgenarray;
+| "%obj_size" -> Parraylength Pgenarray;
+| "%obj_field" -> Parrayrefu Pgenarray;
+| "%obj_set_field" -> Parraysetu Pgenarray;
+| "%obj_is_int" -> Pisint;
+| "%lazy_force" -> Plazyforce;
+| "%nativeint_of_int" -> Pbintofint Pnativeint;
+| "%nativeint_to_int" -> Pintofbint Pnativeint;
+| "%nativeint_neg" -> Pnegbint Pnativeint;
+| "%nativeint_add" -> Paddbint Pnativeint;
+| "%nativeint_sub" -> Psubbint Pnativeint;
+| "%nativeint_mul" -> Pmulbint Pnativeint;
+| "%nativeint_div" -> Pdivbint { size = Pnativeint; is_safe = Safe };
+| "%nativeint_mod" -> Pmodbint { size = Pnativeint; is_safe = Safe };
+| "%nativeint_and" -> Pandbint Pnativeint;
+| "%nativeint_or" ->  Porbint Pnativeint;
+| "%nativeint_xor" -> Pxorbint Pnativeint;
+| "%nativeint_lsl" -> Plslbint Pnativeint;
+| "%nativeint_lsr" -> Plsrbint Pnativeint;
+| "%nativeint_asr" -> Pasrbint Pnativeint;
+| "%int32_of_int" -> Pbintofint Pint32;
+| "%int32_to_int" -> Pintofbint Pint32;
+| "%int32_neg" -> Pnegbint Pint32;
+| "%int32_add" -> Paddbint Pint32;
+| "%int32_sub" -> Psubbint Pint32;
+| "%int32_mul" -> Pmulbint Pint32;
+| "%int32_div" -> Pdivbint { size = Pint32; is_safe = Safe };
+| "%int32_mod" -> Pmodbint { size = Pint32; is_safe = Safe };
+| "%int32_and" -> Pandbint Pint32;
+| "%int32_or" ->  Porbint Pint32;
+| "%int32_xor" -> Pxorbint Pint32;
+| "%int32_lsl" -> Plslbint Pint32;
+| "%int32_lsr" -> Plsrbint Pint32;
+| "%int32_asr" -> Pasrbint Pint32;
+| "%int64_of_int" -> Pbintofint Pint64;
+| "%int64_to_int" -> Pintofbint Pint64;
+| "%int64_neg" -> Pnegbint Pint64;
+| "%int64_add" -> Paddbint Pint64;
+| "%int64_sub" -> Psubbint Pint64;
+| "%int64_mul" -> Pmulbint Pint64;
+| "%int64_div" -> Pdivbint { size = Pint64; is_safe = Safe };
+| "%int64_mod" -> Pmodbint { size = Pint64; is_safe = Safe };
+| "%int64_and" -> Pandbint Pint64;
+| "%int64_or" ->  Porbint Pint64;
+| "%int64_xor" -> Pxorbint Pint64;
+| "%int64_lsl" -> Plslbint Pint64;
+| "%int64_lsr" -> Plsrbint Pint64;
+| "%int64_asr" -> Pasrbint Pint64;
+| "%nativeint_of_int32" -> Pcvtbint(Pint32, Pnativeint);
+| "%nativeint_to_int32" -> Pcvtbint(Pnativeint, Pint32);
+| "%int64_of_int32" -> Pcvtbint(Pint32, Pint64);
+| "%int64_to_int32" -> Pcvtbint(Pint64, Pint32);
+| "%int64_of_nativeint" -> Pcvtbint(Pnativeint, Pint64);
+| "%int64_to_nativeint" -> Pcvtbint(Pint64, Pnativeint);
+| "%caml_ba_ref_1" ->
     Pbigarrayref(false, 1, Pbigarray_unknown, Pbigarray_unknown_layout);
-  "%caml_ba_ref_2",
+| "%caml_ba_ref_2" ->
     Pbigarrayref(false, 2, Pbigarray_unknown, Pbigarray_unknown_layout);
-  "%caml_ba_ref_3",
+| "%caml_ba_ref_3" ->
     Pbigarrayref(false, 3, Pbigarray_unknown, Pbigarray_unknown_layout);
-  "%caml_ba_set_1",
+| "%caml_ba_set_1" ->
     Pbigarrayset(false, 1, Pbigarray_unknown, Pbigarray_unknown_layout);
-  "%caml_ba_set_2",
+| "%caml_ba_set_2" ->
     Pbigarrayset(false, 2, Pbigarray_unknown, Pbigarray_unknown_layout);
-  "%caml_ba_set_3",
+| "%caml_ba_set_3" ->
     Pbigarrayset(false, 3, Pbigarray_unknown, Pbigarray_unknown_layout);
-  "%caml_ba_unsafe_ref_1",
+| "%caml_ba_unsafe_ref_1" ->
     Pbigarrayref(true, 1, Pbigarray_unknown, Pbigarray_unknown_layout);
-  "%caml_ba_unsafe_ref_2",
+| "%caml_ba_unsafe_ref_2" ->
     Pbigarrayref(true, 2, Pbigarray_unknown, Pbigarray_unknown_layout);
-  "%caml_ba_unsafe_ref_3",
+| "%caml_ba_unsafe_ref_3" ->
     Pbigarrayref(true, 3, Pbigarray_unknown, Pbigarray_unknown_layout);
-  "%caml_ba_unsafe_set_1",
+| "%caml_ba_unsafe_set_1" ->
     Pbigarrayset(true, 1, Pbigarray_unknown, Pbigarray_unknown_layout);
-  "%caml_ba_unsafe_set_2",
+| "%caml_ba_unsafe_set_2" ->
     Pbigarrayset(true, 2, Pbigarray_unknown, Pbigarray_unknown_layout);
-  "%caml_ba_unsafe_set_3",
+| "%caml_ba_unsafe_set_3" ->
     Pbigarrayset(true, 3, Pbigarray_unknown, Pbigarray_unknown_layout);
-  "%caml_ba_dim_1", Pbigarraydim(1);
-  "%caml_ba_dim_2", Pbigarraydim(2);
-  "%caml_ba_dim_3", Pbigarraydim(3);
-  "%caml_string_get16", Pstring_load_16(false);
-  "%caml_string_get16u", Pstring_load_16(true);
-  "%caml_string_get32", Pstring_load_32(false);
-  "%caml_string_get32u", Pstring_load_32(true);
-  "%caml_string_get64", Pstring_load_64(false);
-  "%caml_string_get64u", Pstring_load_64(true);
-  "%caml_string_set16", Pstring_set_16(false);
-  "%caml_string_set16u", Pstring_set_16(true);
-  "%caml_string_set32", Pstring_set_32(false);
-  "%caml_string_set32u", Pstring_set_32(true);
-  "%caml_string_set64", Pstring_set_64(false);
-  "%caml_string_set64u", Pstring_set_64(true);
-  "%caml_bigstring_get16", Pbigstring_load_16(false);
-  "%caml_bigstring_get16u", Pbigstring_load_16(true);
-  "%caml_bigstring_get32", Pbigstring_load_32(false);
-  "%caml_bigstring_get32u", Pbigstring_load_32(true);
-  "%caml_bigstring_get64", Pbigstring_load_64(false);
-  "%caml_bigstring_get64u", Pbigstring_load_64(true);
-  "%caml_bigstring_set16", Pbigstring_set_16(false);
-  "%caml_bigstring_set16u", Pbigstring_set_16(true);
-  "%caml_bigstring_set32", Pbigstring_set_32(false);
-  "%caml_bigstring_set32u", Pbigstring_set_32(true);
-  "%caml_bigstring_set64", Pbigstring_set_64(false);
-  "%caml_bigstring_set64u", Pbigstring_set_64(true);
-  "%bswap16", Pbswap16;
-  "%bswap_int32", Pbbswap(Pint32);
-  "%bswap_int64", Pbbswap(Pint64);
-  "%bswap_native", Pbbswap(Pnativeint);
-  "%int_as_pointer", Pint_as_pointer;
-  "%opaque", Popaque;
-]
+| "%caml_ba_dim_1" -> Pbigarraydim(1);
+| "%caml_ba_dim_2" -> Pbigarraydim(2);
+| "%caml_ba_dim_3" -> Pbigarraydim(3);
+| "%caml_string_get16" -> Pstring_load_16(false);
+| "%caml_string_get16u" -> Pstring_load_16(true);
+| "%caml_string_get32" -> Pstring_load_32(false);
+| "%caml_string_get32u" -> Pstring_load_32(true);
+| "%caml_string_get64" -> Pstring_load_64(false);
+| "%caml_string_get64u" -> Pstring_load_64(true);
+| "%caml_string_set16" -> Pstring_set_16(false);
+| "%caml_string_set16u" -> Pstring_set_16(true);
+| "%caml_string_set32" -> Pstring_set_32(false);
+| "%caml_string_set32u" -> Pstring_set_32(true);
+| "%caml_string_set64" -> Pstring_set_64(false);
+| "%caml_string_set64u" -> Pstring_set_64(true);
+| "%caml_bigstring_get16" -> Pbigstring_load_16(false);
+| "%caml_bigstring_get16u" -> Pbigstring_load_16(true);
+| "%caml_bigstring_get32" -> Pbigstring_load_32(false);
+| "%caml_bigstring_get32u" -> Pbigstring_load_32(true);
+| "%caml_bigstring_get64" -> Pbigstring_load_64(false);
+| "%caml_bigstring_get64u" -> Pbigstring_load_64(true);
+| "%caml_bigstring_set16" -> Pbigstring_set_16(false);
+| "%caml_bigstring_set16u" -> Pbigstring_set_16(true);
+| "%caml_bigstring_set32" -> Pbigstring_set_32(false);
+| "%caml_bigstring_set32u" -> Pbigstring_set_32(true);
+| "%caml_bigstring_set64" -> Pbigstring_set_64(false);
+| "%caml_bigstring_set64u" -> Pbigstring_set_64(true);
+| "%bswap16" -> Pbswap16;
+| "%bswap_int32" -> Pbbswap(Pint32);
+| "%bswap_int64" -> Pbbswap(Pint64);
+| "%bswap_native" -> Pbbswap(Pnativeint);
+| "%int_as_pointer" -> Pint_as_pointer;
+| "%opaque" -> Popaque
+| _ -> raise Not_found
 
 let find_primitive prim_name =
-  Hashtbl.find primitives_table prim_name
+  (* Hashtbl.find *) primitives_table prim_name
 
 let specialize_comparison table env ty =
   let (gencomp, intcomp, floatcomp, stringcomp, bytescomp,
@@ -428,7 +448,7 @@ let add_used_primitive loc env path =
       then Hashtbl.add used_primitives path loc
   | _ -> ()
 
-let transl_primitive loc p env ty path =
+let transl_primitive lp loc p env ty path =
   let prim =
     try specialize_primitive p env ty ~has_constant_constructor:false
     with Not_found ->
@@ -441,28 +461,41 @@ let transl_primitive loc p env ty path =
       Lfunction{kind = Curried; params = [parm];
                 body = Matching.inline_lazy_force (Lvar parm) Location.none;
                 loc = loc;
-                attr = default_stub_attribute }
+                attr = default_stub_attribute;
+                flocid = Memprof.wrapper loc lp.p "%lazy_force";
+               }
   | Ploc kind ->
     let lam = lam_of_loc kind loc in
     begin match p.prim_arity with
       | 0 -> lam
       | 1 -> (* TODO: we should issue a warning ? *)
         let param = Ident.create "prim" in
+        let locid = Memprof.wrapper loc lp.p "%loc" in
         Lfunction{kind = Curried; params = [param];
                   attr = default_stub_attribute;
                   loc = loc;
                   body = Lprim(Pmakeblock(0, Immutable, None),
-                               [lam; Lvar param], loc)}
+                               [lam; Lvar param], loc);
+                  flocid = locid;
+                 }
       | _ -> assert false
     end
   | _ ->
+    let prim = match prim with
+      | Pccall ({ prim_alloc = true } as p) ->
+        let locid = Memprof.cprim loc lp.p p.prim_name in
+        Pccall p
+      | _ -> prim
+    in
       let rec make_params n =
         if n <= 0 then [] else Ident.create "prim" :: make_params (n-1) in
       let params = make_params p.prim_arity in
       Lfunction{ kind = Curried; params;
                  attr = default_stub_attribute;
                  loc = loc;
-                 body = Lprim(prim, List.map (fun id -> Lvar id) params, loc) }
+                 body = Lprim(prim, List.map (fun id -> Lvar id) params, loc);
+                 flocid = Memprof.wrapper loc lp.p p.prim_name;
+               }
 
 let transl_primitive_application loc prim env ty path args =
   let prim_name = prim.prim_name in
@@ -489,9 +522,9 @@ let check_recursive_lambda idlist lam =
     | Lvar v -> not (List.mem v idlist)
     | Llet _ as lam when check_recursive_recordwith idlist lam ->
         true
-    | Llet(_str, _k, id, arg, body) ->
+    | Llet(_str, _k, id, arg, body, _lp) ->
         check idlist arg && check_top (add_let id arg idlist) body
-    | Lletrec(bindings, body) ->
+    | Lletrec(bindings, body, _locid) ->
         let idlist' = add_letrec bindings idlist in
         List.for_all (fun (_id, arg) -> check idlist' arg) bindings &&
         check_top idlist' body
@@ -507,9 +540,9 @@ let check_recursive_lambda idlist lam =
     | Lfunction _ -> true
     | Llet _ as lam when check_recursive_recordwith idlist lam ->
         true
-    | Llet(_str, _k, id, arg, body) ->
+    | Llet(_str, _k, id, arg, body, _lp) ->
         check idlist arg && check (add_let id arg idlist) body
-    | Lletrec(bindings, body) ->
+    | Lletrec(bindings, body, _locid) ->
         let idlist' = add_letrec bindings idlist in
         List.for_all (fun (_id, arg) -> check idlist' arg) bindings &&
         check idlist' body
@@ -537,7 +570,7 @@ let check_recursive_lambda idlist lam =
   (* reverse-engineering the code generated by transl_record case 2 *)
   (* If you change this, you probably need to change Bytegen.size_of_lambda. *)
   and check_recursive_recordwith idlist = function
-    | Llet (Strict, _k, id1, Lprim (Pduprecord _, [e1], _), body) ->
+    | Llet (Strict, _k, id1, Lprim (Pduprecord _, [e1], _), body, _lp) ->
        check_top idlist e1
        && check_recordwith_updates idlist id1 body
     | _ -> false
@@ -630,7 +663,7 @@ let rec push_defaults loc bindings cases partial =
 (* Insertion of debugging events *)
 
 let event_before exp lam = match lam with
-| Lstaticraise (_,_) -> lam
+| Lstaticraise (_,_,_lp) -> lam
 | _ ->
   if !Clflags.debug && not !Clflags.native_code
   then Levent(lam, {lev_loc = exp.exp_loc;
@@ -699,9 +732,12 @@ let rec transl_exp e =
     | _ -> true
   in
   if eval_once then transl_exp0 e else
+  (*  (newl lp e.exp_loc) *)
   Translobj.oo_wrap e.exp_env true transl_exp0 e
 
 and transl_exp0 e =
+  let lp = newl lp e.exp_loc in
+  let expr_locid = Memprof.locid lp.l lp.p e.exp_type in
   match e.exp_desc with
     Texp_ident(path, _, {val_kind = Val_prim p}) ->
       let public_send = p.prim_name = "%send" in
@@ -711,7 +747,9 @@ and transl_exp0 e =
         Lfunction{kind = Curried; params = [obj; meth];
                   attr = default_stub_attribute;
                   loc = e.exp_loc;
-                  body = Lsend(kind, Lvar meth, Lvar obj, [], e.exp_loc)}
+                  body = Lsend(kind, Lvar meth, Lvar obj, [], e.exp_loc);
+                  flocid = expr_locid;
+                 }
       else if p.prim_name = "%sendcache" then
         let obj = Ident.create "obj" and meth = Ident.create "meth" in
         let cache = Ident.create "cache" and pos = Ident.create "pos" in
@@ -719,9 +757,11 @@ and transl_exp0 e =
                   attr = default_stub_attribute;
                   loc = e.exp_loc;
                   body = Lsend(Cached, Lvar meth, Lvar obj,
-                               [Lvar cache; Lvar pos], e.exp_loc)}
+                               [Lvar cache; Lvar pos], e.exp_loc);
+                  flocid = expr_locid;
+                 }
       else
-        transl_primitive e.exp_loc p e.exp_env e.exp_type (Some path)
+        transl_primitive lp lp.l p e.exp_env e.exp_type (Some path)
   | Texp_ident(_, _, {val_kind = Val_anc _}) ->
       raise(Error(e.exp_loc, Free_super_var))
   | Texp_ident(path, _, {val_kind = Val_reg | Val_self _}) ->
@@ -746,7 +786,8 @@ and transl_exp0 e =
       }
       in
       let loc = e.exp_loc in
-      Lfunction{kind; params; body; attr; loc}
+      let flocid = expr_locid in
+      Lfunction{kind; params; body; attr; loc; flocid}
   | Texp_apply({ exp_desc = Texp_ident(path, _, {val_kind = Val_prim p});
                 exp_type = prim_type } as funct, oargs)
     when List.length oargs >= p.prim_arity
@@ -774,7 +815,7 @@ and transl_exp0 e =
         if args' = [] then f else wrap f in
       let args =
          List.map (function _, Some x -> x | _ -> assert false) args in
-      let argl = transl_list args in
+      let argl = transl_list lp args in
       let public_send = p.prim_name = "%send"
         || not !Clflags.native_code && p.prim_name = "%sendcache"in
       if public_send || p.prim_name = "%sendself" then
@@ -836,14 +877,14 @@ and transl_exp0 e =
       Ltrywith(transl_exp body, id,
                Matching.for_trywith (Lvar id) (transl_cases_try pat_expr_list))
   | Texp_tuple el ->
-      let ll, shape = transl_list_with_shape el in
+      let ll, shape = transl_list_with_shape lp el in
       begin try
         Lconst(Const_block(0, List.map extract_constant ll))
       with Not_constant ->
         Lprim(Pmakeblock(0, Immutable, Some shape), ll, e.exp_loc)
       end
   | Texp_construct(_, cstr, args) ->
-      let ll, shape = transl_list_with_shape args in
+      let ll, shape = transl_list_with_shape lp args in
       if cstr.cstr_inlined <> None then begin match ll with
         | [x] -> x
         | _ -> assert false
@@ -907,7 +948,7 @@ and transl_exp0 e =
       Lprim(access, [transl_exp arg; transl_exp newval], e.exp_loc)
   | Texp_array expr_list ->
       let kind = array_kind e in
-      let ll = transl_list expr_list in
+      let ll = transl_list lp expr_list in
       begin try
         (* For native code the decision as to which compilation strategy to
            use is made later.  This enables the Flambda passes to lift certain
@@ -983,7 +1024,9 @@ and transl_exp0 e =
              ap_func=Lprim(Pfield 0, [transl_path ~loc e.exp_env cl], loc);
              ap_args=[lambda_unit];
              ap_inlined=Default_inline;
-             ap_specialised=Default_specialise}
+             ap_specialised=Default_specialise;
+             ap_lp = lp;
+            }
   | Texp_instvar(path_self, path, _) ->
       Lprim(Parrayrefu Paddrarray,
             [transl_normal_path path_self; transl_normal_path path], e.exp_loc)
@@ -997,7 +1040,9 @@ and transl_exp0 e =
                   ap_func=Translobj.oo_prim "copy";
                   ap_args=[transl_normal_path path_self];
                   ap_inlined=Default_inline;
-                  ap_specialised=Default_specialise},
+                  ap_specialised=Default_specialise;
+                  ap_lp = lp;
+                 },
            List.fold_right
              (fun (path, _, expr) rem ->
                 Lsequence(transl_setinstvar Location.none
@@ -1006,14 +1051,14 @@ and transl_exp0 e =
              (Lvar cpy))
   | Texp_letmodule(id, _, modl, body) ->
       Llet(Strict, Pgenval, id,
-           !transl_module Tcoerce_none None modl,
+           !transl_module lp Tcoerce_none None modl,
            transl_exp body)
   | Texp_letexception(cd, body) ->
       Llet(Strict, Pgenval,
            cd.ext_id, transl_extension_constructor e.exp_env None cd,
            transl_exp body)
   | Texp_pack modl ->
-      !transl_module Tcoerce_none None modl
+      !transl_module lp Tcoerce_none None modl
   | Texp_assert {exp_desc=Texp_construct(_, {cstr_name="false"}, _)} ->
       assert_failed e
   | Texp_assert (cond) ->
@@ -1056,13 +1101,15 @@ and transl_exp0 e =
          let fn = Lfunction {kind = Curried; params = [Ident.create "param"];
                              attr = default_function_attribute;
                              loc = e.exp_loc;
-                             body = transl_exp e} in
+                             body = transl_exp e;
+                             flocid = expr_locid;
+                            } in
           Lprim(Pmakeblock(Config.lazy_tag, Mutable, None), [fn], e.exp_loc)
       end
   | Texp_object (cs, meths) ->
       let cty = cs.cstr_type in
       let cl = Ident.create "class" in
-      !transl_object cl meths
+      !transl_object locid cl meths
         { cl_desc = Tcl_structure cs;
           cl_loc = e.exp_loc;
           cl_type = Cty_signature cty;
@@ -1072,10 +1119,10 @@ and transl_exp0 e =
   | Texp_unreachable ->
       raise (Error (e.exp_loc, Unreachable_reached))
 
-and transl_list expr_list =
-  List.map transl_exp expr_list
+and transl_list lp expr_list =
+  List.map (fun e -> transl_exp e) expr_list
 
-and transl_list_with_shape expr_list =
+and transl_list_with_shape lp expr_list =
   let transl_with_shape e =
     let shape = Typeopt.value_kind e.exp_env e.exp_type in
     transl_exp e, shape
@@ -1087,7 +1134,7 @@ and transl_guard guard rhs =
   match guard with
   | None -> expr
   | Some cond ->
-      event_before cond (Lifthenelse(transl_exp cond, expr, staticfail))
+      event_before cond (Lifthenelse(transl_exp cond, expr, staticfail lp))
 
 and transl_case {c_lhs; c_guard; c_rhs} =
   c_lhs, transl_guard c_guard c_rhs
@@ -1136,7 +1183,8 @@ and transl_apply ?(should_be_tailcall=false) ?(inlined = Default_inline)
                 ap_func=lexp;
                 ap_args=args;
                 ap_inlined=inlined;
-                ap_specialised=specialised;}
+                ap_specialised=specialised;
+                ap_lp = lp;}
   in
   let rec build_apply lam args = function
       (None, optional) :: l ->
@@ -1161,14 +1209,14 @@ and transl_apply ?(should_be_tailcall=false) ?(inlined = Default_inline)
           match build_apply handle ((Lvar id_arg, optional)::args') l with
             Lfunction{kind = Curried; params = ids; body = lam; attr; loc} ->
               Lfunction{kind = Curried; params = id_arg::ids; body = lam; attr;
-                        loc}
+                        loc; flocid;}
           | Levent(Lfunction{kind = Curried; params = ids;
-                             body = lam; attr; loc}, _) ->
+                             body = lam; attr; loc; flocid;}, _) ->
               Lfunction{kind = Curried; params = id_arg::ids; body = lam; attr;
-                        loc}
+                        loc; flocid}
           | lam ->
               Lfunction{kind = Curried; params = [id_arg]; body = lam;
-                        attr = default_stub_attribute; loc = loc}
+                        attr = default_stub_attribute; loc = loc; flocid}
         in
         List.fold_left
           (fun body (id, lam) -> Llet(Strict, Pgenval, id, lam, body))
@@ -1376,11 +1424,11 @@ and transl_match e arg pat_expr_list exn_pat_expr_list partial =
   in
   match arg, exn_cases with
   | {exp_desc = Texp_tuple argl}, [] ->
-    Matching.for_multiple_match e.exp_loc (transl_list argl) cases partial
+    Matching.for_multiple_match e.exp_loc (transl_list lp argl) cases partial
   | {exp_desc = Texp_tuple argl}, _ :: _ ->
     let val_ids = List.map (fun _ -> Typecore.name_pattern "val" []) argl in
     let lvars = List.map (fun id -> Lvar id) val_ids in
-    static_catch (transl_list argl) val_ids
+    static_catch (transl_list lp argl) val_ids
       (Matching.for_multiple_match e.exp_loc lvars cases partial)
   | arg, [] ->
     Matching.for_function e.exp_loc None (transl_exp arg) cases partial

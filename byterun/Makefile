@@ -61,6 +61,10 @@ DFLAGS=$(CFLAGS) -DDEBUG
 IFLAGS=$(CFLAGS) -DCAML_INSTR
 PICFLAGS=$(CFLAGS) $(SHAREDCCCOMPOPTS)
 
+# ocp-memprof We always compile in debug mode. Do we really care about
+# performance penalty when debugging helps so much ?
+CFLAGS += -g
+
 ifneq "$(CCOMPTYPE)" "msvc"
 DFLAGS += -g
 endif
@@ -73,7 +77,7 @@ endif
 DBGO=d.$(O)
 
 ifeq "$(UNIX_OR_WIN32)" "win32"
-LIBS = $(call SYSLIB,ws2_32) $(EXTRALIBS)
+LIBS = $(call SYSLIB,advapi32) $(call SYSLIB,ws2_32) $(EXTRALIBS)
 ifdef BOOTSTRAPPING_FLEXLINK
 MAKE_OCAMLRUN=$(MKEXE_BOOT)
 else
@@ -81,14 +85,15 @@ MAKE_OCAMLRUN = $(MKEXE) -o $(1) $(2)
 endif
 else
 LIBS = $(BYTECCLIBS)
-MAKE_OCAMLRUN = $(MKEXE) $(BYTECCLINKOPTS) -o $(1) $(2)
+MAKE_OCAMLRUN = $(MKEXE) -g $(BYTECCLINKOPTS) -o $(1) $(2)
 endif
 
 PRIMS=\
   alloc.c array.c compare.c extern.c floats.c gc_ctrl.c hash.c \
   intern.c interp.c ints.c io.c lexing.c md5.c meta.c obj.c parsing.c \
   signals.c str.c sys.c terminfo.c callback.c weak.c finalise.c stacks.c \
-  dynlink.c backtrace_prim.c backtrace.c spacetime.c afl.c
+  dynlink.c backtrace_prim.c backtrace.c spacetime.c afl.c \
+  ocp_win.c
 
 OBJS=$(addsuffix .$(O), \
   interp misc stacks fix_code startup_aux startup \
@@ -97,6 +102,7 @@ OBJS=$(addsuffix .$(O), \
   compare ints floats str array io extern intern \
   hash sys meta parsing gc_ctrl terminfo md5 obj \
   lexing callback debugger weak compact finalise custom \
+  ocp_bytecode ocp_utils ocp_memprof ocp_gcprof ocp_win \
   dynlink spacetime afl cplugins $(UNIX_OR_WIN32) main)
 
 DOBJS=$(OBJS:.$(O)=.$(DBGO)) instrtrace.$(DBGO)
@@ -109,6 +115,8 @@ all: $(LIBRARIES) $(PROGRAMS)
 ld.conf: ../config/Makefile
 	echo "$(STUBLIBDIR)" > $@
 	echo "$(LIBDIR)" >> $@
+	echo "+stublibs" >> $@
+	echo "+" >> $@
 
 .PHONY: install
 install:
@@ -119,6 +127,8 @@ install:
 	  sed -f ../tools/cleanup-header $$i \
 	      > "$(INSTALL_LIBDIR)/$$i"; \
 	done
+	if test -d $(INSTALL_LIBDIR)/caml/config; then : ; else mkdir $(INSTALL_LIBDIR)/caml/config; fi
+	cp -f ../config/*.h  $(INSTALL_LIBDIR)/caml/config/
 
 # If primitives contain duplicated lines (e.g. because the code is defined
 # like
@@ -176,7 +186,8 @@ caml/version.h : ../VERSION ../tools/make-version-header.sh
 clean:
 	rm -f $(LIBRARIES) $(PROGRAMS) *.$(O) *.$(A) *.$(SO)
 	rm -f primitives prims.c caml/opnames.h caml/jumptbl.h
-	rm -f caml/version.h
+	rm -f caml/version.h caml/commit.h
+	rm -f DATE COMMIT COMMIT.tmp COMMIT.old
 
 ocamlrun$(EXE): prims.$(O) libcamlrun.$(A)
 	$(call MAKE_OCAMLRUN,$@,$^ $(LIBS))
@@ -217,12 +228,12 @@ libcamlrun_shared.$(SO): $(PICOBJS)
 ifneq "$(TOOLCHAIN)" "msvc"
 .PHONY: depend
 depend : prims.c caml/opnames.h caml/jumptbl.h caml/version.h
-	-$(CC) -MM $(BYTECCCOMPOPTS) *.c > .depend
+	-$(CC) -MM $(BYTECCCOMPOPTS) *.c > .depend.memprof
 	-$(CC) -MM $(BYTECCCOMPOPTS) -DDEBUG *.c | sed -e 's/\.o/.d.o/' \
-	       >> .depend
+	       >> .depend.memprof
 	-$(CC) -MM $(BYTECCCOMPOPTS) -DCAML_INSTR *.c | sed -e 's/\.o/.i.o/' \
-	       >> .depend
-	-$(CC) -MM $(BYTECCCOMPOPTS) *.c | sed -e 's/\.o/.pic.o/' >> .depend
+	       >> .depend.memprof
+	-$(CC) -MM $(BYTECCCOMPOPTS) *.c | sed -e 's/\.o/.pic.o/' >> .depend.memprof
 endif
 
 ifeq "$(UNIX_OR_WIN32)" "win32"
@@ -247,5 +258,24 @@ ifeq "$(UNIX_OR_WIN32)" "win32"
 include .depend.nt
 
 else
-include .depend
+include .depend.memprof
 endif
+
+.PHONY: COMMIT.tmp
+
+COMMIT.tmp:
+	git rev-parse --short HEAD > COMMIT.tmp || cp ../VERSION COMMIT.tmp
+	date +"%Y%m%d-%H%M" > DATE
+
+COMMIT.old:
+	touch COMMIT.old
+
+COMMIT: COMMIT.tmp COMMIT.old
+	cmp COMMIT.old COMMIT.tmp || \
+	  (cp -f COMMIT.tmp COMMIT.old; cp -f COMMIT.tmp COMMIT)
+
+caml/commit.h: COMMIT
+	echo '#define OCAML_COMMIT "'$(shell cat COMMIT)'"' > caml/commit.h
+	echo '#define OCAML_DATE "'$(shell cat DATE)'"' >> caml/commit.h
+
+memprof.$(O): caml/commit.h

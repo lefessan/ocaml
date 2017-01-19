@@ -15,6 +15,7 @@
 
 MAKEFLAGS := -r -R
 include ../config/Makefile
+BOOTDIR ?= boot2
 INSTALL_BINDIR:=$(DESTDIR)$(BINDIR)
 INSTALL_LIBDIR:=$(DESTDIR)$(LIBDIR)
 INSTALL_COMPLIBDIR:=$(DESTDIR)$(COMPLIBDIR)
@@ -83,7 +84,7 @@ else
 export OCAML_FLEXLINK:=$(ROOTDIR)/boot/ocamlrun $(ROOTDIR)/flexdll/flexlink.exe
 endif
 
-CAMLC=$(CAMLRUN) ../boot/ocamlc -nostdlib -I ../boot \
+CAMLC=$(CAMLRUN) ../$(BOOTDIR)/ocamlc -nostdlib -I ../boot \
       -use-prims ../byterun/primitives -I ..
 CAMLOPT=$(CAMLRUN) ../ocamlopt -nostdlib -I ../stdlib
 ifeq "$(UNIX_OR_WIN32)" "win32"
@@ -171,9 +172,9 @@ clean::
 # To make custom toplevels
 
 OCAMLMKTOP=ocamlmktop.cmo
-OCAMLMKTOP_IMPORTS=misc.cmo identifiable.cmo numbers.cmo config.cmo \
-		   arg_helper.cmo clflags.cmo ccomp.cmo
-
+OCAMLMKTOP_IMPORTS=\
+  ../compilerlibs/ocamlcommon.cma \
+  ../compilerlibs/ocamlbytecomp.cma
 $(call byte_and_opt,ocamlmktop,$(OCAMLMKTOP_IMPORTS) $(OCAMLMKTOP),)
 
 # Converter olabl/ocaml 2.99 to ocaml 3

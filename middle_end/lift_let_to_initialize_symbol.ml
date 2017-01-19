@@ -14,6 +14,12 @@
 (*                                                                        *)
 (**************************************************************************)
 
+(* remove for ocp-memprof on flambda ! *)
+let locid = Memprof.nolocid
+(*
+let lp = Lambda.unitlp "closure_conversion"
+*)
+
 [@@@ocaml.warning "+a-4-9-30-40-41-42"]
 
 type ('a, 'b) kind =

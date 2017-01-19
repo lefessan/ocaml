@@ -1,0 +1,4 @@
+patch add_primitive_flags {
+  prim_flags = [ "memprof" ]
+  prim_names = [ "caml_power_float" "caml_exp_float" "caml_expm1_float" "caml_acos_float" "caml_asin_float" "caml_atan_float" "caml_atan2_float" "caml_hypot_float" "caml_cos_float" "caml_cosh_float" "caml_log_float" "caml_log10_float" "caml_log1p_float" "caml_sin_float" "caml_sinh_float" "caml_sqrt_float" "caml_tan_float" "caml_tanh_float" "caml_ceil_float" "caml_floor_float" "caml_copysign_float" "caml_fmod_float" "caml_ldexp_float" "caml_int64_float_of_bits" "caml_create_string" "caml_format_int" "caml_format_float" "caml_float_of_string" "caml_ml_open_descriptor_out" "caml_ml_open_descriptor_in" "caml_sys_open" "caml_ml_pos_out_64" "caml_ml_channel_size_64" "caml_ml_pos_in_64" "caml_ml_channel_size_64" "caml_create_string" ]
+}

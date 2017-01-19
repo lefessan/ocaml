@@ -1,0 +1,59 @@
+
+include "lambda_lambda_exp.sempatch"
+include "lambda_lambda_patany.sempatch"
+include "lambda_prims_exp.sempatch"
+include "lambda_prims_patany.sempatch"
+
+patch add_record_fields {
+  record_labels = [ "body" ]
+  record_new_labels = [ "flocid" ]
+}
+
+patch add_record_fields {
+  record_labels = [ "ap_loc" ]
+  record_new_labels = [ "ap_lp" ]
+}
+
+patch add_function_argument {
+  fun_new_argument = "lp"
+  fun_names = [
+
+    "name_lambda" (* Lambda. *)
+    "transl_primitive" (* Translcore. *)
+    "Translcore.transl_exp"
+    "transl_exp" (* Translcore. *)
+    "transl_let" (* Translcore. *)
+    "Translobj.transl_label_init"
+    "transl_label_init" (* Translobj. *)
+
+    "transl_type_extension"
+    "apply_coercion"
+    "apply_coercion_field"
+    "wrap_id_pos_list"
+    "eval_rec_bindings"
+    "compile_recmodule"
+    "transl_module"
+    "transl_structure"
+    "transl_struct"
+
+    "field_of_str"
+    "transl_store_structure"
+  ]
+}
+
+
+patch add_function_argument {
+  fun_new_argument = "locid"
+  fun_names = [
+    "transl_class"
+
+  ]
+}
+
+
+patch add_function_argument {
+  fun_new_argument = [ "lp" "module_name" ]
+  fun_names = [
+    "transl_store_label_init" (* Translobj. *)
+  ]
+}

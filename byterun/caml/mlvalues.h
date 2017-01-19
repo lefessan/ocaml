@@ -63,6 +63,7 @@ typedef uintnat mlsize_t;
 typedef unsigned int tag_t;             /* Actually, an unsigned char */
 typedef uintnat color_t;
 typedef uintnat mark_t;
+typedef uintnat profinfo_t;
 
 /* Longs vs blocks. */
 #define Is_long(x)   (((x) & 1) != 0)
@@ -110,8 +111,10 @@ bits  63        (64-P) (63-P)        10 9     8 7   0
 #define Tag_hd(hd) ((tag_t) ((hd) & 0xFF))
 #ifdef WITH_PROFINFO
 #define Hd_no_profinfo(hd) ((hd) & ~(PROFINFO_MASK << PROFINFO_SHIFT))
+#define NoProfinfo_hd(hd) ((hd) & ~(PROFINFO_MASK << PROFINFO_SHIFT))
 #define Wosize_hd(hd) ((mlsize_t) ((Hd_no_profinfo(hd)) >> 10))
 #else
+#define NoProfinfo_hd(hd) (hd)
 #define Wosize_hd(hd) ((mlsize_t) ((hd) >> 10))
 #endif /* WITH_PROFINFO */
 #if defined(ARCH_SIXTYFOUR) && defined(WITH_PROFINFO)

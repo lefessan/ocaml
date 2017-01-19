@@ -14,7 +14,9 @@
 #**************************************************************************
 
 # The main Makefile
-
+BOOTDIR ?= boot2
+POST ?= .
+HAS_MEMPROF ?= -D HAS_MEMPROF
 MAKEREC=$(MAKE)
 include Makefile.shared
 
@@ -38,12 +40,12 @@ all:
 	  $(WITH_OCAMLDOC)
 
 # Compile everything the first time
-world:
+world: $(BOOTDIR)/ocamlc
 	$(MAKE) coldstart
 	$(MAKE) all
 
 # Compile also native code compiler and libraries, fast
-world.opt:
+world.opt: $(BOOTDIR)/ocamlc
 	$(MAKE) coldstart
 	$(MAKE) opt.opt
 
@@ -70,7 +72,7 @@ coreboot:
 	$(MAKE) promote-cross
 # Rebuild ocamlc and ocamllex (run on byterun/ocamlrun)
 	$(MAKE) partialclean
-	$(MAKE) ocamlc ocamllex ocamltools
+	$(MAKE) ocamlc plugins ocamllex ocamltools
 # Rebuild the library (using byterun/ocamlrun ./ocamlc)
 	$(MAKE) library-cross
 # Promote the new compiler and the new runtime
@@ -96,14 +98,28 @@ coldstart:
 	cd byterun; $(MAKE) all
 	cp byterun/ocamlrun$(EXE) boot/ocamlrun$(EXE)
 	cd yacc; $(MAKE) all
+	cd ocamlpro/$(BOOTDIR); $(MAKE) all BOOTDIR=boot HAS_MEMPROF="$(HAS_MEMPROF)"
+	cd ocamlpro/ocpp; $(MAKE) -f Makefile.plugin PRE=boot POST="$(BOOTDIR)" HAS_MEMPROF="$(HAS_MEMPROF)"
+	cd ocamlpro/sempatch; $(MAKE) -f Makefile.plugin PRE=boot POST="$(BOOTDIR)" HAS_MEMPROF="$(HAS_MEMPROF)"
+	cd ocamlpro/last-plugin; $(MAKE) -f Makefile.plugin PRE=boot POST="$(BOOTDIR)" HAS_MEMPROF="$(HAS_MEMPROF)"
 	cp yacc/ocamlyacc$(EXE) boot/ocamlyacc$(EXE)
 	cd stdlib; \
-	  $(MAKE) COMPILER="../boot/ocamlc -use-prims ../byterun/primitives" all
+	  $(MAKE) COMPILER="../$(BOOTDIR)/ocamlc -use-prims ../byterun/primitives" BOOTDIR=$(BOOTDIR) HAS_MEMPROF="$(HAS_MEMPROF)" all
 	cd stdlib; cp $(LIBFILES) ../boot
 	if test -f boot/libcamlrun.a; then :; else \
 	  ln -s ../byterun/libcamlrun.a boot/libcamlrun.a; fi
 	if test -d stdlib/caml; then :; else \
 	  ln -s ../byterun/caml stdlib/caml; fi
+
+boot2/ocamlc: boot/ocamlc
+	mkdir -p boot2
+	$(MAKE) BOOTDIR="boot" POST=boot2 HAS_MEMPROF=""  coldstart
+	$(MAKE) BOOTDIR="boot" POST=boot2 HAS_MEMPROF=""  ocamlc
+	mv ./ocamlc ./boot2/ocamlc
+	rm -f ocamlpro/stdlib/*.cmi
+	rm -f ocamlpro/compiler/*.cmi
+	cp -f boot/*.cmi ocamlpro/boot2/stdlib
+	$(MAKE) partialclean
 
 # Build the core system: the minimum needed to make depend and bootstrap
 core:
@@ -112,7 +128,7 @@ core:
 
 # Recompile the core system using the bootstrap compiler
 coreall:
-	$(MAKE) ocamlc
+	$(MAKE) ocamlc plugins
 	$(MAKE) ocamllex ocamlyacc ocamltools library
 
 # Save the current bootstrap compiler
@@ -124,35 +140,38 @@ backup:
 	mkdir boot/Saved
 	mv boot/Saved.prev boot/Saved/Saved.prev
 	cp boot/ocamlrun$(EXE) boot/Saved
-	mv boot/ocamlc boot/ocamllex boot/ocamlyacc$(EXE) boot/ocamldep \
-	   boot/Saved
-	cd boot; cp $(LIBFILES) Saved
+	mv $(BOOT)/ocamlc boot/Saved
+# we don't use them anyway:
+#	mv -f $(BOOT)/ocamllex $(BOOT)/ocamldep boot/Saved
+#	cd boot; cp $(LIBFILES) Saved
+
+# why is ocamlyacc and $(LIBFILES) also saved ?
 
 # Promote the newly compiled system to the rank of cross compiler
 # (Runs on the old runtime, produces code for the new runtime)
 promote-cross:
-	$(CAMLRUN) tools/stripdebug ocamlc boot/ocamlc
-	$(CAMLRUN) tools/stripdebug lex/ocamllex boot/ocamllex
+	$(CAMLRUN) tools/stripdebug ocamlc $(BOOT)/ocamlc
+	$(CAMLRUN) tools/stripdebug lex/ocamllex $(BOOT)/ocamllex
 	cp yacc/ocamlyacc$(EXE) boot/ocamlyacc$(EXE)
-	$(CAMLRUN) tools/stripdebug tools/ocamldep boot/ocamldep
+	$(CAMLRUN) tools/stripdebug tools/ocamldep $(BOOT)/ocamldep
 	cd stdlib; cp $(LIBFILES) ../boot
 
 # Promote the newly compiled system to the rank of bootstrap compiler
 # (Runs on the new runtime, produces code for the new runtime)
 promote: promote-cross
-	cp byterun/ocamlrun$(EXE) boot/ocamlrun$(EXE)
+	cp byterun/ocamlrun$(EXE) $(BOOT)/ocamlrun$(EXE)
 
 # Restore the saved bootstrap compiler if a problem arises
 restore:
-	mv boot/Saved/* boot
+	mv boot/Saved/* $(BOOT)
 	rmdir boot/Saved
 	mv boot/Saved.prev boot/Saved
 
 # Check if fixpoint reached
 compare:
-	@if $(CAMLRUN) tools/cmpbyt boot/ocamlc ocamlc \
-	 && $(CAMLRUN) tools/cmpbyt boot/ocamllex lex/ocamllex \
-	 && $(CAMLRUN) tools/cmpbyt boot/ocamldep tools/ocamldep; \
+	@if $(CAMLRUN) tools/cmpbyt $(BOOT)/ocamlc ocamlc \
+	 && $(CAMLRUN) tools/cmpbyt $(BOOT)/ocamllex lex/ocamllex \
+	 && $(CAMLRUN) tools/cmpbyt $(BOOT)/ocamldep tools/ocamldep; \
 	then echo "Fixpoint reached, bootstrap succeeded."; \
 	else echo "Fixpoint not reached, try one more bootstrapping cycle."; \
 	fi
@@ -344,9 +363,26 @@ partialclean::
 	rm -f compilerlibs/ocamlbytecomp.cma
 
 ocamlc: compilerlibs/ocamlcommon.cma compilerlibs/ocamlbytecomp.cma $(BYTESTART)
+	mkdir -p ocamlpro/$(POST)/stdlib
+	mkdir -p ocamlpro/$(POST)/compiler
+	cp -f stdlib/*.cmi ocamlpro/$(POST)/stdlib/
+	cp -f utils/*.cmi parsing/*.cmi typing/*.cmi bytecomp/*.cmi \
+		driver/*.cmi ocamlpro/$(POST)/compiler/
+	touch ocamlpro/$(POST)/compiler/witness
 	$(CAMLC) $(LINKFLAGS) -compat-32 -o ocamlc \
 	   compilerlibs/ocamlcommon.cma compilerlibs/ocamlbytecomp.cma \
 	   $(BYTESTART)
+
+plugins: $(POST)/ocpp-plugin.cma $(POST)/ocpp-sempatch.cma $(POST)/last-plugin.cma
+
+$(POST)/ocpp-plugin.cma: $(POST)/ocamlc
+	cd ocamlpro/ocpp; $(MAKE) -f Makefile.plugin PRE=$(BOOTDIR) POST=$(POST) HAS_MEMPROF="$(HAS_MEMPROF)"
+
+$(POST)/ocpp-sempatch.cma: $(POST)/ocamlc
+	cd ocamlpro/sempatch; $(MAKE) -f Makefile.plugin PRE="$(BOOTDIR)" POST=$(POST) HAS_MEMPROF="$(HAS_MEMPROF)"
+
+$(POST)/last-plugin.cma: $(POST)/ocamlc
+	cd ocamlpro/last-plugin; $(MAKE) -f Makefile.plugin PRE="$(BOOTDIR)" POST=$(POST) HAS_MEMPROF="$(HAS_MEMPROF)"
 
 # The native-code compiler
 
@@ -446,6 +482,14 @@ utils/config.ml: utils/config.mlp config/Makefile
 	    -e 's|%%PROFILING%%|$(PROFILING)|' \
 	    -e 's|%%SAFE_STRING%%|$(SAFE_STRING)|' \
 	    -e 's|%%AFL_INSTRUMENT%%|$(AFL_INSTRUMENT)|' \
+            -e "s|%%BINDIR%%|$(BINDIR)|" \
+            -e "s|%%SUPPORTS_SHARED_LIBRARIES%%|$(SUPPORTS_SHARED_LIBRARIES)|" \
+            -e "s|%%MKSHAREDLIB%%|$(MKSHAREDLIB)|" \
+            -e "s|%%BYTECCRPATH%%|$(BYTECCRPATH)|" \
+            -e "s|%%NATIVECCRPATH%%|$(NATIVECCRPATH)|" \
+            -e "s|%%MKSHAREDLIBRPATH%%|$(MKSHAREDLIBRPATH)|" \
+            -e "s|%%MKLIB1%%|$(MKLIB1)|" \
+            -e "s|%%MKLIB2%%|$(MKLIB2)|" \
 	    utils/config.mlp > utils/config.ml
 
 partialclean::
@@ -609,14 +653,14 @@ alldepend::
 
 # The library
 
-library: ocamlc
-	cd stdlib; $(MAKE) all
+library: ocamlc plugins
+	cd stdlib; $(MAKE) BOOTDIR=$(POST) all
 
 library-cross:
 	cd stdlib; $(MAKE) CAMLRUN=../byterun/ocamlrun all
 
 libraryopt:
-	cd stdlib; $(MAKE) allopt
+	cd stdlib; $(MAKE) BOOTDIR=$(POST) allopt
 
 partialclean::
 	cd stdlib; $(MAKE) clean
@@ -626,8 +670,8 @@ alldepend::
 
 # The lexer and parser generators
 
-ocamllex: ocamlyacc ocamlc
-	cd lex; $(MAKE) all
+ocamllex: ocamlyacc ocamlc plugins
+	cd lex; $(MAKE) BOOTDIR="$(BOOTDIR)" all
 
 ocamllex.opt: ocamlopt
 	cd lex; $(MAKE) allopt
@@ -646,7 +690,7 @@ clean::
 
 # OCamldoc
 
-ocamldoc: ocamlc ocamlyacc ocamllex otherlibraries
+ocamldoc: ocamlc plugins ocamlyacc ocamllex otherlibraries
 	cd ocamldoc && $(MAKE) all
 
 ocamldoc.opt: ocamlc.opt ocamlyacc ocamllex
@@ -668,7 +712,7 @@ alldepend::
 
 otherlibraries: ocamltools
 	for i in $(OTHERLIBRARIES); do \
-	  (cd otherlibs/$$i; $(MAKE) all) || exit $$?; \
+	  (cd otherlibs/$$i; $(MAKE) BOOTDIR="$(POST)" all) || exit $$?; \
 	done
 
 otherlibrariesopt:
@@ -693,7 +737,7 @@ alldepend::
 
 # The replay debugger
 
-ocamldebugger: ocamlc ocamlyacc ocamllex otherlibraries
+ocamldebugger: ocamlc plugins ocamlyacc ocamllex otherlibraries
 	cd debugger; $(MAKE) all
 
 partialclean::
@@ -731,6 +775,14 @@ clean::
 
 .SUFFIXES: .ml .mli .cmo .cmi .cmx
 
+
+%.cmo: %.ml %.ml.ocpp
+	$(CAMLC) $(COMPFLAGS) -c $<
+%.cmx: %.ml %.ml.ocpp
+	$(CAMLOPT) $(COMPFLAGS) -c $<
+%.cmi: %.mli %.mli.ocpp
+	$(CAMLC) $(COMPFLAGS) -c $<
+
 .ml.cmo:
 	$(CAMLC) $(COMPFLAGS) -c $<
 
@@ -749,16 +801,22 @@ partialclean::
 	done
 	rm -f *~
 
+BOOTPLUGINS=\
+   -plugin boot/ocpp-plugin.cma \
+   -plugin boot/sempatch-plugin.cma \
+   -plugin boot/last-plugin.cma 
+BOOTCAMLDEP=./boot/ocamlrun ./boot/ocamldep $(BOOTPLUGINS)
+
 depend: beforedepend
 	(for d in utils parsing typing bytecomp asmcomp middle_end \
 	          middle_end/base_types driver toplevel; \
 	 do \
-	   $(CAMLDEP) $(DEPFLAGS) $$d/*.mli $$d/*.ml; \
-	 done) > .depend
-	$(CAMLDEP) $(DEPFLAGS) -native \
-		-impl driver/compdynlink.mlopt >> .depend
-	$(CAMLDEP) $(DEPFLAGS) -bytecode \
-		-impl driver/compdynlink.mlbyte >> .depend
+	   $(BOOTCAMLDEP) $(DEPFLAGS) $$d/*.mli $$d/*.ml; \
+	 done) > .depend.memprof
+	$(BOOTCAMLDEP) $(DEPFLAGS) -native \
+		-impl driver/compdynlink.mlopt >> .depend.memprof
+	$(BOOTCAMLDEP) $(DEPFLAGS) -bytecode \
+		-impl driver/compdynlink.mlbyte >> .depend.memprof
 
 alldepend:: depend
 
@@ -782,4 +840,21 @@ distclean:
 .PHONY: otherlibrariesopt package-macosx promote promote-cross
 .PHONY: restore runtime runtimeopt makeruntimeopt world world.opt
 
-include .depend
+include .depend.memprof
+
+### ocamlpro
+
+partialclean::
+	cd ocamlpro/boot; $(MAKE) partialclean
+	cd ocamlpro/ocpp; $(MAKE) -f Makefile.plugin partialclean
+	cd ocamlpro/sempatch; $(MAKE) -f Makefile.plugin partialclean
+	cd ocamlpro/last-plugin; $(MAKE) -f Makefile.plugin partialclean
+
+ocp-clean::
+	rm -f boot2/ocamlc boot2/*.cm?
+	rm -f ocamlpro/boot/stdlib/*.cm?
+	rm -f ocamlpro/boot/compiler/*.cm?
+	rm -f ocamlpro/boot2/stdlib/*.cm?
+	rm -f ocamlpro/boot2/compiler/*.cm?
+	rm -f ocamlpro/boot2/*.cm?
+	rm -f boot/*.cm?

@@ -31,6 +31,9 @@
 #include "caml/signals.h"
 #include "caml/weak.h"
 
+#include "caml/ocp_gcprof.h"
+#include "caml/ocp_allocprof.h"
+
 /* Pointers into the minor heap.
    [caml_young_base]
        The [malloc] block that contains the heap.
@@ -166,6 +169,9 @@ void caml_set_minor_heap_size (asize_t bsz)
   caml_young_ptr = caml_young_alloc_end;
   caml_minor_heap_wsz = Wsize_bsize (bsz);
 
+  GCPROF_PREPARE_MINOR();
+  ALLOCPROF_SET_YOUNG_LIMIT();
+
   reset_table ((struct generic_table *) &caml_ref_table);
   reset_table ((struct generic_table *) &caml_ephe_ref_table);
   reset_table ((struct generic_table *) &caml_custom_table);
@@ -197,6 +203,7 @@ void caml_oldify_one (value v, value *p)
 
         sz = Wosize_hd (hd);
         result = caml_alloc_shr_preserving_profinfo (sz, tag, hd);
+        GCPROF_HEADER(hd, MINOR_PROMOTE);
         *p = result;
         field0 = Field (v, 0);
         Hd_val (v) = 0;            /* Set forward flag */
@@ -214,6 +221,7 @@ void caml_oldify_one (value v, value *p)
       }else if (tag >= No_scan_tag){
         sz = Wosize_hd (hd);
         result = caml_alloc_shr_preserving_profinfo (sz, tag, hd);
+        GCPROF_HEADER(hd, MINOR_PROMOTE);
         for (i = 0; i < sz; i++) Field (result, i) = Field (v, i);
         Hd_val (v) = 0;            /* Set forward flag */
         Field (v, 0) = result;     /*  and forward pointer. */
@@ -243,6 +251,7 @@ void caml_oldify_one (value v, value *p)
           /* Do not short-circuit the pointer.  Copy as a normal block. */
           Assert (Wosize_hd (hd) == 1);
           result = caml_alloc_shr_preserving_profinfo (1, Forward_tag, hd);
+          GCPROF_HEADER(hd, MINOR_PROMOTE);
           *p = result;
           Hd_val (v) = 0;             /* Set (GC) forward flag */
           Field (v, 0) = result;      /*  and forward pointer. */
@@ -343,7 +352,9 @@ void caml_empty_minor_heap (void)
     MAYBE_HOOK1(caml_minor_gc_begin_hook,);
     CAML_INSTR_SETUP (tmr, "minor");
     prev_alloc_words = caml_allocated_words;
+    ALLOCPROF_MINOR_COLLECTION();
     caml_in_minor_collection = 1;
+    GCPROF_MINOR_SCAN();
     caml_gc_message (0x02, "<", 0);
     caml_oldify_local_roots();
     CAML_INSTR_TIME (tmr, "minor/local_roots");
@@ -389,11 +400,16 @@ void caml_empty_minor_heap (void)
     caml_gc_clock += (double) (caml_young_alloc_end - caml_young_ptr)
                      / caml_minor_heap_wsz;
     caml_young_ptr = caml_young_alloc_end;
+
+    GCPROF_PREPARE_MINOR();
+    ALLOCPROF_SET_YOUNG_LIMIT();
+
     clear_table ((struct generic_table *) &caml_ref_table);
     clear_table ((struct generic_table *) &caml_ephe_ref_table);
     clear_table ((struct generic_table *) &caml_custom_table);
     caml_gc_message (0x02, ">", 0);
     caml_in_minor_collection = 0;
+    GCPROF_GC_PHASE(Phase_minor, Subphase_final);
     caml_final_empty_young ();
     CAML_INSTR_TIME (tmr, "minor/finalized");
     caml_stat_promoted_words += caml_allocated_words - prev_alloc_words;

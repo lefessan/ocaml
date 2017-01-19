@@ -71,7 +71,6 @@ void caml_debugger_cleanup_fork(void)
 #include "caml/fix_code.h"
 #include "caml/instruct.h"
 #include "caml/intext.h"
-#include "caml/io.h"
 #include "caml/mlvalues.h"
 #include "caml/stacks.h"
 #include "caml/sys.h"

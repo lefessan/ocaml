@@ -1,0 +1,31 @@
+
+include "lambda_lambda_exp.sempatch"
+include "lambda_lambda_pat.sempatch"
+include "lambda_prims_exp.sempatch"
+include "lambda_prims_pat.sempatch"
+
+patch add_record_fields {
+  record_labels = [ "body" ]
+  record_new_labels = [ "flocid" ]
+}
+
+patch add_record_fields {
+  record_labels = [ "ap_loc" ]
+  record_new_labels = [ "ap_lp" ]
+}
+
+
+patch add_function_argument {
+  fun_new_argument = "lp"
+  fun_names = [
+    "beta_reduce"
+    "mklet"
+  ]
+}
+
+patch add_function_argument {
+  fun_new_argument = "flocid"
+  fun_names = [
+    "split_default_wrapper"
+  ]
+}

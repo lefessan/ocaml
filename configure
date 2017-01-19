@@ -53,9 +53,9 @@ with_debugger=ocamldebugger
 with_ocamldoc=ocamldoc
 with_frame_pointers=false
 with_spacetime=false
-with_profinfo=false
+with_profinfo=true
 with_gc_hooks=false
-profinfo_width=0
+profinfo_width=22
 no_naked_pointers=false
 native_compiler=true
 TOOLPREF=""
@@ -186,15 +186,17 @@ while : ; do
     -spacetime|--spacetime)
         with_spacetime=true;  with_profinfo=true; profinfo_width=26;;
     -reserved-header-bits|--reserved-header-bits)
-        with_spacetime=false; with_profinfo=true; profinfo_width=$2;shift
-        case $profinfo_width in
-            0) with_profinfo=false;;
-            [0123456789]);;
-            1?|2?);;
-            3[012]);;
-            *) err "--reserved-header-bits argument must be less than 32"
-        esac
-        ;;
+        echo '--reserved-header-bits disabled with memprof';
+        exit 2;;
+#        with_spacetime=false; with_profinfo=true; profinfo_width=$2;shift
+#        case $profinfo_width in
+#            0) with_profinfo=false;;
+#            [0123456789]);;
+#            1?|2?);;
+#            3[012]);;
+#            *) err "--reserved-header-bits argument must be less than 32"
+#        esac
+#        ;;
     -gc-hooks|--gc-hooks)
         with_gc_hooks=true;;
     -no-cfi|--no-cfi)

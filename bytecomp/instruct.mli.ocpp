@@ -1,0 +1,13 @@
+patch add_constructor_arguments_typ {
+   constr_names = [
+   "Kgrab"
+   "Kclosure"
+   "Kclosurerec"
+   "Kmakeblock"
+   "Kmakefloatblock"
+   "Kgetfloatfield"
+   "Kccall"
+   ]
+   constr_position = "end"
+   constr_new_arguments = [ "Lambda.alloc" ]
+}

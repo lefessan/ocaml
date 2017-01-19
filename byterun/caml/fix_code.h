@@ -40,6 +40,8 @@ extern char * caml_instr_base;
 void caml_thread_code (code_t code, asize_t len);
 #endif
 
+CAMLextern int* caml_init_opcode_nargs(void);
+
 #endif /* CAML_INTERNALS */
 
 #endif /* CAML_FIX_CODE_H */

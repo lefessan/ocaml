@@ -1,0 +1,34 @@
+asttypes.cmi : location.cmi
+clflags.cmi : misc.cmi
+cmi_format.cmi : types.cmi
+cmo_format.cmi : tbl.cmi lambda.cmi ident.cmi
+config.cmi :
+consistbl.cmi :
+docstrings.cmi : parsetree.cmi location.cmi
+env.cmi : warnings.cmi types.cmi subst.cmi path.cmi longident.cmi \
+    location.cmi ident.cmi consistbl.cmi cmi_format.cmi asttypes.cmi
+ident.cmi : identifiable.cmi
+identifiable.cmi :
+lambda.cmi : types.cmi primitive.cmi path.cmi memprof.cmi location.cmi \
+    ident.cmi env.cmi asttypes.cmi
+lexer.cmi : parser.cmi location.cmi
+location.cmi : warnings.cmi
+longident.cmi :
+memprof.cmi : types.cmi typedtree.cmi subst.cmi primitive.cmi path.cmi \
+    location.cmi ident.cmi
+misc.cmi :
+outcometree.cmi : asttypes.cmi
+parser.cmi : parsetree.cmi location.cmi docstrings.cmi
+parsetree.cmi : longident.cmi location.cmi asttypes.cmi
+path.cmi : ident.cmi
+pparse.cmi : parsetree.cmi misc.cmi
+primitive.cmi : parsetree.cmi outcometree.cmi location.cmi
+subst.cmi : types.cmi path.cmi ident.cmi
+symtable.cmi : misc.cmi lambda.cmi ident.cmi cmo_format.cmi
+syntaxerr.cmi : location.cmi
+tbl.cmi :
+typedtree.cmi : types.cmi primitive.cmi path.cmi parsetree.cmi longident.cmi \
+    location.cmi ident.cmi env.cmi asttypes.cmi
+types.cmi : primitive.cmi path.cmi parsetree.cmi longident.cmi location.cmi \
+    ident.cmi asttypes.cmi
+warnings.cmi :

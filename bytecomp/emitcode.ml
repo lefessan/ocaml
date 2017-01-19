@@ -48,6 +48,32 @@ let out opcode =
   out_word opcode 0 0 0
 
 
+
+(* for memprof *)
+let memprof_locids = ref []
+let emit_alloc locid =
+  memprof_locids := (!out_position lsr 2, locid) :: !memprof_locids
+    (*
+let print_noalloc_c_calls =
+  try ignore (Sys.getenv "OCP_DEBUG_NOALLOC"); true with _ -> false
+let noalloc_c_calls = ref StringSet.empty
+let noalloc_c_call name =
+  emit_alloc NoAlloc;
+  if print_noalloc_c_calls && not (StringSet.mem name !noalloc_c_calls) then
+    begin
+      Printf.eprintf "noalloc: %s\n%!" name;
+      noalloc_c_calls := StringSet.add name !noalloc_c_calls
+    end
+    *)
+let make_cu_memprof unit_name (mp_table, mp_table_size) =
+  let mp_locids = Array.of_list (List.rev !memprof_locids) in
+  let mp_nopcodes = !out_position / 4 in
+  {
+    mp_name = unit_name;
+    mp_table; mp_table_size;
+    mp_locids; mp_nopcodes }
+
+
 exception AsInt
 
 let const_as_int = function
@@ -194,9 +220,14 @@ let emit_instr = function
                else (out opAPPTERM; out_int n; out_int sz)
   | Kreturn n -> out opRETURN; out_int n
   | Krestart -> out opRESTART
-  | Kgrab n -> out opGRAB; out_int n
-  | Kclosure(lbl, n) -> out opCLOSURE; out_int n; out_label lbl
-  | Kclosurerec(lbls, n) ->
+  | Kgrab (n, alloc) ->
+    emit_alloc alloc;
+    out opGRAB; out_int n
+  | Kclosure(lbl, n, alloc) ->
+    emit_alloc alloc;
+    out opCLOSURE; out_int n; out_label lbl
+  | Kclosurerec(lbls, n, alloc) ->
+    emit_alloc alloc;
       out opCLOSUREREC; out_int (List.length lbls); out_int n;
       let org = !out_position in
       List.iter (out_label_with_orig org) lbls
@@ -223,18 +254,32 @@ let emit_instr = function
       | _ ->
           out opGETGLOBAL; slot_for_literal sc
       end
-  | Kmakeblock(n, t) ->
+  | Kmakeblock(n, t, alloc) ->
       if n = 0 then
         if t = 0 then out opATOM0 else (out opATOM; out_int t)
-      else if n < 4 then (out(opMAKEBLOCK1 + n - 1); out_int t)
-      else (out opMAKEBLOCK; out_int n; out_int t)
+      else if n < 4 then begin
+        emit_alloc alloc;
+        out(opMAKEBLOCK1 + n - 1);
+        out_int t
+      end else begin
+        emit_alloc alloc;
+        out opMAKEBLOCK;
+        out_int n;
+        out_int t
+      end
   | Kgetfield n ->
       if n < 4 then out(opGETFIELD0 + n) else (out opGETFIELD; out_int n)
   | Ksetfield n ->
       if n < 4 then out(opSETFIELD0 + n) else (out opSETFIELD; out_int n)
-  | Kmakefloatblock(n) ->
-      if n = 0 then out opATOM0 else (out opMAKEFLOATBLOCK; out_int n)
-  | Kgetfloatfield n -> out opGETFLOATFIELD; out_int n
+  | Kmakefloatblock(n, alloc) ->
+    if n = 0 then out opATOM0 else begin
+      emit_alloc alloc;
+      out opMAKEFLOATBLOCK;
+      out_int n
+    end
+  | Kgetfloatfield (n, alloc) ->
+    emit_alloc alloc;
+    out opGETFLOATFIELD; out_int n
   | Ksetfloatfield n -> out opSETFLOATFIELD; out_int n
   | Kvectlength -> out opVECTLENGTH
   | Kgetvectitem -> out opGETVECTITEM
@@ -259,7 +304,8 @@ let emit_instr = function
   | Kraise Raise_reraise -> out opRERAISE
   | Kraise Raise_notrace -> out opRAISE_NOTRACE
   | Kcheck_signals -> out opCHECK_SIGNALS
-  | Kccall(name, n) ->
+  | Kccall(name, n, alloc) ->
+    emit_alloc alloc;
       if n <= 5
       then (out (opC_CALL1 + n - 1); slot_for_c_prim name)
       else (out opC_CALLN; out_int n; slot_for_c_prim name)
@@ -366,6 +412,8 @@ let rec emit = function
 (* Emission to a file *)
 
 let to_file outchan unit_name objfile ~required_globals code =
+  let locid_base = Ident.create_persistent (unit_name ^ "__locid") in
+  let loctbl = Memprof.dump_location_table (Ident.name locid_base) in
   init();
   output_string outchan cmo_magic_number;
   let pos_depl = pos_out outchan in
@@ -384,6 +432,7 @@ let to_file outchan unit_name objfile ~required_globals code =
       (p, pos_out outchan - p)
     end else
       (0, 0) in
+  let cu_memprof = make_cu_memprof unit_name loctbl in
   let compunit =
     { cu_name = unit_name;
       cu_pos = pos_code;
@@ -395,7 +444,9 @@ let to_file outchan unit_name objfile ~required_globals code =
       cu_required_globals = Ident.Set.elements required_globals;
       cu_force_link = !Clflags.link_everything;
       cu_debug = pos_debug;
-      cu_debugsize = size_debug } in
+      cu_debugsize = size_debug;
+      cu_memprof = [cu_memprof];
+    } in
   init();                               (* Free out_buffer and reloc_info *)
   Btype.cleanup_abbrev ();              (* Remove any cached abbreviation
                                            expansion before saving *)
@@ -420,13 +471,16 @@ let to_memory init_code fun_code =
 
 (* Emission to a file for a packed library *)
 
-let to_packed_file outchan code =
+let to_packed_file outchan unit_name code =
   init();
   emit code;
   LongString.output outchan !out_buffer 0 !out_position;
   let reloc = !reloc_info in
+  let locid_base = Ident.create_persistent (unit_name ^ "__locid_base") in
+  let loctbl = Memprof.dump_location_table (Ident.name locid_base) in
+  let cu_memprof = make_cu_memprof unit_name loctbl in
   init();
-  reloc
+  reloc, cu_memprof
 
 let reset () =
   out_buffer := LongString.create 1024;

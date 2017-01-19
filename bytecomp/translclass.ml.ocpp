@@ -1,0 +1,56 @@
+
+include "lambda_lambda_exp.sempatch"
+include "lambda_lambda_patany.sempatch"
+include "lambda_prims_exp.sempatch"
+include "lambda_prims_patany.sempatch"
+
+patch add_record_fields {
+  record_labels = [ "body" ]
+  record_new_labels = [ "flocid" ]
+}
+
+patch add_record_fields {
+  record_labels = [ "ap_loc" ]
+  record_new_labels = [ "ap_lp" ]
+}
+
+patch add_function_argument {
+  fun_new_argument = "lp"
+  fun_names = [
+
+
+    "Matching.for_function"
+    "transl_exp";  (* Translcore. *)
+    "transl_apply" (* Translcore. *)
+    "Translcore.transl_let"
+
+    "mkappl";
+    "set_inst_var"
+    "transl_val"
+    "transl_vals"
+    "meths_super"
+    "bind_super"
+    "create_object"
+    "build_object_init"
+    "build_object_init_0"
+    "bind_method"
+    "bind_methods"
+    "output_methods"
+    "build_class_init"
+    "build_class_lets"
+
+    "transl_class_rebind"
+    "transl_class_rebind_0"
+
+
+  ]
+}
+
+
+patch add_function_argument {
+  fun_new_argument = "locid"
+  fun_names = [
+     "oo_add_class"
+    "transl_class"
+  ]
+}

@@ -289,6 +289,9 @@ extern void caml_set_fields (intnat v, unsigned long, unsigned long);
 
 /* snprintf emulation for Win32 */
 
+/*  In ocpwin, we use something a little different:
+#if defined(_WIN32) && defined(_MSC_VER) && _MSC_VER < 1900
+ */
 #if defined(_WIN32) && !defined(_UCRT)
 extern int caml_snprintf(char * buf, size_t size, const char * format, ...);
 #define snprintf caml_snprintf

@@ -486,6 +486,7 @@ static inline value caml_alloc_shr_aux (mlsize_t wosize, tag_t tag,
 #ifdef WITH_GC_HOOKS
   MAYBE_HOOK3(caml_alloc_shr_begin_hook, wosize, tag, profinfo);
 #endif
+  ALLOCPROF_ALLOC_MAJOR(wosize, tag, profinfo);
   hp = caml_fl_allocate (wosize);
   if (hp == NULL){
     new_block = expand_heap (wosize);
@@ -540,7 +541,7 @@ static inline value caml_alloc_shr_aux (mlsize_t wosize, tag_t tag,
 
 CAMLexport value caml_alloc_shr_no_raise (mlsize_t wosize, tag_t tag)
 {
-  return caml_alloc_shr_aux(wosize, tag, 0, 0);
+  return caml_alloc_shr_aux(wosize, tag, 0, caml_memprof_ccall_locid);
 }
 
 #ifdef WITH_PROFINFO
@@ -565,7 +566,7 @@ CAMLexport value caml_alloc_shr (mlsize_t wosize, tag_t tag)
   uintnat profinfo;
 
   if( caml_alloc_get_profinfo == NULL ){
-    profinfo = NO_PROFINFO;
+    profinfo = caml_memprof_ccall_locid;
   } else {
     profinfo = caml_alloc_get_profinfo(wosize);
   }

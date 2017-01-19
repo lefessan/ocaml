@@ -200,4 +200,20 @@ typedef uint64_t uintnat;
 /* Maximum size of the major GC slice smoothing window. */
 #define Max_major_window 50
 
+
+
+
+
+/* This macro is used to tell users that CAML_INTERNALS can be used to
+show more internal macros and functions. This can typically be used in
+Coq. */
+#define CAML_HAS_INTERNALS
+  
+/* For now, memprof is incompatible with --reserved-header-bits */
+#if defined(WITH_PROFINFO) && !defined(WITH_SPACETIME)
+#define WITH_MEMPROF
+#endif
+
+
+
 #endif /* CAML_CONFIG_H */

@@ -25,6 +25,8 @@
 #include <io.h>
 #endif
 
+#include <stdio.h>
+
 #include "caml/debugger.h"
 #include "caml/fix_code.h"
 #include "caml/instruct.h"
@@ -34,6 +36,8 @@
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
 #include "caml/reverse.h"
+
+#include "caml/ocp_bytecode.h"
 
 code_t caml_start_code;
 asize_t caml_code_size;
@@ -53,19 +57,26 @@ void caml_init_code_fragments(void) {
   caml_ext_table_add(&caml_code_fragments_table, cf);
 }
 
+/* Can only be called from startup.c */
 void caml_load_code(int fd, asize_t len)
 {
   int i;
+  code_t prog = (code_t) caml_stat_alloc(len);
 
   caml_code_size = len;
-  caml_start_code = (code_t) caml_stat_alloc(caml_code_size);
+  caml_start_code = prog;
   if (read(fd, (char *) caml_start_code, caml_code_size) != caml_code_size)
     caml_fatal_error("Fatal error: truncated bytecode file.\n");
   caml_init_code_fragments();
   /* Prepare the code for execution */
 #ifdef ARCH_BIG_ENDIAN
-  caml_fixup_endianness(caml_start_code, caml_code_size);
+  caml_fixup_endianness(prog, len);
 #endif
+
+  prog = caml_ocp_bytecode_fix_locids(prog, &len);
+  caml_code_size = len;
+  caml_start_code = prog;
+
   if (caml_debugger_in_use) {
     len /= sizeof(opcode_t);
     caml_saved_code = (unsigned char *) caml_stat_alloc(len);
@@ -75,7 +86,7 @@ void caml_load_code(int fd, asize_t len)
   /* Better to thread now than at the beginning of [caml_interprete],
      since the debugger interface needs to perform SET_EVENT requests
      on the code. */
-  caml_thread_code(caml_start_code, caml_code_size);
+  caml_thread_code(prog, len);
 #endif
 }
 
@@ -94,15 +105,10 @@ void caml_fixup_endianness(code_t code, asize_t len)
 
 #endif
 
-/* This code is needed only if we're using threaded code */
-
-#ifdef THREADED_CODE
-
-char ** caml_instr_table;
-char * caml_instr_base;
-
+/* ocp-memprof: the interest of this function is to be able to use
+   it for other reasons than threaded code. */
 static int* opcode_nargs = NULL;
-int* caml_init_opcode_nargs(void)
+CAMLexport int* caml_init_opcode_nargs(void)
 {
   if( opcode_nargs == NULL ){
     int* l = (int*)caml_stat_alloc(sizeof(int) * FIRST_UNIMPLEMENTED_OP);
@@ -135,10 +141,21 @@ int* caml_init_opcode_nargs(void)
   return opcode_nargs;
 }
 
+/* This code is needed only if we're using threaded code */
+
+#ifdef THREADED_CODE
+
+char ** caml_instr_table;
+char * caml_instr_base;
+
 void caml_thread_code (code_t code, asize_t len)
 {
   code_t p;
   int* l = caml_init_opcode_nargs();
+
+  //  fprintf(stderr, "caml_thread_code\n");
+  //  fprintf(stderr, "   src: %lX %ld\n", (value)code, len);
+
   len /= sizeof(opcode_t);
   for (p = code; p < code + len; /*nothing*/) {
     opcode_t instr = *p;
@@ -156,21 +173,18 @@ void caml_thread_code (code_t code, asize_t len)
       uint32_t block_size = sizes >> 16;
       p += const_size + block_size;
     } else if (instr == CLOSUREREC) {
-      uint32_t nfuncs = *p++;
+      uint32_t nfuncs;
+      if( caml_ocp_bytecode_has_locid(CLOSUREREC) ){
+        p++; /* move above the locid */
+      }
+      nfuncs = *p++;
       p++;                      /* skip nvars */
       p += nfuncs;
     } else {
-      p += l[instr];
+      p += l[instr] + caml_ocp_bytecode_has_locid(instr);
     }
   }
   Assert(p == code + len);
-}
-
-#else
-
-int* caml_init_opcode_nargs()
-{
-  return NULL;
 }
 
 #endif /* THREADED_CODE */

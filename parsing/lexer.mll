@@ -215,6 +215,7 @@ let update_loc lexbuf file line absolute chars =
   }
 ;;
 
+let check_spaces = ref None
 let preprocessor = ref None
 
 let escaped_newlines = ref false
@@ -280,7 +281,8 @@ let () =
 }
 
 let newline = ('\013'* '\010')
-let blank = [' ' '\009' '\012']
+let space = [' ' '\012']
+let tabulation =  space* '\009' space*
 let lowercase = ['a'-'z' '_']
 let uppercase = ['A'-'Z']
 let identchar = ['A'-'Z' 'a'-'z' '_' '\'' '0'-'9']
@@ -321,8 +323,22 @@ rule token = parse
   | newline
       { update_loc lexbuf None 1 false 0;
         EOL }
-  | blank +
-      { token lexbuf }
+  | space+ newline
+      {
+        (match !check_spaces with | None -> ()
+        | Some f -> f ( Location.curr lexbuf ) "spaces at end of line");
+        update_loc lexbuf None 1 false 0;
+        match !preprocessor with
+        | None -> token lexbuf
+        | Some _ -> EOL
+      }
+(* tryocaml: accept js_of_ocaml method invocation *)
+  | space + { token lexbuf }
+  | tabulation space* {
+    (match !check_spaces with | None -> ()
+    | Some f -> f ( Location.curr lexbuf ) "tabulation in file");
+       token lexbuf
+    }
   | "_"
       { UNDERSCORE }
   | "~"
@@ -683,6 +699,8 @@ and skip_hash_bang = parse
   | "" { () }
 
 {
+
+  let raw_lexer = token
 
   let token_with_comments lexbuf =
     match !preprocessor with

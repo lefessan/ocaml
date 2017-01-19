@@ -1,0 +1,63 @@
+
+PRE ?= boot2
+POST ?= .
+ROOTDIR=../..
+
+INCLUDES=-I ../$(POST)/stdlib -I ../$(POST)/compiler
+CAMLRUN=$(ROOTDIR)/boot/ocamlrun
+CAMLC=$(CAMLRUN) $(ROOTDIR)/$(PRE)/ocamlc $(INCLUDES)
+CAMLDEP=$(CAMLRUN) $(ROOTDIR)/boot/ocamldep
+CAMLLEX=$(CAMLRUN) $(ROOTDIR)/boot/ocamllex
+CAMLYACC=../../yacc/ocamlyacc
+
+OCPP_CMOS:= ocpp_types.cmo ocpp_version.cmo \
+        ocpp_parser.cmo ocpp_lexer.cmo ocpp.cmo \
+        ocpp_plugin.cmo
+
+OCPP_MLS:=$(OCPP_CMOS:.cmo=.ml)
+
+PLUGIN_CMA=../../$(POST)/ocpp-plugin.cma
+
+all: $(PLUGIN_CMA)
+
+$(PLUGIN_CMA): \
+   $(ROOTDIR)/$(PRE)/ocamlc $(OCPP_MLS) ../$(POST)/compiler/witness
+	$(MAKE) -f Makefile.plugin $(OCPP_CMOS)
+	$(CAMLC) -a -o $(PLUGIN_CMA) $(OCPP_CMOS)
+#	cp -f ocpp.cmi ../sempatch/
+	rm -f *.cmi *.cmti *.cmo *.cmt
+
+beforedepend:: $(OCPP_MLS)
+
+partialclean::
+	rm -f *.cm? *.cm?? *~
+	rm -f ocpp_parser.mli ocpp_parser.ml
+	rm -f ocpp_lexer.ml
+
+ocpp_version.cmi: ocpp_parser.cmi
+ocpp_version.cmo: ocpp_parser.cmi
+ocpp_parser.cmi: ocpp_parser.ml
+ocpp_parser.cmo: ocpp_parser.ml
+
+ocpp_parser.ml ocpp_parser.mli: ocpp_parser.mly
+	$(CAMLYACC) ocpp_parser.mly
+ocpp_lexer.ml: ocpp_lexer.mll
+	$(CAMLLEX) ocpp_lexer.mll
+
+clean:
+	rm -f *.cm?
+
+depend: beforedepend
+	$(CAMLDEP) $(INCLUDES) *.ml *.mli > .depend.$(PRE)$(POST)
+
+.SUFFIXES: .ml .mli .cmo .cmi .cmx
+
+.ml.cmo:
+	$(CAMLC) $(COMPFLAGS) -c $<
+
+.mli.cmi:
+	$(CAMLC) $(COMPFLAGS) -c $<
+
+-include .depend.$(PRE)$(POST)
+
+
