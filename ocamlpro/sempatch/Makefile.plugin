@@ -1,0 +1,65 @@
+
+
+
+BOOTDIR=../../boot
+
+INCLUDES=-I ../boot/stdlib -I ../boot/compiler -I ../ocpp
+CAMLRUN=$(BOOTDIR)/ocamlrun
+CAMLFLAGS= $(INCLUDES) -plugin ../ocpp/ocpp-plugin.cma
+CAMLC=$(CAMLRUN) $(BOOTDIR)/ocamlc $(CAMLFLAGS)
+CAMLDEP=$(CAMLRUN) $(BOOTDIR)/ocamldep $(CAMLFLAGS)
+CAMLLEX=$(CAMLRUN) $(BOOTDIR)/ocamllex
+CAMLYACC=../../yacc/ocamlyacc
+
+
+
+SEMPATCH_CMOS:= \
+  parsetree_iter.cmo \
+  parsetree_map.cmo \
+  patch_types.cmo \
+  stringCompat.cmo \
+  patch_lexer.cmo		\
+  patch_parser.cmo \
+  patch_engine.cmo	\
+  ocpstd.cmo \
+  patch_main.cmo \
+  cleanup.cmo
+
+SEMPATCH_MLS:=$(SEMPATCH_CMOS:.cmo=.ml)
+
+all: sempatch-plugin.cma
+
+sempatch-plugin.cma: $(SEMPATCH_CMOS)
+	$(CAMLC) -a -o sempatch-plugin.cma $(SEMPATCH_CMOS)
+
+.SUFFIXES: .ml .mli .cmo .cmi .cmx
+
+.ml.cmo:
+	$(CAMLC) $(COMPFLAGS) -c $<
+
+.mli.cmi:
+	$(CAMLC) $(COMPFLAGS) -c $<
+
+beforedepend:: $(SEMPATCH_MLS)
+
+partialclean::
+	rm -f patch_parser.mli patch_parser.ml
+	rm -f patch_lexer.ml
+	rm -f *.cm?? *.cm? *~
+
+patch_parser.cmi: patch_parser.ml
+patch_parser.ml: patch_parser.mly
+	$(CAMLYACC) patch_parser.mly
+patch_lexer.ml: patch_lexer.mll
+	$(CAMLLEX) patch_lexer.mll
+
+depend: beforedepend
+	$(CAMLDEP) *.ml *.mli > .depend.boot
+
+-include .depend.boot
+
+parsetree_iter.cmo: parsetree_iter.cmi
+parsetree_map.cmo: parsetree_map.cmi
+patch_parser.cmo: patch_parser.cmi
+ocpstd.cmo: ocpstd.cmi
+
