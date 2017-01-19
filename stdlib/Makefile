@@ -16,10 +16,17 @@
 include ../config/Makefile
 CAMLRUN ?= ../boot/ocamlrun
 CAMLYACC ?= ../boot/ocamlyacc
+BOOTDIR ?= boot.ocp
 TARGET_BINDIR ?= $(BINDIR)
 
+PLUGINDIR ?= ../ocamlpro/$(BOOTDIR)
+PLUGINS=\
+  -plugin $(PLUGINDIR)/ocpp-plugin.cma \
+  -plugin $(PLUGINDIR)/sempatch-plugin.cma \
+  -plugin $(PLUGINDIR)/last-plugin.cma
+
 COMPILER=../ocamlc
-CAMLC=$(CAMLRUN) $(COMPILER)
+CAMLC=$(CAMLRUN) $(COMPILER) $(PLUGINS)
 COMPFLAGS=-strict-sequence -absname -w +a-4-9-41-42-44-45-48 \
           -g -warn-error A -bin-annot -nostdlib \
           -safe-string -strict-formats
@@ -29,8 +36,8 @@ else
 OPTCOMPFLAGS=
 endif
 OPTCOMPILER=../ocamlopt
-CAMLOPT=$(CAMLRUN) $(OPTCOMPILER)
-CAMLDEP=$(CAMLRUN) ../tools/ocamldep
+CAMLOPT=$(CAMLRUN) $(OPTCOMPILER) $(PLUGINS)
+CAMLDEP=$(CAMLRUN) ../tools/ocamldep $(PLUGINS)
 
 OBJS=camlinternalFormatBasics.cmo pervasives.cmo $(OTHERS)
 OTHERS=list.cmo char.cmo bytes.cmo string.cmo sys.cmo \

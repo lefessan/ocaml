@@ -1,13 +1,3 @@
-# To update this directory:
-# * locate the last commit that updated the bootstrap compiler
-#     `git log boot/ocamlc`
-# * checkout that commit
-# * create a new ocamlpro/boot with Makefile.boot only
-# * use the `make -f Makefile.boot update` rule
-# * use the `make -f Makefile.boot depend` to create a .depend file
-
-# current:
-# 10b0afb4e61ce5ddc3e43b2dc0ea70b7  boot/ocamlc
 
 
 CMIS=asttypes.cmi longident.cmi clflags.cmi docstrings.cmi parser.cmi	\
@@ -19,23 +9,18 @@ CMIS=asttypes.cmi longident.cmi clflags.cmi docstrings.cmi parser.cmi	\
 
 MLIS=$(CMIS:.cmi=.mli)
 
+BOOTDIR=boot.ocp
+
 ROOTDIR=../..
 CAMLRUN:=$(ROOTDIR)/boot/ocamlrun
 CAMLC:=$(CAMLRUN) $(ROOTDIR)/$(BOOTDIR)/ocamlc
 CAMLYACC:=$(ROOTDIR)/yacc/ocamlyacc
 CAMLLEX=$(CAMLRUN) $(ROOTDIR)/boot/ocamllex
 
-MAKE_STDLIB:=$(MAKE) \
-	CAMLRUN="../$(CAMLRUN)" \
-	CAMLDEP="../$(CAMLRUN) ../$(ROOTDIR)/boot/ocamldep" \
-	COMPILER="../$(ROOTDIR)/$(BOOTDIR)/ocamlc -use-prims ../$(ROOTDIR)/byterun/primitives"
-
 default:
 	@echo No default rule
 
 update:
-	rm -rf stdlib
-	cp -r ../../stdlib .
 	rm -rf compiler compiler-srcs
 	mkdir compiler
 	mkdir compiler-srcs
@@ -52,17 +37,11 @@ update:
 	cd compiler; $(MAKE) depend
 
 all:
-	mkdir -p config
-	cd config; ln -sf ../../../config/Makefile
-	ln -sf ../../VERSION
-	cd stdlib; $(MAKE_STDLIB)
 	cd compiler; $(MAKE) $(CMIS)
 
 depend:
-	$(MAKE_STDLIB) depend
 	cd compiler; $(MAKE) depend
 
 partialclean:
 	rm -f *.cma *.cmi
-	cd stdlib; $(MAKE) clean
 	cd compiler; $(MAKE) partialclean
