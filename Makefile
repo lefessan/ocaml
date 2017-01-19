@@ -96,6 +96,9 @@ coldstart:
 	cd byterun; $(MAKE) all
 	cp byterun/ocamlrun$(EXE) boot/ocamlrun$(EXE)
 	cd yacc; $(MAKE) all
+	cd ocamlpro/boot; $(MAKE) all
+	cd ocamlpro/ocpp; $(MAKE) -f Makefile.plugin
+	cd ocamlpro/sempatch; $(MAKE) -f Makefile.plugin
 	cp yacc/ocamlyacc$(EXE) boot/ocamlyacc$(EXE)
 	cd stdlib; \
 	  $(MAKE) COMPILER="../boot/ocamlc -use-prims ../byterun/primitives" all
@@ -783,3 +786,11 @@ distclean:
 .PHONY: restore runtime runtimeopt makeruntimeopt world world.opt
 
 include .depend
+
+### ocamlpro
+
+partialclean::
+	cd ocamlpro/boot; $(MAKE) partialclean
+	cd ocamlpro/ocpp; $(MAKE) -f Makefile.plugin partialclean
+	cd ocamlpro/sempatch; $(MAKE) -f Makefile.plugin partialclean
+
