@@ -7,6 +7,7 @@ CAMLLEX=$(CAMLRUN) $(ROOTDIR)/boot/ocamllex
 CAMLYACC:=$(ROOTDIR)/yacc/ocamlyacc
 
 INCLUDES=-I ../stdlib
+
 COMPFLAGS=$(INCLUDES)
 
 .SUFFIXES: .ml .mli .cmo .cmi .cmx

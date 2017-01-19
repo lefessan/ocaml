@@ -14,6 +14,7 @@
 #**************************************************************************
 
 # The main Makefile
+BOOTDIR ?= boot.ocp
 
 MAKEREC=$(MAKE)
 include Makefile.shared
@@ -38,12 +39,12 @@ all:
 	  $(WITH_OCAMLDOC)
 
 # Compile everything the first time
-world:
+world: $(BOOTDIR)/ocamlc
 	$(MAKE) coldstart
 	$(MAKE) all
 
 # Compile also native code compiler and libraries, fast
-world.opt:
+world.opt: $(BOOTDIR)/ocamlc
 	$(MAKE) coldstart
 	$(MAKE) opt.opt
 
@@ -96,17 +97,26 @@ coldstart:
 	cd byterun; $(MAKE) all
 	cp byterun/ocamlrun$(EXE) boot/ocamlrun$(EXE)
 	cd yacc; $(MAKE) all
-	cd ocamlpro/boot; $(MAKE) all
-	cd ocamlpro/ocpp; $(MAKE) -f Makefile.plugin
-	cd ocamlpro/sempatch; $(MAKE) -f Makefile.plugin
+	cd ocamlpro/$(BOOTDIR); $(MAKE) all BOOTDIR=$(BOOTDIR)
+	cd ocamlpro/ocpp; $(MAKE) -f Makefile.plugin BOOTDIR=$(BOOTDIR)
+	cd ocamlpro/sempatch; $(MAKE) -f Makefile.plugin BOOTDIR=$(BOOTDIR)
+	cd ocamlpro/last-plugin; $(MAKE) -f Makefile.plugin BOOTDIR=$(BOOTDIR)
 	cp yacc/ocamlyacc$(EXE) boot/ocamlyacc$(EXE)
 	cd stdlib; \
-	  $(MAKE) COMPILER="../boot/ocamlc -use-prims ../byterun/primitives" all
+	  $(MAKE) COMPILER="../$(BOOTDIR)/ocamlc -use-prims ../byterun/primitives" BOOTDIR=$(BOOTDIR) all
 	cd stdlib; cp $(LIBFILES) ../boot
 	if test -f boot/libcamlrun.a; then :; else \
 	  ln -s ../byterun/libcamlrun.a boot/libcamlrun.a; fi
 	if test -d stdlib/caml; then :; else \
 	  ln -s ../byterun/caml stdlib/caml; fi
+
+boot.ocp/ocamlc:
+	mkdir -p boot.ocp
+	$(MAKE) BOOTDIR=boot coldstart
+	$(MAKE) BOOTDIR=boot ocamlc
+	mv ./ocamlc ./boot.ocp/ocamlc
+	cp -f boot/*.cmi ocamlpro/boot.ocp/stdlib
+	$(MAKE) partialclean
 
 # Build the core system: the minimum needed to make depend and bootstrap
 core:
@@ -793,4 +803,8 @@ partialclean::
 	cd ocamlpro/boot; $(MAKE) partialclean
 	cd ocamlpro/ocpp; $(MAKE) -f Makefile.plugin partialclean
 	cd ocamlpro/sempatch; $(MAKE) -f Makefile.plugin partialclean
+	cd ocamlpro/last-plugin; $(MAKE) -f Makefile.plugin partialclean
 
+ocp-clean::
+	rm -f boot.ocp/ocamlc
+	rm -f ocamlpro/boot.ocp/stdlib/*.cm?

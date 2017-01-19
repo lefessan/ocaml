@@ -1,11 +1,11 @@
 
-BOOTDIR=../../boot
+ROOTDIR=../..
 
-INCLUDES=-I ../boot/stdlib -I ../boot/compiler
-CAMLRUN=$(BOOTDIR)/ocamlrun
-CAMLC=$(CAMLRUN) $(BOOTDIR)/ocamlc $(INCLUDES)
-CAMLDEP=$(CAMLRUN) $(BOOTDIR)/ocamldep
-CAMLLEX=$(CAMLRUN) $(BOOTDIR)/ocamllex
+INCLUDES=-I ../$(BOOTDIR)/stdlib -I ../$(BOOTDIR)/compiler
+CAMLRUN=$(ROOTDIR)/boot/ocamlrun
+CAMLC=$(CAMLRUN) $(ROOTDIR)/$(BOOTDIR)/ocamlc $(INCLUDES)
+CAMLDEP=$(CAMLRUN) $(ROOTDIR)/boot/ocamldep
+CAMLLEX=$(CAMLRUN) $(ROOTDIR)/boot/ocamllex
 CAMLYACC=../../yacc/ocamlyacc
 
 OCPP_CMOS:= ocpp_types.cmo ocpp_version.cmo \
@@ -14,26 +14,26 @@ OCPP_CMOS:= ocpp_types.cmo ocpp_version.cmo \
 
 OCPP_MLS:=$(OCPP_CMOS:.cmo=.ml)
 
-all: ocpp-plugin.cma
+all: ../$(BOOTDIR)/ocpp-plugin.cma
 
-ocpp-plugin.cma: $(OCPP_CMOS)
-	$(CAMLC) -a -o ocpp-plugin.cma $(OCPP_CMOS)
+../$(BOOTDIR)/ocpp-plugin.cma: $(OCPP_CMOS)
+	$(CAMLC) -a -o ../$(BOOTDIR)/ocpp-plugin.cma $(OCPP_CMOS)
+	cp -f ocpp.cmi ../$(BOOTDIR)/
+	rm -f *.cmi *.cmti *.cmo *.cmt
 
 beforedepend:: $(OCPP_MLS)
 
 partialclean::
 	rm -f *.cm? *.cm?? *~
-	rm -f ocpp_parser.mli
 	rm -f ocpp_parser.mli ocpp_parser.ml
 	rm -f ocpp_lexer.ml
-	rm -f test_ocpp $(OCPP_DIR)test_ocpp.cm?
 
 ocpp_version.cmi: ocpp_parser.cmi
 ocpp_version.cmo: ocpp_parser.cmi
 ocpp_parser.cmi: ocpp_parser.ml
 ocpp_parser.cmo: ocpp_parser.ml
 
-ocpp_parser.ml: ocpp_parser.mly
+ocpp_parser.ml ocpp_parser.mli: ocpp_parser.mly
 	$(CAMLYACC) ocpp_parser.mly
 ocpp_lexer.ml: ocpp_lexer.mll
 	$(CAMLLEX) ocpp_lexer.mll

@@ -1,0 +1,2 @@
+last_plugin.cmo : ../boot/compiler/symtable.cmi
+last_plugin.cmx : ../boot/compiler/symtable.cmi

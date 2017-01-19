@@ -1,16 +1,14 @@
 
 
+ROOTDIR=../..
 
-BOOTDIR=../../boot
-
-INCLUDES=-I ../boot/stdlib -I ../boot/compiler -I ../ocpp
-CAMLRUN=$(BOOTDIR)/ocamlrun
-CAMLFLAGS= $(INCLUDES) -plugin ../ocpp/ocpp-plugin.cma
-CAMLC=$(CAMLRUN) $(BOOTDIR)/ocamlc $(CAMLFLAGS)
-CAMLDEP=$(CAMLRUN) $(BOOTDIR)/ocamldep $(CAMLFLAGS)
-CAMLLEX=$(CAMLRUN) $(BOOTDIR)/ocamllex
+INCLUDES=-I ../$(BOOTDIR)/stdlib -I ../$(BOOTDIR)/compiler -I ../$(BOOTDIR)
+CAMLRUN=$(ROOTDIR)/boot/ocamlrun
+CAMLFLAGS= $(INCLUDES) -plugin ../$(BOOTDIR)/ocpp-plugin.cma
+CAMLC=$(CAMLRUN) $(ROOTDIR)/$(BOOTDIR)/ocamlc $(CAMLFLAGS)
+CAMLDEP=$(CAMLRUN) $(ROOTDIR)/boot/ocamldep $(CAMLFLAGS)
+CAMLLEX=$(CAMLRUN) $(ROOTDIR)/boot/ocamllex
 CAMLYACC=../../yacc/ocamlyacc
-
 
 
 SEMPATCH_CMOS:= \
@@ -23,14 +21,15 @@ SEMPATCH_CMOS:= \
   patch_engine.cmo	\
   ocpstd.cmo \
   patch_main.cmo \
-  cleanup.cmo
+  sempatch_plugin.cmo
 
 SEMPATCH_MLS:=$(SEMPATCH_CMOS:.cmo=.ml)
 
-all: sempatch-plugin.cma
+all: ../$(BOOTDIR)/sempatch-plugin.cma
 
-sempatch-plugin.cma: $(SEMPATCH_CMOS)
-	$(CAMLC) -a -o sempatch-plugin.cma $(SEMPATCH_CMOS)
+../$(BOOTDIR)/sempatch-plugin.cma: $(SEMPATCH_CMOS)
+	$(CAMLC) -a -o ../$(BOOTDIR)/sempatch-plugin.cma $(SEMPATCH_CMOS)
+	rm -f *.cmi *.cmti *.cmo *.cmt
 
 .SUFFIXES: .ml .mli .cmo .cmi .cmx
 
@@ -48,7 +47,7 @@ partialclean::
 	rm -f *.cm?? *.cm? *~
 
 patch_parser.cmi: patch_parser.ml
-patch_parser.ml: patch_parser.mly
+patch_parser.ml patch_parser.mli: patch_parser.mly
 	$(CAMLYACC) patch_parser.mly
 patch_lexer.ml: patch_lexer.mll
 	$(CAMLLEX) patch_lexer.mll

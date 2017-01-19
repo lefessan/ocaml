@@ -1,10 +1,10 @@
 
-BOOTDIR=../../../boot
-CAMLRUN:=$(BOOTDIR)/ocamlrun
-CAMLC:=$(CAMLRUN) $(BOOTDIR)/ocamlc
-CAMLDEP:=$(CAMLRUN) $(BOOTDIR)/ocamldep
-CAMLLEX=$(CAMLRUN) $(BOOTDIR)/ocamllex
-CAMLYACC:=../../../yacc/ocamlyacc
+ROOTDIR=../../..
+CAMLRUN:=$(ROOTDIR)/boot/ocamlrun
+CAMLC:=$(CAMLRUN) $(ROOTDIR)/$(BOOTDIR)/ocamlc
+CAMLDEP:=$(CAMLRUN) $(ROOTDIR)/boot/ocamldep
+CAMLLEX=$(CAMLRUN) $(ROOTDIR)/boot/ocamllex
+CAMLYACC:=$(ROOTDIR)/yacc/ocamlyacc
 
 INCLUDES=-I ../stdlib
 COMPFLAGS=$(INCLUDES)
