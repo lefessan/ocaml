@@ -1,0 +1,37 @@
+asttypes.cmi : location.cmi
+clflags.cmi : misc.cmi ../stdlib/arg.cmi
+cmi_format.cmi : types.cmi ../stdlib/format.cmi ../stdlib/digest.cmi
+cmo_format.cmi : tbl.cmi lambda.cmi ident.cmi ../stdlib/digest.cmi
+config.cmi :
+consistbl.cmi : ../stdlib/digest.cmi
+docstrings.cmi : parsetree.cmi location.cmi ../stdlib/lexing.cmi \
+    ../stdlib/lazy.cmi
+env.cmi : warnings.cmi types.cmi subst.cmi path.cmi ../stdlib/map.cmi \
+    longident.cmi location.cmi ident.cmi ../stdlib/format.cmi \
+    ../stdlib/digest.cmi consistbl.cmi cmi_format.cmi asttypes.cmi
+ident.cmi : identifiable.cmi
+identifiable.cmi : ../stdlib/set.cmi ../stdlib/map.cmi ../stdlib/hashtbl.cmi \
+    ../stdlib/format.cmi
+lambda.cmi : types.cmi ../stdlib/set.cmi primitive.cmi path.cmi location.cmi \
+    ident.cmi env.cmi asttypes.cmi
+lexer.cmi : parser.cmi location.cmi ../stdlib/lexing.cmi \
+    ../stdlib/format.cmi
+location.cmi : warnings.cmi ../stdlib/lexing.cmi ../stdlib/format.cmi
+longident.cmi :
+misc.cmi : ../stdlib/set.cmi ../stdlib/map.cmi ../stdlib/hashtbl.cmi \
+    ../stdlib/format.cmi
+outcometree.cmi : ../stdlib/format.cmi asttypes.cmi
+parser.cmi : parsetree.cmi location.cmi ../stdlib/lexing.cmi docstrings.cmi
+parsetree.cmi : longident.cmi location.cmi asttypes.cmi
+path.cmi : ident.cmi
+pparse.cmi : parsetree.cmi misc.cmi ../stdlib/lexing.cmi \
+    ../stdlib/format.cmi
+primitive.cmi : parsetree.cmi outcometree.cmi location.cmi
+subst.cmi : types.cmi path.cmi ident.cmi
+symtable.cmi : ../stdlib/obj.cmi misc.cmi lambda.cmi ident.cmi \
+    ../stdlib/format.cmi ../stdlib/digest.cmi cmo_format.cmi
+syntaxerr.cmi : location.cmi ../stdlib/format.cmi
+tbl.cmi : ../stdlib/format.cmi
+types.cmi : ../stdlib/set.cmi primitive.cmi path.cmi parsetree.cmi \
+    ../stdlib/map.cmi longident.cmi location.cmi ident.cmi asttypes.cmi
+warnings.cmi : ../stdlib/format.cmi
