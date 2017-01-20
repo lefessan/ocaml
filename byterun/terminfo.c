@@ -20,7 +20,7 @@
 #include "caml/config.h"
 #include "caml/alloc.h"
 #include "caml/fail.h"
-#include "caml/io.h"
+#include "caml/caml_io.h"
 #include "caml/mlvalues.h"
 
 #define Uninitialised (Val_int(0))

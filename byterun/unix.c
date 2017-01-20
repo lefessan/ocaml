@@ -52,7 +52,7 @@
 #include "caml/osdeps.h"
 #include "caml/signals.h"
 #include "caml/sys.h"
-#include "caml/io.h"
+#include "caml/caml_io.h"
 
 #ifndef S_ISREG
 #define S_ISREG(mode) (((mode) & S_IFMT) == S_IFREG)

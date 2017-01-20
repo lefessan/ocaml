@@ -21,7 +21,7 @@
 #include <signal.h>
 #include "caml/alloc.h"
 #include "caml/fail.h"
-#include "caml/io.h"
+#include "caml/caml_io.h"
 #include "caml/gc.h"
 #include "caml/memory.h"
 #include "caml/mlvalues.h"

@@ -50,7 +50,7 @@
 #include "caml/fail.h"
 #include "caml/gc_ctrl.h"
 #include "caml/instruct.h"
-#include "caml/io.h"
+#include "caml/caml_io.h"
 #include "caml/misc.h"
 #include "caml/mlvalues.h"
 #include "caml/osdeps.h"
