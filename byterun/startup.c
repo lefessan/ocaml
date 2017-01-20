@@ -42,7 +42,6 @@
 #include "caml/instrtrace.h"
 #include "caml/interp.h"
 #include "caml/intext.h"
-#include "caml/io.h"
 #include "caml/memory.h"
 #include "caml/minor_gc.h"
 #include "caml/misc.h"

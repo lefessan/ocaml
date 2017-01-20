@@ -21,7 +21,7 @@
 #ifdef CAML_INTERNALS
 
 #include "mlvalues.h"
-#include "io.h"
+#include "caml_io.h"
 
 CAMLextern value caml_md5_string (value str, value ofs, value len);
 CAMLextern value caml_md5_chan (value vchan, value len);
