@@ -137,35 +137,38 @@ backup:
 	mkdir boot/Saved
 	mv boot/Saved.prev boot/Saved/Saved.prev
 	cp boot/ocamlrun$(EXE) boot/Saved
-	mv boot/ocamlc boot/ocamllex boot/ocamlyacc$(EXE) boot/ocamldep \
-	   boot/Saved
-	cd boot; cp $(LIBFILES) Saved
+	mv $(BOOT)/ocamlc boot/Saved
+# we don't use them anyway:
+#	mv -f $(BOOT)/ocamllex $(BOOT)/ocamldep boot/Saved
+#	cd boot; cp $(LIBFILES) Saved
+
+# why is ocamlyacc and $(LIBFILES) also saved ?
 
 # Promote the newly compiled system to the rank of cross compiler
 # (Runs on the old runtime, produces code for the new runtime)
 promote-cross:
-	$(CAMLRUN) tools/stripdebug ocamlc boot/ocamlc
-	$(CAMLRUN) tools/stripdebug lex/ocamllex boot/ocamllex
+	$(CAMLRUN) tools/stripdebug ocamlc $(BOOT)/ocamlc
+	$(CAMLRUN) tools/stripdebug lex/ocamllex $(BOOT)/ocamllex
 	cp yacc/ocamlyacc$(EXE) boot/ocamlyacc$(EXE)
-	$(CAMLRUN) tools/stripdebug tools/ocamldep boot/ocamldep
+	$(CAMLRUN) tools/stripdebug tools/ocamldep $(BOOT)/ocamldep
 	cd stdlib; cp $(LIBFILES) ../boot
 
 # Promote the newly compiled system to the rank of bootstrap compiler
 # (Runs on the new runtime, produces code for the new runtime)
 promote: promote-cross
-	cp byterun/ocamlrun$(EXE) boot/ocamlrun$(EXE)
+	cp byterun/ocamlrun$(EXE) $(BOOT)/ocamlrun$(EXE)
 
 # Restore the saved bootstrap compiler if a problem arises
 restore:
-	mv boot/Saved/* boot
+	mv boot/Saved/* $(BOOT)
 	rmdir boot/Saved
 	mv boot/Saved.prev boot/Saved
 
 # Check if fixpoint reached
 compare:
-	@if $(CAMLRUN) tools/cmpbyt boot/ocamlc ocamlc \
-	 && $(CAMLRUN) tools/cmpbyt boot/ocamllex lex/ocamllex \
-	 && $(CAMLRUN) tools/cmpbyt boot/ocamldep tools/ocamldep; \
+	@if $(CAMLRUN) tools/cmpbyt $(BOOT)/ocamlc ocamlc \
+	 && $(CAMLRUN) tools/cmpbyt $(BOOT)/ocamllex lex/ocamllex \
+	 && $(CAMLRUN) tools/cmpbyt $(BOOT)/ocamldep tools/ocamldep; \
 	then echo "Fixpoint reached, bootstrap succeeded."; \
 	else echo "Fixpoint not reached, try one more bootstrapping cycle."; \
 	fi
