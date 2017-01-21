@@ -61,6 +61,10 @@ DFLAGS=$(CFLAGS) -DDEBUG
 IFLAGS=$(CFLAGS) -DCAML_INSTR
 PICFLAGS=$(CFLAGS) $(SHAREDCCCOMPOPTS)
 
+# We always compile in debug mode. Do we really care about performance
+# penalty when debugging helps so much ?
+CFLAGS += -g
+
 ifneq "$(CCOMPTYPE)" "msvc"
 DFLAGS += -g
 endif
@@ -97,6 +101,7 @@ OBJS=$(addsuffix .$(O), \
   compare ints floats str array io extern intern \
   hash sys meta parsing gc_ctrl terminfo md5 obj \
   lexing callback debugger weak compact finalise custom \
+  ocp_memprof ocpwin \
   dynlink spacetime afl cplugins $(UNIX_OR_WIN32) main)
 
 DOBJS=$(OBJS:.$(O)=.$(DBGO)) instrtrace.$(DBGO)
@@ -249,3 +254,16 @@ include .depend.nt
 else
 include .depend
 endif
+
+COMMIT.tmp:
+	git rev-parse --short HEAD > COMMIT.tmp || cp ../VERSION COMMIT.tmp
+	date +"%Y%m%d-%H%M" > DATE
+
+COMMIT: COMMIT.tmp
+	cmp COMMIT COMMIT.tmp && cp -f COMMIT.tmp COMMIT
+
+caml/commit.h: COMMIT
+	echo '#define OCAML_COMMIT "'$(shell cat COMMIT)'"' > caml/commit.h
+	echo '#define OCAML_DATE "'$(shell cat DATE)'"' >> caml/commit.h
+
+memprof.$(O): caml/commit.h
