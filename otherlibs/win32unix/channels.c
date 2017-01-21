@@ -17,7 +17,7 @@
 
 #include <caml/mlvalues.h>
 #include <caml/alloc.h>
-#include <caml/io.h>
+#include <caml/caml_io.h>
 #include <caml/memory.h>
 #include "unixsupport.h"
 #include <fcntl.h>

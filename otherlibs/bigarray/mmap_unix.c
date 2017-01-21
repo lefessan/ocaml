@@ -24,7 +24,7 @@
 #include "bigarray.h"
 #include "caml/custom.h"
 #include "caml/fail.h"
-#include "caml/io.h"
+#include "caml/caml_io.h"
 #include "caml/mlvalues.h"
 #include "caml/sys.h"
 #include "caml/signals.h"
