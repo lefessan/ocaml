@@ -122,7 +122,7 @@ extern uintnat caml_spacetime_my_profinfo(struct ext_table**, uintnat);
     caml_spacetime_my_profinfo(NULL, wosize))
 #else
 #define Alloc_small(result, wosize, tag) \
-  Alloc_small_with_profinfo(result, wosize, tag, (uintnat) 0)
+  Alloc_small_with_profinfo(result, wosize, tag, caml_memprof_ccall_locid)
 #endif
 
 /* Deprecated alias for [caml_modify] */

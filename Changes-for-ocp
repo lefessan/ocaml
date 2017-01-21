@@ -1,0 +1,27 @@
+2017-01-18:
+* use plugins on bootstrap compiler to build ocaml with preprocessor and
+semantic patches
+
+2017-01-19:
+* two-step bootstrap with boot.ocp/ocamlc
+
+2017-01-20:
+* byterun: rename caml/io.h in caml/caml_io.h
+
+2017-01-21:
+* caml_alloc_loc est remplacé par caml_alloc_with_profinfo
+* les fonctions caml_alloc_*_loc ne vont être définies qu'à la demande
+* alloc.c:
+  * caml_alloc
+* memory.h:
+  * Alloc_small utilise caml_memprof_ccall_locid
+* memory.c:
+  * caml_alloc_shr et caml_alloc_shr_no_raise utilise caml_memprof_ccall_locid
+
+
+
+
+A VERIFIER:
+===========
+* caml_alloc_shr_no_raise fournit un profinfo = 0, pourquoi ?
+	 (utiliser dans intern.c)
