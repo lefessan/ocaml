@@ -19,7 +19,7 @@
 #include <sys/types.h>
 #include <caml/mlvalues.h>
 #include <caml/alloc.h>
-#include <caml/io.h>
+#include <caml/caml_io.h>
 #include <caml/signals.h>
 #include "unixsupport.h"
 

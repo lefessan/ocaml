@@ -20,7 +20,7 @@
 #include <caml/memory.h>
 #include <caml/fail.h>
 #include <caml/signals.h>
-#include <caml/io.h>
+#include <caml/caml_io.h>
 #include "unixsupport.h"
 #ifdef HAS_UNISTD
 #include <unistd.h>
