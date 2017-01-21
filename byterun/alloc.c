@@ -31,7 +31,8 @@
 #define Setup_for_gc
 #define Restore_after_gc
 
-CAMLexport value caml_alloc (mlsize_t wosize, tag_t tag)
+CAMLexport value caml_alloc_with_profinfo
+   (mlsize_t wosize, tag_t tag, uintnat profinfo)
 {
   value result;
   mlsize_t i;
@@ -41,18 +42,23 @@ CAMLexport value caml_alloc (mlsize_t wosize, tag_t tag)
   if (wosize == 0){
     result = Atom (tag);
   }else if (wosize <= Max_young_wosize){
-    Alloc_small (result, wosize, tag);
+    Alloc_small_with_profinfo (result, wosize, tag, profinfo);
     if (tag < No_scan_tag){
       for (i = 0; i < wosize; i++) Field (result, i) = Val_unit;
     }
   }else{
-    result = caml_alloc_shr (wosize, tag);
+    result = caml_alloc_shr_with_profinfo (wosize, tag, profinfo);
     if (tag < No_scan_tag){
       for (i = 0; i < wosize; i++) Field (result, i) = Val_unit;
     }
     result = caml_check_urgent_gc (result);
   }
   return result;
+}
+
+CAMLexport value caml_alloc (mlsize_t wosize, tag_t tag)
+{
+  return caml_alloc_with_profinfo (wosize, tag, caml_memprof_ccall_locid);
 }
 
 CAMLexport value caml_alloc_small (mlsize_t wosize, tag_t tag)

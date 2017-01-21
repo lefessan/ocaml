@@ -258,6 +258,13 @@ static int caml_float_of_hex(const char * s, double * res)
   return 0;
 }
 
+
+/* Under Windows, strtod is not always available */
+#ifdef _WIN32
+#undef strtod
+#endif
+
+
 CAMLprim value caml_float_of_string(value vs)
 {
   char parse_buffer[64];

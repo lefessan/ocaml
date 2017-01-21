@@ -5,21 +5,22 @@ semantic patches
 2017-01-19:
 * two-step bootstrap with boot.ocp/ocamlc
 
-2017-01-20:
+2017-01-20: in byterun/
 * byterun: rename caml/io.h in caml/caml_io.h
 
-2017-01-21:
+2017-01-21: in byterun/ mostly
 * caml_alloc_loc est remplacé par caml_alloc_with_profinfo
 * les fonctions caml_alloc_*_loc ne vont être définies qu'à la demande
 * alloc.c:
-  * caml_alloc
+  * caml_alloc devient caml_alloc_with_profinfo, BUG in ocaml ?
 * memory.h:
   * Alloc_small utilise caml_memprof_ccall_locid
 * memory.c:
   * caml_alloc_shr et caml_alloc_shr_no_raise utilise caml_memprof_ccall_locid
-
-
-
+* configure:
+  * WITH_PROFINFO=true, PROFINFO_WIDTH=22
+* add byterun/ocp_memprof.c, byterun/caml/ocp_memprof.h, byterun/ocpwin.c
+* make install: install *.h content of ../config/
 
 A VERIFIER:
 ===========
