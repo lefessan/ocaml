@@ -77,7 +77,7 @@ endif
 DBGO=d.$(O)
 
 ifeq "$(UNIX_OR_WIN32)" "win32"
-LIBS = $(call SYSLIB,ws2_32) $(EXTRALIBS)
+LIBS = $(call SYSLIB,advapi32) $(call SYSLIB,ws2_32) $(EXTRALIBS)
 ifdef BOOTSTRAPPING_FLEXLINK
 MAKE_OCAMLRUN=$(MKEXE_BOOT)
 else
@@ -112,8 +112,12 @@ PICOBJS=$(OBJS:.$(O)=.pic.$(O))
 all: $(LIBRARIES) $(PROGRAMS)
 
 ld.conf: ../config/Makefile
-	echo "$(STUBLIBDIR)" > $@
-	echo "$(LIBDIR)" >> $@
+	echo "+stublibs" > $@
+	echo "+" >> $@
+# Our ocaml is relocatable, so should the shared libs be. We need to upstream
+# a patch to ocamlfind for this to work completely
+#	echo "$(STUBLIBDIR)" > $@
+#	echo "$(LIBDIR)" >> $@
 
 .PHONY: install
 install:
@@ -124,6 +128,8 @@ install:
 	  sed -f ../tools/cleanup-header $$i \
 	      > "$(INSTALL_LIBDIR)/$$i"; \
 	done
+	if test -d $(INSTALL_LIBDIR)/caml/config; then : ; else mkdir $(INSTALL_LIBDIR)/caml/config; fi
+	cp -f ../config/*.h  $(INSTALL_LIBDIR)/caml/config/
 
 # If primitives contain duplicated lines (e.g. because the code is defined
 # like
@@ -181,7 +187,8 @@ caml/version.h : ../VERSION ../tools/make-version-header.sh
 clean:
 	rm -f $(LIBRARIES) $(PROGRAMS) *.$(O) *.$(A) *.$(SO)
 	rm -f primitives prims.c caml/opnames.h caml/jumptbl.h
-	rm -f caml/version.h
+	rm -f caml/version.h caml/commit.h
+	rm -f DATE COMMIT COMMIT.tmp
 
 ocamlrun$(EXE): prims.$(O) libcamlrun.$(A)
 	$(call MAKE_OCAMLRUN,$@,$^ $(LIBS))
