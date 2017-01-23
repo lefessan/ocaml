@@ -72,20 +72,25 @@ CAMLexport value caml_alloc_small (mlsize_t wosize, tag_t tag)
   return result;
 }
 
+CAMLexport value caml_alloc_small_with_profinfo (mlsize_t wosize,
+  tag_t tag, uintnat profinfo)
+{
+  value result;
+  
+  Assert (wosize > 0);
+  Assert (wosize <= Max_young_wosize);
+  Assert (tag < 256);
+  Alloc_small_with_profinfo (result, wosize, tag, profinfo);
+  return result;
+}
+
 CAMLexport value caml_alloc_small_with_my_or_given_profinfo (mlsize_t wosize,
   tag_t tag, uintnat profinfo)
 {
   if (profinfo == 0) {
     return caml_alloc_small(wosize, tag);
-  }
-  else {
-    value result;
-
-    Assert (wosize > 0);
-    Assert (wosize <= Max_young_wosize);
-    Assert (tag < 256);
-    Alloc_small_with_profinfo (result, wosize, tag, profinfo);
-    return result;
+  } else {
+    return caml_alloc_small_with_profinfo(wosize, tag, profinfo);
   }
 }
 
@@ -96,16 +101,16 @@ CAMLexport value caml_alloc_tuple(mlsize_t n)
 }
 
 /* [len] is a number of bytes (chars) */
-CAMLexport value caml_alloc_string (mlsize_t len)
+CAMLexport value caml_alloc_string_with_profinfo (mlsize_t len, uintnat profinfo)
 {
   value result;
   mlsize_t offset_index;
   mlsize_t wosize = (len + sizeof (value)) / sizeof (value);
 
   if (wosize <= Max_young_wosize) {
-    Alloc_small (result, wosize, String_tag);
+    Alloc_small_with_profinfo (result, wosize, String_tag,profinfo);
   }else{
-    result = caml_alloc_shr (wosize, String_tag);
+    result = caml_alloc_shr_with_profinfo (wosize, String_tag,profinfo);
     result = caml_check_urgent_gc (result);
   }
   Field (result, wosize - 1) = 0;
@@ -113,6 +118,12 @@ CAMLexport value caml_alloc_string (mlsize_t len)
   Byte (result, offset_index) = offset_index - len;
   return result;
 }
+
+CAMLexport value caml_alloc_string (mlsize_t len)
+{
+  return caml_alloc_string_with_profinfo(len, caml_memprof_ccall_locid);
+}
+
 
 /* [len] is a number of words.
    [mem] and [max] are relative (without unit).
@@ -124,16 +135,22 @@ CAMLexport value caml_alloc_final (mlsize_t len, final_fun fun,
                            len * sizeof(value), mem, max);
 }
 
-CAMLexport value caml_copy_string(char const *s)
+CAMLexport value caml_copy_string_with_profinfo(char const *s,uintnat profinfo)
 {
   int len;
   value res;
 
   len = strlen(s);
-  res = caml_alloc_string(len);
+  res = caml_alloc_string_with_profinfo(len, profinfo);
   memmove(String_val(res), s, len);
   return res;
 }
+
+CAMLexport value caml_copy_string(char const *s)
+{
+  return caml_copy_string_with_profinfo(s, caml_memprof_ccall_locid);
+}
+
 
 CAMLexport value caml_alloc_array(value (*funct)(char const *),
                                   char const ** arr)

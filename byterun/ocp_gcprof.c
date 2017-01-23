@@ -1,4 +1,3 @@
-
 /**************************************************************************/
 /*                                                                        */
 /*  Copyright 2014, OCamlPro. All rights reserved.                        */
@@ -40,15 +39,48 @@
 #include <errno.h>
 
 
-#include "caml/ocp_memprof.h"
+#include "caml/ocp_utils.h"
+#include "caml/ocp_gcprof.h"
 
-#ifdef WITH_MEMPROF
-CAMLexport uintnat caml_memprof_ccall_locid = PROF_INIT;
-CAMLexport uintnat caml_memprof_exception_locid = PROF_EXCEPTION;
-#else
-CAMLexport uintnat caml_memprof_ccall_locid = 0;
-CAMLexport uintnat caml_memprof_exception_locid = 0;
-#endif
+CAMLexport int caml_gcprof_flag = 0;
+
+
+VOID_MEMPROF_STUB2( caml_gcprof_gc_phase, ocp_gcprof_gc_phase,
+                    int, gc_phase, int, gc_subphase)
+VOID_MEMPROF_STUB2( caml_gcprof_header, ocp_gcprof_header,value,hd,int,kind)
+VOID_MEMPROF_STUB1( caml_gcprof_intern_init, ocp_gcprof_intern_init,
+                    mlsize_t, wosize)
+VOID_MEMPROF_STUB2( caml_gcprof_intern_alloc, ocp_gcprof_intern_alloc,
+                    header_t*, hp, int, kind)
+VOID_MEMPROF_STUB0( caml_gcprof_intern_finish, ocp_gcprof_intern_finish)
+VOID_MEMPROF_STUB0( caml_gcprof_minor_prepare, ocp_gcprof_minor_prepare)
+RET_MEMPROF_STUB0( int, caml_gcprof_record_minor_alloc,
+                   ocp_gcprof_record_minor_alloc, 0)
+VOID_MEMPROF_STUB2( caml_gcprof_record_major_alloc,
+                    ocp_gcprof_record_major_alloc,
+                    mlsize_t, wosize, uintnat, locid)
+VOID_MEMPROF_STUB1( caml_gcprof_major_scan, ocp_gcprof_major_scan,
+                    int, kind)
+VOID_MEMPROF_STUB0( caml_gcprof_minor_scan, ocp_gcprof_minor_scan)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -66,15 +98,6 @@ CAMLexport uintnat caml_memprof_exception_locid = 0;
 
 #if 0
 
-#ifdef NATIVE_CODE
-/* locid used when calling caml_memprof_register_table from ASM */
-uintnat caml_memprof_locid_location_table_locid = PROF_MEMPROF;
-#endif
-
-CAMLexport int caml_gcprof_flag = 0;
-
-/* This value is used in 64bit code to store the locid to be used
-   in C externals. */
 
 CAMLexport char *caml_gcprof_young_space = NULL;
 CAMLexport uintnat caml_gcprof_profile_period = 0;
@@ -383,111 +406,6 @@ value caml_memprof_register_table (value table, value elems, value ui_name)
 #endif
 
 
-#define VOID_MEMPROF_STUB0(caml_name, ocp_name)                         \
-  CAMLexport void caml_name(){                                          \
-    static void (*ocp_name)() = NULL;                                   \
-    if( caml_memprof_dll_handle != NULL ){                              \
-      if( ocp_name == NULL ) {                                          \
-        ocp_name =                                                      \
-          caml_memprof_load_symbol(#ocp_name);                           \
-      }                                                                 \
-      ocp_name();                                                       \
-    }                                                                   \
-  }
-
-#define VOID_MEMPROF_STUB1(caml_name, ocp_name, ty1,arg1)               \
-  CAMLexport void caml_name(ty1 arg1){                                  \
-    static void (*ocp_name) (ty1 arg1) = NULL;                          \
-    if( caml_memprof_dll_handle != NULL ){                              \
-      if( ocp_name == NULL ) {                                          \
-        ocp_name =                                                      \
-          caml_memprof_load_symbol(#ocp_name);                           \
-      }                                                                 \
-      ocp_name(arg1);                                                   \
-    }                                                                   \
-  }
-
-#define VOID_MEMPROF_STUB2(caml_name, ocp_name, ty1,arg1, ty2, arg2)    \
-  CAMLexport void caml_name(ty1 arg1, ty2 arg2){                        \
-    static void (*ocp_name) (ty1 arg1, ty2 arg2) = NULL;                \
-    if( caml_memprof_dll_handle != NULL ){                              \
-      if( ocp_name == NULL ) {                                          \
-        ocp_name =                                                      \
-          caml_memprof_load_symbol(#ocp_name);                           \
-      }                                                                 \
-      ocp_name(arg1,arg2);                                              \
-    }                                                                   \
-  }
-
-#define VOID_MEMPROF_STUB3(caml_name, ocp_name, ty1,arg1, ty2, arg2, ty3, arg3) \
-  CAMLexport void caml_name(ty1 arg1, ty2 arg2, ty3 arg3){              \
-    static void (*ocp_name) (ty1 arg1, ty2 arg2, ty3 arg3) = NULL;      \
-    if( caml_memprof_dll_handle != NULL ){                              \
-      if( ocp_name == NULL ) {                                          \
-        ocp_name =                                                      \
-          caml_memprof_load_symbol(#ocp_name);                           \
-      }                                                                 \
-      ocp_name(arg1,arg2,arg3);                                         \
-    }                                                                   \
-  }
-
-
-#define RET_MEMPROF_STUB0(rety, caml_name, ocp_name, retv)              \
-  CAMLexport rety caml_name(){                                          \
-    static rety (*ocp_name)() = NULL;                                   \
-    if( caml_memprof_dll_handle != NULL ){                              \
-      if( ocp_name == NULL ) {                                          \
-        ocp_name =                                                      \
-          caml_memprof_load_symbol(#ocp_name);                           \
-      }                                                                 \
-      return ocp_name();                                                \
-    } else {                                                            \
-      return retv;                                                      \
-    }                                                                   \
-  }
-
-#define RET_MEMPROF_STUB1(rety, caml_name, ocp_name, ty1,arg1, retv)    \
-  CAMLexport rety caml_name(ty1 arg1){                                  \
-    static rety (*ocp_name) (ty1 arg1) = NULL;                          \
-    if( caml_memprof_dll_handle != NULL ){                              \
-      if( ocp_name == NULL ) {                                          \
-        ocp_name =                                                      \
-          caml_memprof_load_symbol(#ocp_name);                           \
-      }                                                                 \
-      return ocp_name(arg1);                                            \
-    } else {                                                            \
-      return retv;                                                      \
-    }                                                                   \
-  }
-
-#define RET_MEMPROF_STUB2(rety, caml_name, ocp_name, ty1,arg1, ty2, arg2, retv) \
-  CAMLexport rety caml_name(ty1 arg1, ty2 arg2){                        \
-    static rety (*ocp_name) (ty1 arg1, ty2 arg2) = NULL;                \
-    if( caml_memprof_dll_handle != NULL ){                              \
-      if( ocp_name == NULL ) {                                          \
-        ocp_name =                                                      \
-          caml_memprof_load_symbol(#ocp_name);                           \
-      }                                                                 \
-      return ocp_name(arg1,arg2);                                       \
-    } else {                                                            \
-      return retv;                                                      \
-    }                                                                   \
-  }
-
-#define RET_MEMPROF_STUB3(rety, caml_name, ocp_name, ty1,arg1, ty2, arg2, ty3, arg3, retv) \
-  CAMLexport rety caml_name(ty1 arg1, ty2 arg2, ty3 arg3){              \
-    static rety (*ocp_name) (ty1 arg1, ty2 arg2, ty3 arg3) = NULL;      \
-    if( caml_memprof_dll_handle != NULL ){                              \
-      if( ocp_name == NULL ) {                                          \
-        ocp_name =                                                      \
-          caml_memprof_load_symbol(#ocp_name);                           \
-      }                                                                 \
-      return ocp_name(arg1,arg2,arg3);                                  \
-    } else {                                                            \
-      return retv;                                                      \
-    }                                                                   \
-  }
-
 
 
 
@@ -529,24 +447,6 @@ VOID_MEMPROF_STUB3( caml_memprof_next_thread, ocp_memprof_next_thread,
                     uintnat, retaddr)
 VOID_MEMPROF_STUB2( caml_memprof_change_thread, ocp_memprof_change_thread,
                     value, thread_id, int, change)
-
-VOID_MEMPROF_STUB2( caml_gcprof_gc_phase, ocp_gcprof_gc_phase,
-                    int, gc_phase, int, gc_subphase)
-VOID_MEMPROF_STUB2( caml_gcprof_header, ocp_gcprof_header,value,hd,int,kind)
-VOID_MEMPROF_STUB1( caml_gcprof_intern_init, ocp_gcprof_intern_init,
-                    mlsize_t, wosize)
-VOID_MEMPROF_STUB2( caml_gcprof_intern_alloc, ocp_gcprof_intern_alloc,
-                    header_t*, hp, int, kind)
-VOID_MEMPROF_STUB0( caml_gcprof_intern_finish, ocp_gcprof_intern_finish)
-VOID_MEMPROF_STUB0( caml_gcprof_minor_prepare, ocp_gcprof_minor_prepare)
-RET_MEMPROF_STUB0( int, caml_gcprof_record_minor_alloc,
-                   ocp_gcprof_record_minor_alloc, 0)
-VOID_MEMPROF_STUB2( caml_gcprof_record_major_alloc,
-                    ocp_gcprof_record_major_alloc,
-                    mlsize_t, wosize, profiling_t, locid)
-VOID_MEMPROF_STUB1( caml_gcprof_major_scan, ocp_gcprof_major_scan,
-                    int, kind)
-VOID_MEMPROF_STUB0( caml_gcprof_minor_scan, ocp_gcprof_minor_scan)
 
 CAMLexport char *caml_allocprof_young_ptr;
 VOID_MEMPROF_STUB2( caml_allocprof_future_minor_alloc,

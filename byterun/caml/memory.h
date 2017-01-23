@@ -30,6 +30,7 @@
 #include "misc.h"
 #include "mlvalues.h"
 #include "hooks.h"
+#include "ocp_allocprof.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -95,6 +96,26 @@ int caml_page_table_initialize(mlsize_t bytesize);
 #define DEBUG_clear(result, wosize)
 #endif
 
+  
+/*
+  1/ in native-code, we have to compare [caml_young_ptr] with 
+  [caml_young_limit] instead of formerly [caml_young_start] because it
+  is the correct way to check for signals.
+  2/ in native-code, we should call [caml_garbage_collection] instead
+  of [caml_minor_collection] to check again for signals. 
+  [caml_garbage_collection] will trigger a minor_collection only if
+  needed.
+  3/ in native code, we should not modify [caml_young_ptr] before calling
+  [caml_garbage_collection] because otherwise, it might not detect correctly
+  the need for a minor garbage_collection. As a consequence, the preceeding
+  allocated space is lost if a signal was received.
+  4/ in native code, [caml_garbage_collection] might trigger the execution
+  of a signal handler. Consequently, there might be not enough space in the
+  minor heap for the interrupted allocation, so we need to recheck that
+  [caml_young_ptr] is bigger than [caml_young_limit] (as it is already done
+  in generated code).
+ */
+
 #define Alloc_small_with_profinfo(result, wosize, tag, profinfo) do {       \
                                                 CAMLassert ((wosize) >= 1); \
                                           CAMLassert ((tag_t) (tag) < 256); \
@@ -110,6 +131,7 @@ int caml_page_table_initialize(mlsize_t bytesize);
   }                                                                         \
   Hd_hp (caml_young_ptr) =                                                  \
     Make_header_with_profinfo ((wosize), (tag), Caml_black, profinfo);      \
+  ALLOCPROF_SMALL_ALLOC(wosize);                                            \
   CAML_ALLOC_SMALL_HOOK(wosize);                                            \
   (result) = Val_hp (caml_young_ptr);                                       \
   DEBUG_clear ((result), (wosize));                                         \

@@ -27,15 +27,14 @@
 
 #include <windows.h>
 
-
-#endif
+#include "caml/ocp_win.h"
 
 /*********************************************************************/
 
-#ifdef _WIN32
+
 
 /* from ocamltopwin, startocaml.c */
-static int ReadRegistryValue(HKEY h,
+int caml_ReadRegistryValue(HKEY h,
                         char ** keys, int pos, int len,
 			char *entry,
                         unsigned char *dest, unsigned long size)
@@ -47,7 +46,7 @@ static int ReadRegistryValue(HKEY h,
       /*      fprintf(stderr, "RegOpenKeyExA(%s)\n", keys[pos]); */
       if (RegOpenKeyExA(h, keys[pos], 0, KEY_QUERY_VALUE, &hret) != ERROR_SUCCESS)
         return -1;
-      ret = ReadRegistryValue(hret, keys, pos+1, len, entry, dest, size);
+      ret = caml_ReadRegistryValue(hret, keys, pos+1, len, entry, dest, size);
       RegCloseKey(hret);
       return ret;
     } else {
@@ -108,7 +107,7 @@ CAMLprim value caml_ocp_win32_read_registry(value hroot_v,value keys_v,value ent
 {
 #ifdef _WIN32
   int ret =
-     ReadRegistryValue(
+     caml_ReadRegistryValue(
 		  TranslateHROOT(hroot_v),
 		  (char**) keys_v,
 		  0, Wosize_val(keys_v),

@@ -22,7 +22,47 @@ semantic patches
 * add byterun/ocp_memprof.c, byterun/caml/ocp_memprof.h, byterun/ocpwin.c
 * make install: install *.h content of ../config/
 
+2017-01-23:
+* byterun/caml/mlvalues: WITH_MEMPROF defined when WITH_PROFINFO
+    without WITH_SPACETIME
+* byterun/dynlink.c:
+  * OCAML_ALLOWS_UNKNOWN_PRIM env var can be used to avoid
+     "Fatal error: unknown C primitive" for a primitive known not to be used
+* byterun/hash.c:
+  * No modification: hash only the lower 32 bits of the header, i.e. without
+    Profinfo_hd
+* byterun/caml/config.h:
+  * New macro CAML_HAS_INTERNALS to tell Coq to use CAML_INTERNALS to define
+    Make_header
+* byterun/major_gc.c:
+  * Adds only GCPPROF_GC_PHASE macros, no GCPPROF_GCTIME nor
+     GCPROF_HEADER
+* add new files byterun/ocp_utils.c (for stubs and dynlink) and
+   byterun/ocp_gcprof.c (code for gcprof), with their corresponding
+   header files.
+* byterun/caml/spacetime.h:
+  * uses caml_memprof_ccall_locid in Get_my_profinfo_with_cached_backtrace
+* byterun/obj.c:
+  * caml_obj_dup reuses locid when available
+
 A VERIFIER:
 ===========
 * caml_alloc_shr_no_raise fournit un profinfo = 0, pourquoi ?
 	 (utiliser dans intern.c)
+* byterun/caml/memory.h:
+  ALLOCPROF_SMALL_ALLOC dans Alloc_small_with_profinfo a été remplacé
+  par un appel à CAML_ALLOC_SMALL_HOOK(wosize), qui n'est utilisé que
+  avec --gc-hooks
+
+BYTECODE:
+=========
+
+Tous les fichiers sont dans PATCHES/byterun/BYTECODE/. Je pense qu'on
+pourrait faire plus simple: ne pas ajouter de nouveaux OPCODEs, mais
+changer l'arité des OPCODEs précédents pour rajouter le LOCID.
+
+COQ:
+====
+
+Pour être compatible avec Coq, il faudrait que Coq puisse utiliser
+le Make_header d'OCaml. Cela peut se faire via CAML_INTERNALS
