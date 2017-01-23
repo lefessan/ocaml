@@ -96,20 +96,25 @@ CAMLprim value caml_obj_dup(value arg)
   CAMLlocal1 (res);
   mlsize_t sz, i;
   tag_t tg;
-
-  sz = Wosize_val(arg);
+  profinfo_t profinfo;
+  header_t hd = Hd_val(arg);
+  
+  sz = Wosize_hd(hd);
   if (sz == 0) CAMLreturn (arg);
-  tg = Tag_val(arg);
+  tg = Tag_hd(hd);
+  profinfo = Profinfo_hd(hd);
+  if( profinfo == 0 ) profinfo = caml_memprof_ccall_locid;
   if (tg >= No_scan_tag) {
-    res = caml_alloc(sz, tg);
+    res = caml_alloc_with_profinfo(sz, tg, profinfo);
     memcpy(Bp_val(res), Bp_val(arg), sz * sizeof(value));
   } else if (sz <= Max_young_wosize) {
-    uintnat profinfo;
+#ifdef SPACETIME
     Get_my_profinfo_with_cached_backtrace(profinfo, sz);
+#endif
     res = caml_alloc_small_with_my_or_given_profinfo(sz, tg, profinfo);
     for (i = 0; i < sz; i++) Field(res, i) = Field(arg, i);
   } else {
-    res = caml_alloc_shr(sz, tg);
+    res = caml_alloc_shr_with_profinfo(sz, tg, profinfo);
     for (i = 0; i < sz; i++) caml_initialize(&Field(res, i), Field(arg, i));
   }
   CAMLreturn (res);

@@ -192,13 +192,13 @@ extern void caml_spacetime_automatic_snapshot (void);
   while (0);
 #else
 #define Get_my_profinfo_with_cached_backtrace(profinfo, size) \
-  profinfo = (uintnat) 0;
+  profinfo = (uintnat) caml_memprof_ccall_locid;
 #endif
 
 #else
 
 #define Get_my_profinfo_with_cached_backtrace(profinfo, size)   \
-  profinfo = (uintnat) 0;
+  profinfo = (uintnat) caml_memprof_ccall_locid;
 
 #endif /* NATIVE_CODE */
 

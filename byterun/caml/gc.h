@@ -21,6 +21,7 @@
 
 /* Used by memprof to store locids to be used during C calls. */
 extern uintnat caml_memprof_ccall_locid;
+extern uintnat caml_memprof_exception_locid;
 
 #define Caml_white (0 << 8)
 #define Caml_gray  (1 << 8)
