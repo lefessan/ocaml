@@ -17,13 +17,15 @@ include ../config/Makefile
 CAMLRUN ?= ../boot/ocamlrun
 CAMLYACC ?= ../boot/ocamlyacc
 BOOTDIR ?= boot.ocp
+HAS_MEMPROF ?= -D HAS_MEMPROF
 TARGET_BINDIR ?= $(BINDIR)
 
 PLUGINDIR ?= ../ocamlpro/$(BOOTDIR)
 PLUGINS=\
   -plugin $(PLUGINDIR)/ocpp-plugin.cma \
   -plugin $(PLUGINDIR)/sempatch-plugin.cma \
-  -plugin $(PLUGINDIR)/last-plugin.cma
+  -plugin $(PLUGINDIR)/last-plugin.cma \
+  $(HAS_MEMPROF)
 
 COMPILER=../ocamlc
 CAMLC=$(CAMLRUN) $(COMPILER) $(PLUGINS)

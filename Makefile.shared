@@ -26,7 +26,8 @@ PLUGINDIR=./ocamlpro/$(BOOTDIR)
 PLUGINS=\
    -plugin $(PLUGINDIR)/ocpp-plugin.cma \
    -plugin $(PLUGINDIR)/sempatch-plugin.cma \
-   -plugin $(PLUGINDIR)/last-plugin.cma
+   -plugin $(PLUGINDIR)/last-plugin.cma \
+   $(HAS_MEMPROF)
 
 CAMLC=$(CAMLRUN) $(BOOTDIR)/ocamlc $(PLUGINS) -g -nostdlib -I boot -use-prims byterun/primitives
 CAMLOPT=$(CAMLRUN) ./ocamlopt -g -nostdlib -I stdlib -I otherlibs/dynlink

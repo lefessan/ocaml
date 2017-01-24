@@ -1301,3 +1301,20 @@ let lexbuf () = !current_lexbuf
    3/ to stack the correct behavior to handle tokens
 
 *)
+
+
+
+let () =
+  let arg_D s =
+    let name, value =
+      try
+        let name, value = Misc.cut_at s '=' in
+        name, [Ocpp_version.mk_string value]
+      with Not_found -> s, []
+    in
+    add_macro name value
+  in
+  Clflags.add_arguments __LOC__
+    [
+        "-D", Arg.String arg_D, "<macro[=string]> Define a macro for Ocpp"
+    ]
