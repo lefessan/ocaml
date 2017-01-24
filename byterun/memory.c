@@ -486,7 +486,7 @@ static inline value caml_alloc_shr_aux (mlsize_t wosize, tag_t tag,
 #ifdef WITH_GC_HOOKS
   MAYBE_HOOK3(caml_alloc_shr_begin_hook, wosize, tag, profinfo);
 #endif
-  ALLOCPROF_ALLOC_MAJOR(wosize, tag, id);
+  ALLOCPROF_ALLOC_MAJOR(wosize, tag, profinfo);
   hp = caml_fl_allocate (wosize);
   if (hp == NULL){
     new_block = expand_heap (wosize);

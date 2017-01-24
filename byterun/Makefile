@@ -61,8 +61,8 @@ DFLAGS=$(CFLAGS) -DDEBUG
 IFLAGS=$(CFLAGS) -DCAML_INSTR
 PICFLAGS=$(CFLAGS) $(SHAREDCCCOMPOPTS)
 
-# We always compile in debug mode. Do we really care about performance
-# penalty when debugging helps so much ?
+# ocp-memprof We always compile in debug mode. Do we really care about
+# performance penalty when debugging helps so much ?
 CFLAGS += -g
 
 ifneq "$(CCOMPTYPE)" "msvc"
@@ -85,7 +85,7 @@ MAKE_OCAMLRUN = $(MKEXE) -o $(1) $(2)
 endif
 else
 LIBS = $(BYTECCLIBS)
-MAKE_OCAMLRUN = $(MKEXE) $(BYTECCLINKOPTS) -o $(1) $(2)
+MAKE_OCAMLRUN = $(MKEXE) -g $(BYTECCLINKOPTS) -o $(1) $(2)
 endif
 
 PRIMS=\
@@ -101,7 +101,7 @@ OBJS=$(addsuffix .$(O), \
   compare ints floats str array io extern intern \
   hash sys meta parsing gc_ctrl terminfo md5 obj \
   lexing callback debugger weak compact finalise custom \
-  ocp_utils ocp_memprof ocp_gcprof ocp_win \
+  ocp_bytecode ocp_utils ocp_memprof ocp_gcprof ocp_win \
   dynlink spacetime afl cplugins $(UNIX_OR_WIN32) main)
 
 DOBJS=$(OBJS:.$(O)=.$(DBGO)) instrtrace.$(DBGO)
@@ -262,12 +262,18 @@ else
 include .depend
 endif
 
+.PHONY: COMMIT.tmp
+
 COMMIT.tmp:
 	git rev-parse --short HEAD > COMMIT.tmp || cp ../VERSION COMMIT.tmp
 	date +"%Y%m%d-%H%M" > DATE
 
-COMMIT: COMMIT.tmp
-	cmp COMMIT COMMIT.tmp && cp -f COMMIT.tmp COMMIT
+COMMIT.old:
+	touch COMMIT.old
+
+COMMIT: COMMIT.tmp COMMIT.old
+	cmp COMMIT.old COMMIT.tmp || \
+	  (cp -f COMMIT.tmp COMMIT.old; cp -f COMMIT.tmp COMMIT)
 
 caml/commit.h: COMMIT
 	echo '#define OCAML_COMMIT "'$(shell cat COMMIT)'"' > caml/commit.h

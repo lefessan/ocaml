@@ -59,6 +59,7 @@
 
 #include "caml/ocp_utils.h"
 #include "caml/ocp_memprof.h"
+#include "caml/ocp_bytecode.h"
 
 #ifndef O_BINARY
 #define O_BINARY 0
@@ -363,7 +364,7 @@ CAMLexport void caml_main(char **argv)
   /* Initialize the debugger, if needed */
   caml_debugger_init();
   caml_ocp_utils_init();
-  caml_memprof_bytecode_init(read_section(fd, &trail, "MEMP"));
+  caml_ocp_bytecode_init(read_section(fd, &trail, "MEMP"));
   /* Load the code */
   caml_code_size = caml_seek_section(fd, &trail, "CODE");
   caml_load_code(fd, caml_code_size);
@@ -453,7 +454,7 @@ CAMLexport void caml_startup_code(
   caml_debugger_init();
   caml_ocp_utils_init();
   /* For now, we cannot handle this case. */
-  caml_memprof_bytecode_init(NULL); // read_section(fd, &trail, "MEMP"));
+  caml_ocp_bytecode_init(NULL); // read_section(fd, &trail, "MEMP"));
   /* Load the code */
   caml_start_code = code;
   caml_code_size = code_size;

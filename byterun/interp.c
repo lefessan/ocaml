@@ -35,6 +35,9 @@
 #include "caml/stacks.h"
 #include "caml/startup_aux.h"
 
+#include "caml/ocp_bytecode.h"
+#include "caml/ocp_memprof.h"
+
 /* Registers for the abstract machine:
         pc         the code pointer
         sp         the stack pointer (grows downward)
@@ -222,7 +225,10 @@ value caml_interprete(code_t prog, asize_t prog_size)
 #ifndef THREADED_CODE
   opcode_t curr_instr;
 #endif
-
+#ifdef OCP_BYTECODE_DISABLED
+  profinfo_t locid = 0;
+#endif
+  
 #ifdef THREADED_CODE
   static void * jumptable[] = {
 #    include "caml/jumptbl.h"
@@ -237,6 +243,8 @@ value caml_interprete(code_t prog, asize_t prog_size)
     return Val_unit;
   }
 
+  caml_memprof_ccall_locid = PROF_INTERP;
+  
 #if defined(THREADED_CODE) && defined(ARCH_SIXTYFOUR) && !defined(ARCH_CODE32)
   jumptbl_base = Jumptbl_base;
 #endif
@@ -504,17 +512,23 @@ value caml_interprete(code_t prog, asize_t prog_size)
       Next;
     }
 
+      /* not fallthrough, because the offset to the restart instruction
+	 needs to take the locid into account */
     Instruct(GRAB): {
-      int required = *pc++;
+      int required;
+#ifndef OCP_BYTECODE_DISABLED
+      profinfo_t locid = *pc++;
+#endif
+      required = *pc++;
       if (extra_args >= required) {
         extra_args -= required;
       } else {
         mlsize_t num_args, i;
         num_args = 1 + extra_args; /* arg1 + extra args */
-        Alloc_small(accu, num_args + 2, Closure_tag);
+        Alloc_small_with_profinfo(accu, num_args + 2, Closure_tag, locid);
         Field(accu, 1) = env;
         for (i = 0; i < num_args; i++) Field(accu, i + 2) = sp[i];
-        Code_val(accu) = pc - 3; /* Point to the preceding RESTART instr. */
+        Code_val(accu) = pc - 4; /* Point to the preceding RESTART instr. */
         sp += num_args;
         pc = (code_t)(sp[0]);
         env = sp[1];
@@ -525,18 +539,21 @@ value caml_interprete(code_t prog, asize_t prog_size)
     }
 
     Instruct(CLOSURE): {
+#ifndef OCP_BYTECODE_DISABLED
+      profinfo_t locid = *pc++; 
+#endif
       int nvars = *pc++;
       int i;
       if (nvars > 0) *--sp = accu;
       if (nvars < Max_young_wosize) {
         /* nvars + 1 <= Max_young_wosize, can allocate in minor heap */
-        Alloc_small(accu, 1 + nvars, Closure_tag);
+        Alloc_small_with_profinfo(accu, 1 + nvars, Closure_tag, locid);
         for (i = 0; i < nvars; i++) Field(accu, i + 1) = sp[i];
       } else {
         /* PR#6385: must allocate in major heap */
         /* caml_alloc_shr and caml_initialize never trigger a GC,
            so no need to Setup_for_gc */
-        accu = caml_alloc_shr(1 + nvars, Closure_tag);
+        accu = caml_alloc_shr_with_profinfo(1 + nvars, Closure_tag, locid);
         for (i = 0; i < nvars; i++) caml_initialize(&Field(accu, i + 1), sp[i]);
       }
       /* The code pointer is not in the heap, so no need to go through
@@ -548,6 +565,9 @@ value caml_interprete(code_t prog, asize_t prog_size)
     }
 
     Instruct(CLOSUREREC): {
+#ifndef OCP_BYTECODE_DISABLED
+      profinfo_t locid = *pc++; 
+#endif
       int nfuncs = *pc++;
       int nvars = *pc++;
       mlsize_t blksize = nfuncs * 2 - 1 + nvars;
@@ -555,14 +575,14 @@ value caml_interprete(code_t prog, asize_t prog_size)
       value * p;
       if (nvars > 0) *--sp = accu;
       if (blksize <= Max_young_wosize) {
-        Alloc_small(accu, blksize, Closure_tag);
+        Alloc_small_with_profinfo(accu, blksize, Closure_tag, locid);
         p = &Field(accu, nfuncs * 2 - 1);
         for (i = 0; i < nvars; i++, p++) *p = sp[i];
       } else {
         /* PR#6385: must allocate in major heap */
         /* caml_alloc_shr and caml_initialize never trigger a GC,
            so no need to Setup_for_gc */
-        accu = caml_alloc_shr(blksize, Closure_tag);
+        accu = caml_alloc_shr_with_profinfo(blksize, Closure_tag, locid);
         p = &Field(accu, nfuncs * 2 - 1);
         for (i = 0; i < nvars; i++, p++) caml_initialize(p, sp[i]);
       }
@@ -645,16 +665,19 @@ value caml_interprete(code_t prog, asize_t prog_size)
       accu = Atom(*pc++); Next;
 
     Instruct(MAKEBLOCK): {
-      mlsize_t wosize = *pc++;
+#ifndef OCP_BYTECODE_DISABLED
+       profinfo_t locid = *pc++; 
+#endif
+     mlsize_t wosize = *pc++;
       tag_t tag = *pc++;
       mlsize_t i;
       value block;
       if (wosize <= Max_young_wosize) {
-        Alloc_small(block, wosize, tag);
+        Alloc_small_with_profinfo(block, wosize, tag, locid);
         Field(block, 0) = accu;
         for (i = 1; i < wosize; i++) Field(block, i) = *sp++;
       } else {
-        block = caml_alloc_shr(wosize, tag);
+        block = caml_alloc_shr_with_profinfo(wosize, tag, locid);
         caml_initialize(&Field(block, 0), accu);
         for (i = 1; i < wosize; i++) caml_initialize(&Field(block, i), *sp++);
       }
@@ -662,17 +685,23 @@ value caml_interprete(code_t prog, asize_t prog_size)
       Next;
     }
     Instruct(MAKEBLOCK1): {
+#ifndef OCP_BYTECODE_DISABLED
+      profinfo_t locid = *pc++; 
+#endif
       tag_t tag = *pc++;
       value block;
-      Alloc_small(block, 1, tag);
+      Alloc_small_with_profinfo(block, 1, tag, locid);
       Field(block, 0) = accu;
       accu = block;
       Next;
     }
     Instruct(MAKEBLOCK2): {
-      tag_t tag = *pc++;
+#ifndef OCP_BYTECODE_DISABLED
+       profinfo_t locid = *pc++; 
+#endif
+     tag_t tag = *pc++;
       value block;
-      Alloc_small(block, 2, tag);
+      Alloc_small_with_profinfo(block, 2, tag, locid);
       Field(block, 0) = accu;
       Field(block, 1) = sp[0];
       sp += 1;
@@ -680,9 +709,12 @@ value caml_interprete(code_t prog, asize_t prog_size)
       Next;
     }
     Instruct(MAKEBLOCK3): {
-      tag_t tag = *pc++;
+#ifndef OCP_BYTECODE_DISABLED
+       profinfo_t locid = *pc++; 
+#endif
+     tag_t tag = *pc++;
       value block;
-      Alloc_small(block, 3, tag);
+      Alloc_small_with_profinfo(block, 3, tag, locid);
       Field(block, 0) = accu;
       Field(block, 1) = sp[0];
       Field(block, 2) = sp[1];
@@ -691,13 +723,18 @@ value caml_interprete(code_t prog, asize_t prog_size)
       Next;
     }
     Instruct(MAKEFLOATBLOCK): {
+#ifndef OCP_BYTECODE_DISABLED
+      profinfo_t locid = *pc++; 
+#endif
       mlsize_t size = *pc++;
       mlsize_t i;
       value block;
       if (size <= Max_young_wosize / Double_wosize) {
-        Alloc_small(block, size * Double_wosize, Double_array_tag);
+        Alloc_small_with_profinfo(block, size * Double_wosize,
+                                  Double_array_tag, locid);
       } else {
-        block = caml_alloc_shr(size * Double_wosize, Double_array_tag);
+        block = caml_alloc_shr_with_profinfo(size * Double_wosize,
+                                             Double_array_tag, locid);
       }
       Store_double_field(block, 0, Double_val(accu));
       for (i = 1; i < size; i++){
@@ -721,8 +758,11 @@ value caml_interprete(code_t prog, asize_t prog_size)
     Instruct(GETFIELD):
       accu = Field(accu, *pc); pc++; Next;
     Instruct(GETFLOATFIELD): {
+#ifndef OCP_BYTECODE_DISABLED
+        profinfo_t locid = *pc++; 
+#endif
       double d = Double_field(accu, *pc);
-      Alloc_small(accu, Double_wosize, Double_tag);
+      Alloc_small_with_profinfo(accu, Double_wosize, Double_tag, locid);
       Store_double_val(accu, d);
       pc++;
       Next;
@@ -893,41 +933,94 @@ value caml_interprete(code_t prog, asize_t prog_size)
 
 /* Calling C functions */
 
-    Instruct(C_CALL1):
+    Instruct(C_CALL1): {
+#ifndef OCP_BYTECODE_DISABLED
+      caml_memprof_ccall_locid = *pc++;
+#ifdef DEBUG_C_CALL_WITH_LOCID
+      fprintf(stderr, "C_CALL1_WITH_LOCID %s = %d\n", 
+	      caml_names_of_builtin_cprim[*pc],
+	      caml_memprof_ccall_locid);
+#endif
+#endif
       Setup_for_c_call;
       accu = Primitive(*pc)(accu);
       Restore_after_c_call;
       pc++;
       Next;
-    Instruct(C_CALL2):
+    }
+    Instruct(C_CALL2): {
+#ifndef OCP_BYTECODE_DISABLED
+     caml_memprof_ccall_locid = *pc++; 
+#ifdef DEBUG_C_CALL_WITH_LOCID
+      fprintf(stderr, "C_CALL2_WITH_LOCID %s = %d\n", 
+	      caml_names_of_builtin_cprim[*pc],
+	      caml_memprof_ccall_locid);
+#endif
+#endif
       Setup_for_c_call;
       accu = Primitive(*pc)(accu, sp[1]);
       Restore_after_c_call;
       sp += 1;
       pc++;
       Next;
-    Instruct(C_CALL3):
+      }
+    Instruct(C_CALL3): {
+#ifndef OCP_BYTECODE_DISABLED
+     caml_memprof_ccall_locid = *pc++; 
+#ifdef DEBUG_C_CALL_WITH_LOCID
+      fprintf(stderr, "C_CALL3_WITH_LOCID %s = %d\n", 
+	      caml_names_of_builtin_cprim[*pc],
+	      caml_memprof_ccall_locid);
+#endif
+#endif
       Setup_for_c_call;
       accu = Primitive(*pc)(accu, sp[1], sp[2]);
       Restore_after_c_call;
       sp += 2;
       pc++;
       Next;
-    Instruct(C_CALL4):
+      }
+    Instruct(C_CALL4): {
+#ifndef OCP_BYTECODE_DISABLED
+     caml_memprof_ccall_locid = *pc++; 
+#ifdef DEBUG_C_CALL_WITH_LOCID
+      fprintf(stderr, "C_CALL4_WITH_LOCID %s = %d\n", 
+	      caml_names_of_builtin_cprim[*pc],
+	      caml_memprof_ccall_locid);
+#endif
+#endif
       Setup_for_c_call;
       accu = Primitive(*pc)(accu, sp[1], sp[2], sp[3]);
       Restore_after_c_call;
       sp += 3;
       pc++;
       Next;
-    Instruct(C_CALL5):
+      }
+    Instruct(C_CALL5): {
+#ifndef OCP_BYTECODE_DISABLED
+     caml_memprof_ccall_locid = *pc++; 
+#ifdef DEBUG_C_CALL_WITH_LOCID
+      fprintf(stderr, "C_CALL5_WITH_LOCID %s = %d\n", 
+	      caml_names_of_builtin_cprim[*pc],
+	      caml_memprof_ccall_locid);
+#endif
+#endif
       Setup_for_c_call;
       accu = Primitive(*pc)(accu, sp[1], sp[2], sp[3], sp[4]);
       Restore_after_c_call;
       sp += 4;
       pc++;
       Next;
+      }
     Instruct(C_CALLN): {
+#ifndef OCP_BYTECODE_DISABLED
+     caml_memprof_ccall_locid = *pc++; 
+#ifdef DEBUG_C_CALL_WITH_LOCID
+      fprintf(stderr, "C_CALLN_WITH_LOCID %s = %d\n", 
+	      caml_names_of_builtin_cprim[*pc],
+	      caml_memprof_ccall_locid);
+#endif
+#endif
       int nargs = *pc++;
       *--sp = accu;
       Setup_for_c_call;

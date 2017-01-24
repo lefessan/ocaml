@@ -42,6 +42,8 @@
 #include "caml/fail.h"
 #include "caml/backtrace_prim.h"
 
+#include "caml/ocp_bytecode.h"
+
 /* The table of debug information fragments */
 struct ext_table caml_debug_info;
 
@@ -383,7 +385,25 @@ int caml_debug_info_available(void)
 static struct ev_info *event_for_location(code_t pc)
 {
   uintnat low, high;
-  struct debug_info *di = find_debug_info(pc);
+  struct debug_info *di;
+
+  /* ocp-memprof: if we updated the instruction for memory profiling,
+     we need to change the PC !
+     
+     BUG: we should check that the PC is in the translation_table,
+     otherwise, we do an overthrow !
+  */
+  {
+    value pos;
+    pos = (char *) pc - (char *) caml_start_code;
+    if( caml_ocp_bytecode_translation_table != NULL ){
+      pos -= sizeof(opcode_t) * 
+        caml_ocp_bytecode_translation_table[pos / sizeof(opcode_t)];
+    }
+    pc = (code_t) ((char *) caml_start_code + pos);
+  }
+  
+  di = find_debug_info(pc);
 
   if (di == NULL)
     return NULL;
