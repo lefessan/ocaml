@@ -32,6 +32,39 @@ extern "C" {
 #define PROF_EXCEPTION             7
 #define PROF_LAST_EXTERNAL         8
 
+#ifdef MEMPROF_INSIDE
+
+CAMLextern int64 ocp_memprof_seed(void);
+CAMLextern void ocp_memprof_scanmult (char *opt, uintnat *var);
+CAMLextern void ocp_dump_after_gc(void);
+CAMLextern void ocp_memprof_init();
+CAMLextern void ocp_memprof_exit();
+
+#else /* !MEMPROF_INSIDE */
+
+CAMLextern void caml_memprof_scanmult (char *opt, uintnat *var);
+CAMLextern void caml_dump_after_gc(void);
+
+CAMLextern void caml_memprof_init();
+CAMLextern void caml_memprof_exit();
+
+#endif
+
+
+#ifdef MEMPROF_INSIDE
+ 
+CAMLextern void ocp_memprof_bytecode_init(char *memprof_section);
+CAMLextern code_t ocp_memprof_bytecode_fix_locids(code_t data, 
+                                                  asize_t* code_size);
+
+#else /* !MEMPROF_SECTION */
+
+CAMLextern void caml_memprof_bytecode_init(char *memprof_section);
+CAMLextern code_t caml_memprof_bytecode_fix_locids(code_t data, 
+                                                   asize_t* code_size);
+
+#endif  /* MEMPROF_SECTION */
+
   
 #ifdef __cplusplus
 }
@@ -122,9 +155,6 @@ Windows. */
 #define OCP_FREE_BUFFER(buffer)
 #endif
 
-CAMLextern int (*caml_execute_signal_hook)(int); /* signals.c */
-CAMLextern int caml_hooked_signal;               /* signals.c */
-
 /********************************************************************/
 /*                                                                  */
 /*                     Snapshot Profiling                           */
@@ -157,13 +187,6 @@ CAMLextern code_t caml_memprof_translation_table;
 #define MEMPROF_THREAD_UNREGISTER 6
 #define MEMPROF_THREAD_CREATE     7
 
-
-struct memprof_init {
-  unsigned int memprof_version;
-  char *ocaml_version;
-  char *ocaml_commit;
-  char *ocaml_date;
-};
 
 /*
  [ MEMPROF_THREAD_INIT ]: corresponding thread is the first thread of the
@@ -252,20 +275,6 @@ CAMLextern void caml_gcprof_gctime(int gcevent);
 
 #else /* !NATIVE_CODE */
 
-
-#ifdef MEMPROF_INSIDE
- 
-CAMLextern void ocp_memprof_bytecode_init(char *memprof_section);
-CAMLextern code_t ocp_memprof_bytecode_fix_locids(code_t data, 
-                                                  asize_t* code_size);
-
-#else /* !MEMPROF_SECTION */
-
-CAMLextern void caml_memprof_bytecode_init(char *memprof_section);
-CAMLextern code_t caml_memprof_bytecode_fix_locids(code_t data, 
-                                                   asize_t* code_size);
-
-#endif  /* MEMPROF_SECTION */
 
 #define MEMPROF_BYTECODE_INIT(memprof_section) \
   caml_memprof_bytecode_init(memprof_section)
@@ -525,36 +534,13 @@ CAMLextern void caml_allocprof_alloc_major(mlsize_t sz, tag_t tag, profiling_t l
 /*                                                                  */
 /********************************************************************/
 
-#ifdef MEMPROF_INSIDE
-
-CAMLextern int64 ocp_memprof_seed(void);
-CAMLextern void ocp_memprof_scanmult (char *opt, uintnat *var);
-CAMLextern void ocp_dump_after_gc(void);
-CAMLextern void ocp_memprof_init();
-CAMLextern void ocp_memprof_exit();
-
-#else /* !MEMPROF_INSIDE */
-
-
-CAMLextern void caml_memprof_scanmult (char *opt, uintnat *var);
-CAMLextern void caml_dump_after_gc(void);
-
-CAMLextern void caml_memprof_init();
-CAMLextern void caml_memprof_exit();
-
-#endif
-
 CAMLextern int caml_heapdump_in_dump;
 
 /* in startup.c:parse_camlrunparam */
-#define MEMPROF_PARSE_OCAMLRUNPARAM()                                     \
+/*
+ #define MEMPROF_PARSE_OCAMLRUNPARAM()                        \
   case 'g': scanmult (opt, &caml_grayvals_ratio); break;
-
-#define MEMPROF_INIT()                                     \
-  caml_memprof_init();
-
-#define MEMPROF_EXIT()                                     \
-  caml_memprof_exit();
+*/
 
 
 typedef struct {

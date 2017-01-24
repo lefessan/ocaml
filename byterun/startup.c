@@ -57,6 +57,9 @@
 #include "caml/startup_aux.h"
 #include "caml/version.h"
 
+#include "caml/ocp_utils.h"
+#include "caml/ocp_memprof.h"
+
 #ifndef O_BINARY
 #define O_BINARY 0
 #endif
@@ -254,6 +257,8 @@ static int parse_command_line(char **argv)
       caml_fatal_error_arg("Unknown option %s.\n", argv[i]);
     }
   }
+  /* With ocp-memprof, backtrace is turned on by default. */
+  caml_record_backtrace(Val_true);
   return i;
 }
 
@@ -263,7 +268,9 @@ extern void caml_init_ieee_floats (void);
 extern void caml_signal_thread(void * lpParam);
 #endif
 
-#if defined(_MSC_VER) && __STDC_SECURE_LIB__ >= 200411L
+// ocpwin:
+//#if defined(_MSC_VER) && __STDC_SECURE_LIB__ >= 200411L
+#ifdef _WIN32
 
 /* PR 4887: avoid crash box of windows runtime on some system calls */
 extern void caml_install_invalid_parameter_handler();
@@ -282,13 +289,16 @@ CAMLexport void caml_main(char **argv)
   value res;
   char * shared_lib_path, * shared_libs, * req_prims;
   char * exe_name, * proc_self_exe;
-
+  
+  caml_memprof_ccall_locid = PROF_STARTUP;
   ensure_spacetime_dot_o_is_included++;
 
   /* Machine-dependent initialization of the floating-point hardware
      so that it behaves as much as possible as specified in IEEE */
   caml_init_ieee_floats();
-#if defined(_MSC_VER) && __STDC_SECURE_LIB__ >= 200411L
+// ocpwin
+//#if defined(_MSC_VER) && __STDC_SECURE_LIB__ >= 200411L
+#ifdef _WIN32
   caml_install_invalid_parameter_handler();
 #endif
   caml_init_custom_operations();
@@ -348,8 +358,12 @@ CAMLexport void caml_main(char **argv)
   caml_init_backtrace();
   /* Initialize the interpreter */
   caml_interprete(NULL, 0);
+  /* Initialize system libraries */
+  caml_sys_init(exe_name, argv + pos);
   /* Initialize the debugger, if needed */
   caml_debugger_init();
+  caml_ocp_utils_init();
+  caml_memprof_bytecode_init(read_section(fd, &trail, "MEMP"));
   /* Load the code */
   caml_code_size = caml_seek_section(fd, &trail, "CODE");
   caml_load_code(fd, caml_code_size);
@@ -366,14 +380,14 @@ CAMLexport void caml_main(char **argv)
   /* Load the globals */
   caml_seek_section(fd, &trail, "DATA");
   chan = caml_open_descriptor_in(fd);
+  caml_memprof_ccall_locid = PROF_STARTUP_INPUT_VAL;
   caml_global_data = caml_input_val(chan);
+  caml_memprof_ccall_locid = PROF_STARTUP;
   caml_close_channel(chan); /* this also closes fd */
   caml_stat_free(trail.section);
   /* Ensure that the globals are in the major heap. */
   caml_oldify_one (caml_global_data, &caml_global_data);
   caml_oldify_mopup ();
-  /* Initialize system libraries */
-  caml_sys_init(exe_name, argv + pos);
 #ifdef _WIN32
   /* Start a thread to handle signals */
   if (getenv("CAMLSIGPIPE"))
@@ -381,7 +395,9 @@ CAMLexport void caml_main(char **argv)
 #endif
   /* Execute the program */
   caml_debugger(PROGRAM_START);
+  caml_memprof_ccall_locid = PROF_INTERP;
   res = caml_interprete(caml_start_code, caml_code_size);
+  caml_memprof_exit();
   if (Is_exception_result(res)) {
     caml_exn_bucket = Extract_exception(res);
     if (caml_debugger_in_use) {
@@ -405,8 +421,11 @@ CAMLexport void caml_startup_code(
   char * cds_file;
   char * exe_name;
 
+  caml_memprof_ccall_locid = PROF_STARTUP;
   caml_init_ieee_floats();
-#if defined(_MSC_VER) && __STDC_SECURE_LIB__ >= 200411L
+  // ocpwin
+  //#if defined(_MSC_VER) && __STDC_SECURE_LIB__ >= 200411L
+#ifdef _WIN32
   caml_install_invalid_parameter_handler();
 #endif
   caml_init_custom_operations();
@@ -432,6 +451,9 @@ CAMLexport void caml_startup_code(
   caml_interprete(NULL, 0);
   /* Initialize the debugger, if needed */
   caml_debugger_init();
+  caml_ocp_utils_init();
+  /* For now, we cannot handle this case. */
+  caml_memprof_bytecode_init(NULL); // read_section(fd, &trail, "MEMP"));
   /* Load the code */
   caml_start_code = code;
   caml_code_size = code_size;
@@ -449,7 +471,9 @@ CAMLexport void caml_startup_code(
   /* Use the builtin table of primitives */
   caml_build_primitive_table_builtin();
   /* Load the globals */
+  caml_memprof_ccall_locid = PROF_STARTUP_INPUT_VAL;
   caml_global_data = caml_input_value_from_block(data, data_size);
+  caml_memprof_ccall_locid = PROF_STARTUP;
   /* Ensure that the globals are in the major heap. */
   caml_oldify_one (caml_global_data, &caml_global_data);
   caml_oldify_mopup ();
@@ -460,7 +484,9 @@ CAMLexport void caml_startup_code(
   caml_sys_init(exe_name, argv);
   /* Execute the program */
   caml_debugger(PROGRAM_START);
+  caml_memprof_ccall_locid = PROF_INTERP;
   res = caml_interprete(caml_start_code, caml_code_size);
+  caml_memprof_exit();
   if (Is_exception_result(res)) {
     caml_exn_bucket = Extract_exception(res);
     if (caml_debugger_in_use) {

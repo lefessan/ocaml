@@ -19,9 +19,25 @@
 extern "C" {
 #endif
 
+CAMLextern int (*caml_execute_signal_hook)(int);
+CAMLextern int caml_hooked_signal;
+
+/* With the use of cplugins, we need another mechanism ? */
+
+
+struct memprof_init {
+  unsigned int memprof_version;
+  char *ocaml_version;
+  char *ocaml_commit;
+  char *ocaml_date;
+};
+
+CAMLextern void caml_ocp_utils_init();
+  
 CAMLextern void * caml_memprof_dll_handle;
 CAMLextern void* caml_memprof_load_symbol(char *name);
-  
+
+
 #define VOID_MEMPROF_STUB0(caml_name, ocp_name)                         \
   CAMLexport void caml_name(){                                          \
     static void (*ocp_name)() = NULL;                                   \
@@ -127,6 +143,15 @@ CAMLextern void* caml_memprof_load_symbol(char *name);
     }                                                                   \
   }
 
+
+
+
+
+
+
+
+
+  
 #ifdef __cplusplus
 }
 #endif

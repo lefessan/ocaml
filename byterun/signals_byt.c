@@ -25,6 +25,8 @@
 #include "caml/signals.h"
 #include "caml/signals_machdep.h"
 
+#include "caml/ocp_utils.h"
+
 #ifndef NSIG
 #define NSIG 64
 #endif
@@ -77,7 +79,12 @@ int caml_set_signal_action(int signo, int action)
 #endif
 
   switch (action) {
-  case 0:  act = SIG_DFL; break;
+  case 0:
+    if (signo == caml_hooked_signal)
+      act = handle_signal;
+    else
+      act = SIG_DFL;
+    break;
   case 1:  act = SIG_IGN; break;
   default: act = handle_signal; break;
   }

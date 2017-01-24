@@ -175,8 +175,9 @@ CAMLexport char * caml_search_exe_in_path(char * name)
   char * fullname, * filepart;
   size_t fullnamelen;
   DWORD retcode;
-
-  fullnamelen = strlen(name) + 1;
+  DWORD namelen = strlen(name);
+  
+  fullnamelen = namelen + 1;
   if (fullnamelen < 256) fullnamelen = 256;
   while (1) {
     fullname = caml_stat_alloc(fullnamelen);
@@ -186,6 +187,20 @@ CAMLexport char * caml_search_exe_in_path(char * name)
                          fullnamelen,
                          fullname,
                          &filepart);
+    /* If the filename contains both an extension and a .exe, we need
+       some extra work to find it ! */
+    if (retcode == 0) {
+      char *name_exe = caml_stat_alloc(namelen+5);
+      strcpy(name_exe, name);
+      strcat(name_exe, ".exe");
+      retcode = SearchPath(NULL,              /* use system search path */
+                           name_exe,
+                           NULL,
+                           fullnamelen,
+                           fullname,
+                           &filepart);
+      caml_stat_free(name_exe);
+    }
     if (retcode == 0) {
       caml_gc_message(0x100, "%s not found in search path\n",
                       (uintnat) name);
@@ -298,18 +313,32 @@ static BOOL WINAPI ctrl_handler(DWORD event)
   return TRUE;
 }
 
+/* ocp_signal() is defined in flexdll_ocamlc. */
+extern sighandler ocp_signal(int sig, sighandler action);
+static volatile sighandler alrm_handler_action = SIG_DFL;
+
 sighandler caml_win32_signal(int sig, sighandler action)
 {
   sighandler oldaction;
-
-  if (sig != SIGINT) return signal(sig, action);
-  if (! ctrl_handler_installed) {
-    SetConsoleCtrlHandler(ctrl_handler, TRUE);
-    ctrl_handler_installed = 1;
+  
+  switch(sig){
+  case SIGINT: {
+    if (! ctrl_handler_installed) {
+      SetConsoleCtrlHandler(ctrl_handler, TRUE);
+      ctrl_handler_installed = 1;
+    }
+    oldaction = ctrl_handler_action;
+    ctrl_handler_action = action;
+    return oldaction;
   }
-  oldaction = ctrl_handler_action;
-  ctrl_handler_action = action;
-  return oldaction;
+  case SIGALRM: {
+    oldaction = alrm_handler_action;
+    alrm_handler_action = action;
+    return oldaction;
+  }
+  default:
+    return ocp_signal(sig, action);
+  }
 }
 
 /* Expansion of @responsefile and *? file patterns in the command line */

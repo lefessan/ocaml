@@ -45,6 +45,13 @@ semantic patches
 * byterun/obj.c:
   * caml_obj_dup reuses locid when available
 
+2017-01-24:
+* byterun/ocp_utils.c: utilise l'ancien mécanisme de chargement du plugin
+   memprof.c, on fera mieux plus tard...
+* byterun/signals_byt.c: interception de caml_hooked_signal
+* byterun/win32.c: some code for signals, depending on proper
+   flexdll_ocamlc.
+
 A VERIFIER:
 ===========
 * caml_alloc_shr_no_raise fournit un profinfo = 0, pourquoi ?
