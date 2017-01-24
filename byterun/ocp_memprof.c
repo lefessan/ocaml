@@ -41,6 +41,7 @@
 
 
 #include "caml/ocp_memprof.h"
+#include "caml/ocp_utils.h"
 
 #ifdef WITH_MEMPROF
 CAMLexport uintnat caml_memprof_ccall_locid = PROF_INIT;
@@ -49,6 +50,26 @@ CAMLexport uintnat caml_memprof_exception_locid = PROF_EXCEPTION;
 CAMLexport uintnat caml_memprof_ccall_locid = 0;
 CAMLexport uintnat caml_memprof_exception_locid = 0;
 #endif
+
+
+RET_MEMPROF_STUB3(int, caml_memprof_register_loc_table,
+                  ocp_memprof_register_loc_table,
+                  char*, table,mlsize_t, len, int, elems, 0)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -496,10 +517,6 @@ VOID_MEMPROF_STUB0(caml_memprof_compact_begin, ocp_memprof_compact_begin)
 VOID_MEMPROF_STUB3(caml_memprof_compact_move, ocp_memprof_compact_move,
                    void*, p, void*, newaddr, size_t, sz)
 VOID_MEMPROF_STUB0(caml_memprof_compact_end, ocp_memprof_compact_end)
-
-RET_MEMPROF_STUB3(int, caml_memprof_register_loc_table,
-                  ocp_memprof_register_loc_table,
-                  char*, table,mlsize_t, len, int, elems, 0)
 
 #ifndef NATIVE_CODE
 

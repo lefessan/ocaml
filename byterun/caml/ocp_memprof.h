@@ -65,6 +65,9 @@ CAMLextern code_t caml_memprof_bytecode_fix_locids(code_t data,
 
 #endif  /* MEMPROF_SECTION */
 
+CAMLextern
+  int caml_memprof_register_loc_table (char* table, mlsize_t len, int elems);
+
   
 #ifdef __cplusplus
 }
@@ -166,10 +169,6 @@ CAMLextern int caml_memprof_next_location_id;
 CAMLextern int caml_location_tables_next;
 CAMLextern mlsize_t* caml_location_tables_sizes;
 CAMLextern char** caml_location_tables;
-
-/* This table indicates, for a given instruction in the main code segment,
-   the offset with the original instruction (used for backtraces...). */
-CAMLextern code_t caml_memprof_translation_table;
 
 /* [MEMPROF_THREAD_NEXT(thread_id,bottom_of_stack, retaddr)] is called
    when dumping roots, before scanning the thread roots. If thread_id=0
