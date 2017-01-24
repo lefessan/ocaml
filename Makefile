@@ -15,7 +15,7 @@
 
 # The main Makefile
 BOOTDIR ?= boot.ocp
-
+HAS_MEMPROF ?= -D HAS_MEMPROF
 MAKEREC=$(MAKE)
 include Makefile.shared
 
@@ -103,7 +103,7 @@ coldstart:
 	cd ocamlpro/last-plugin; $(MAKE) -f Makefile.plugin BOOTDIR=$(BOOTDIR)
 	cp yacc/ocamlyacc$(EXE) boot/ocamlyacc$(EXE)
 	cd stdlib; \
-	  $(MAKE) COMPILER="../$(BOOTDIR)/ocamlc -use-prims ../byterun/primitives" BOOTDIR=$(BOOTDIR) all
+	  $(MAKE) COMPILER="../$(BOOTDIR)/ocamlc -use-prims ../byterun/primitives" BOOTDIR=$(BOOTDIR) HAS_MEMPROF="$(HAS_MEMPROF)" all
 	cd stdlib; cp $(LIBFILES) ../boot
 	if test -f boot/libcamlrun.a; then :; else \
 	  ln -s ../byterun/libcamlrun.a boot/libcamlrun.a; fi
@@ -112,8 +112,8 @@ coldstart:
 
 boot.ocp/ocamlc:
 	mkdir -p boot.ocp
-	$(MAKE) BOOTDIR=boot coldstart
-	$(MAKE) BOOTDIR=boot ocamlc
+	$(MAKE) BOOTDIR="boot" HAS_MEMPROF=""  coldstart
+	$(MAKE) BOOTDIR="boot" HAS_MEMPROF=""  ocamlc
 	mv ./ocamlc ./boot.ocp/ocamlc
 	cp -f boot/*.cmi ocamlpro/boot.ocp/stdlib
 	$(MAKE) partialclean
