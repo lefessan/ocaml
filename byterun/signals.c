@@ -17,6 +17,11 @@
 
 /* Signal handling, code common to the bytecode and native systems */
 
+/* ocpwin: need _POSIX to have SIGHUP under Mingw */
+#ifdef _WIN32
+#define _POSIX
+#endif
+
 #include <signal.h>
 #include <errno.h>
 #include "caml/alloc.h"
@@ -32,6 +37,10 @@
 #include "caml/sys.h"
 #include "caml/hooks.h"
 
+#include "caml/ocp_utils.h"
+
+/* ocpwin: this was actually commented out, and we used CAML_NSIG instead
+   to replace all occurrences of NSIG */
 #ifndef NSIG
 #define NSIG 64
 #endif
@@ -135,8 +144,10 @@ static value caml_signal_handlers = 0;
 
 void caml_execute_signal(int signal_number, int in_signal_handler)
 {
-  value res;
+  value res = Val_int(signal_number);
   value handler;
+  int should_exit = 0; /* if memprof uses the signal, we don't want to 
+                          kill the application if the signal is not used. */
 #ifdef POSIX_SIGNALS
   sigset_t sigs;
   /* Block the signal before executing the handler, and record in sigs
@@ -147,15 +158,20 @@ void caml_execute_signal(int signal_number, int in_signal_handler)
 #endif
 #ifdef WITH_PROFINFO
   MAYBE_HOOK1(caml_execute_signal_begin_hook,);
+  if (caml_execute_signal_hook != NULL &&
+      signal_number == caml_hooked_signal){
+    should_exit = 0;
+    (*caml_execute_signal_hook)(signal_number);
+  }
   /* Handled action may have no associated handler, which we interpret
      as meaning the signal should be handled by a call to exit.  This is
      is used to allow spacetime profiles to be completed on interrupt */
   if (caml_signal_handlers == 0) {
-    res = caml_sys_exit(Val_int(2));
+    if(should_exit) res = caml_sys_exit(Val_int(2));
   } else {
     handler = Field(caml_signal_handlers, signal_number);
     if (!Is_block(handler)) {
-      res = caml_sys_exit(Val_int(2));
+      if(should_exit) res = caml_sys_exit(Val_int(2));
     } else {
 #else
   handler = Field(caml_signal_handlers, signal_number);

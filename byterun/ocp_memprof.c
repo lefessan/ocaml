@@ -491,14 +491,6 @@ value caml_memprof_register_table (value table, value elems, value ui_name)
 
 
 
-VOID_MEMPROF_STUB0(caml_memprof_exit2, ocp_memprof_exit)
-
-void caml_memprof_exit()
-{
-  caml_memprof_exit_shared_mem();  
-  caml_memprof_exit2();
-}
-
 
 VOID_MEMPROF_STUB0(caml_memprof_compact_begin, ocp_memprof_compact_begin)
 VOID_MEMPROF_STUB3(caml_memprof_compact_move, ocp_memprof_compact_move,
