@@ -1,0 +1,8 @@
+patch add_primitive_flags {
+  prim_flags = [ "!memprof" ]
+  prim_names = [ "caml_create_string" ]
+}
+patch add_primitive_flags {
+  prim_flags = [ "!noalloc" ]
+  prim_names = [ "caml_is_printable" ]
+}
