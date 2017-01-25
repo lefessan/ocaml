@@ -221,3 +221,5 @@ val add_arguments : string -> (string * Arg.spec * string) list -> unit
 val parse_arguments : Arg.anon_fun -> string -> unit
 
 val print_arguments : string -> unit
+
+val detect_msvc : string ref

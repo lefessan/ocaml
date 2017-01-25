@@ -1,0 +1,41 @@
+cleanup.cmo : ../boot.ocp/compiler/symtable.cmi
+cleanup.cmx : ../boot.ocp/compiler/symtable.cmi
+ocpstd.cmo : ocpstd.cmi
+ocpstd.cmx : ocpstd.cmi
+ocpstd.cmi :
+parsetree_iter.cmo : ../boot.ocp/compiler/parsetree.cmi \
+    ../boot.ocp/compiler/asttypes.cmi parsetree_iter.cmi
+parsetree_iter.cmx : ../boot.ocp/compiler/parsetree.cmi \
+    ../boot.ocp/compiler/asttypes.cmi parsetree_iter.cmi
+parsetree_iter.cmi : ../boot.ocp/compiler/parsetree.cmi \
+    ../boot.ocp/compiler/asttypes.cmi
+parsetree_map.cmo : ../boot.ocp/compiler/parsetree.cmi \
+    ../boot.ocp/compiler/misc.cmi parsetree_map.cmi
+parsetree_map.cmx : ../boot.ocp/compiler/parsetree.cmi \
+    ../boot.ocp/compiler/misc.cmi parsetree_map.cmi
+parsetree_map.cmi : ../boot.ocp/compiler/parsetree.cmi
+patch_engine.cmo : patch_types.cmo parsetree_map.cmi \
+    ../boot.ocp/compiler/parsetree.cmi ../boot.ocp/compiler/parser.cmi \
+    ../boot.ocp/compiler/longident.cmi ../boot.ocp/compiler/location.cmi \
+    ../boot.ocp/compiler/lexer.cmi ../boot.ocp/compiler/asttypes.cmi
+patch_engine.cmx : patch_types.cmx parsetree_map.cmx \
+    ../boot.ocp/compiler/parsetree.cmi ../boot.ocp/compiler/parser.cmi \
+    ../boot.ocp/compiler/longident.cmi ../boot.ocp/compiler/location.cmi \
+    ../boot.ocp/compiler/lexer.cmi ../boot.ocp/compiler/asttypes.cmi
+patch_lexer.cmo : stringCompat.cmo
+patch_lexer.cmx : stringCompat.cmx
+patch_main.cmo : stringCompat.cmo ../boot.ocp/compiler/pparse.cmi \
+    patch_types.cmo patch_parser.cmi patch_lexer.cmo patch_engine.cmo \
+    ocpstd.cmi ../boot.ocp/compiler/misc.cmi
+patch_main.cmx : stringCompat.cmx ../boot.ocp/compiler/pparse.cmi \
+    patch_types.cmx patch_parser.cmx patch_lexer.cmx patch_engine.cmx \
+    ocpstd.cmx ../boot.ocp/compiler/misc.cmi
+patch_parser.cmo : patch_types.cmo patch_parser.cmi
+patch_parser.cmx : patch_types.cmx patch_parser.cmi
+patch_parser.cmi : patch_types.cmo
+patch_types.cmo :
+patch_types.cmx :
+sempatch_plugin.cmo :
+sempatch_plugin.cmx :
+stringCompat.cmo :
+stringCompat.cmx :

@@ -48,7 +48,8 @@ and include_dirs = ref ([] : string list)(* -I *)
 and no_std_include = ref false          (* -nostdlib *)
 and print_types = ref false             (* -i *)
 and make_archive = ref false            (* -a *)
-and debug = ref false                   (* -g *)
+(* In ocp-memprof, debug is on by default. *)
+and debug = ref true                    (* -g *)
 and fast = ref false                    (* -unsafe *)
 and link_everything = ref false         (* -linkall *)
 and custom_runtime = ref false          (* -custom *)
@@ -391,3 +392,5 @@ let parse_arguments f msg =
   with
   | Arg.Bad msg -> Printf.eprintf "%s" msg; exit 2
   | Arg.Help msg -> Printf.printf "%s" msg; exit 0
+
+let detect_msvc = Config.detect_msvc

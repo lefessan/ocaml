@@ -92,7 +92,8 @@ PRIMS=\
   alloc.c array.c compare.c extern.c floats.c gc_ctrl.c hash.c \
   intern.c interp.c ints.c io.c lexing.c md5.c meta.c obj.c parsing.c \
   signals.c str.c sys.c terminfo.c callback.c weak.c finalise.c stacks.c \
-  dynlink.c backtrace_prim.c backtrace.c spacetime.c afl.c
+  dynlink.c backtrace_prim.c backtrace.c spacetime.c afl.c \
+  ocp_win.c
 
 OBJS=$(addsuffix .$(O), \
   interp misc stacks fix_code startup_aux startup \
@@ -188,7 +189,7 @@ clean:
 	rm -f $(LIBRARIES) $(PROGRAMS) *.$(O) *.$(A) *.$(SO)
 	rm -f primitives prims.c caml/opnames.h caml/jumptbl.h
 	rm -f caml/version.h caml/commit.h
-	rm -f DATE COMMIT COMMIT.tmp
+	rm -f DATE COMMIT COMMIT.tmp COMMIT.old
 
 ocamlrun$(EXE): prims.$(O) libcamlrun.$(A)
 	$(call MAKE_OCAMLRUN,$@,$^ $(LIBS))

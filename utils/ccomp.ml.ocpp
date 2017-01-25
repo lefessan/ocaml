@@ -1,0 +1,4 @@
+patch replace_idents {
+  replace_idents = [ "Sys.command" ]
+  replace_with = "Sys.system"
+}

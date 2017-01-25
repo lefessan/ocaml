@@ -10,6 +10,15 @@ INCLUDES=-I ../stdlib
 
 COMPFLAGS=$(INCLUDES)
 
+CMIS=asttypes.cmi longident.cmi clflags.cmi docstrings.cmi parser.cmi	\
+  config.cmi lexer.cmi parsetree.cmi misc.cmi location.cmi		\
+  syntaxerr.cmi warnings.cmi pparse.cmi identifiable.cmi ident.cmi	\
+  outcometree.cmi primitive.cmi path.cmi types.cmi cmi_format.cmi	\
+  consistbl.cmi tbl.cmi subst.cmi env.cmi lambda.cmi cmo_format.cmi	\
+  symtable.cmi
+
+all: $(CMIS)
+
 .SUFFIXES: .ml .mli .cmo .cmi .cmx
 
 .ml.cmo:
@@ -17,6 +26,19 @@ COMPFLAGS=$(INCLUDES)
 
 .mli.cmi:
 	$(CAMLC) $(COMPFLAGS) -c $<
+	touch witness
+
+%.mli: ../../../utils/%.mli
+	cp -f $< $@
+
+%.mli: ../../../parsing/%.mli
+	cp -f $< $@
+
+%.mli: ../../../typing/%.mli
+	cp -f $< $@
+
+%.mli: ../../../bytecomp/%.mli
+	cp -f $< $@
 
 -include .depend
 

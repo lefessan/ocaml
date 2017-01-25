@@ -171,9 +171,9 @@ clean::
 # To make custom toplevels
 
 OCAMLMKTOP=ocamlmktop.cmo
-OCAMLMKTOP_IMPORTS=misc.cmo identifiable.cmo numbers.cmo config.cmo \
-		   arg_helper.cmo clflags.cmo ccomp.cmo
-
+OCAMLMKTOP_IMPORTS=\
+  ../compilerlibs/ocamlcommon.cma \
+  ../compilerlibs/ocamlbytecomp.cma
 $(call byte_and_opt,ocamlmktop,$(OCAMLMKTOP_IMPORTS) $(OCAMLMKTOP),)
 
 # Converter olabl/ocaml 2.99 to ocaml 3
