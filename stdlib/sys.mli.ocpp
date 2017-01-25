@@ -1,0 +1,4 @@
+patch add_primitive_flags {
+  prim_flags = [ "!memprof" ]
+  prim_names = [ "caml_sys_getenv" "caml_sys_time" "caml_sys_getcwd" ]
+}

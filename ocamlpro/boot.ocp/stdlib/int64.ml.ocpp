@@ -1,0 +1,4 @@
+patch add_primitive_flags {
+  prim_flags = [ "!memprof" ]
+  prim_names = [ "caml_int64_of_float" "caml_int64_to_float" "caml_int64_bits_of_float" "caml_int64_float_of_bits" "caml_int64_format" "caml_int64_of_string" ]
+}
