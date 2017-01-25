@@ -35,7 +35,12 @@ let load plugin_name =
   in
 
   if not (Hashtbl.mem plugins plugin_file) then begin
-    Compdynlink.loadfile plugin_file;
+    (try
+       Compdynlink.loadfile plugin_file
+     with exn ->
+       Printf.eprintf "While loading plugin %s:\n%!" plugin_name;
+       raise exn
+    );
     Hashtbl.add plugins plugin_file (); (* plugin loaded *)
   end
 

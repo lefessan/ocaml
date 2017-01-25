@@ -4,7 +4,7 @@ ROOTDIR=../..
 
 INCLUDES=-I ../$(BOOTDIR)/stdlib -I ../$(BOOTDIR)/compiler -I ../$(BOOTDIR)
 CAMLRUN=$(ROOTDIR)/boot/ocamlrun
-CAMLFLAGS= $(INCLUDES) -plugin ../$(BOOTDIR)/ocpp-plugin.cma
+CAMLFLAGS= $(INCLUDES) -plugin ../$(BOOTDIR)/ocpp-plugin.cma $(HAS_MEMPROF)
 CAMLC=$(CAMLRUN) $(ROOTDIR)/$(BOOTDIR)/ocamlc $(CAMLFLAGS)
 CAMLDEP=$(CAMLRUN) $(ROOTDIR)/boot/ocamldep $(CAMLFLAGS)
 CAMLLEX=$(CAMLRUN) $(ROOTDIR)/boot/ocamllex
@@ -27,7 +27,9 @@ SEMPATCH_MLS:=$(SEMPATCH_CMOS:.cmo=.ml)
 
 all: ../$(BOOTDIR)/sempatch-plugin.cma
 
-../$(BOOTDIR)/sempatch-plugin.cma: $(SEMPATCH_CMOS)
+../$(BOOTDIR)/sempatch-plugin.cma:  \
+   $(ROOTDIR)/$(BOOTDIR)/ocamlc $(SEMPATCH_MLS) ../$(BOOTDIR)/ocpp-plugin.cma
+	$(MAKE) -f Makefile.plugin $(SEMPATCH_CMOS)
 	$(CAMLC) -a -o ../$(BOOTDIR)/sempatch-plugin.cma $(SEMPATCH_CMOS)
 	rm -f *.cmi *.cmti *.cmo *.cmt
 
@@ -53,9 +55,9 @@ patch_lexer.ml: patch_lexer.mll
 	$(CAMLLEX) patch_lexer.mll
 
 depend: beforedepend
-	$(CAMLDEP) *.ml *.mli > .depend.boot
+	$(CAMLDEP) *.ml *.mli > .depend.$(BOOTDIR)
 
--include .depend.boot
+-include .depend.$(BOOTDIR)
 
 parsetree_iter.cmo: parsetree_iter.cmi
 parsetree_map.cmo: parsetree_map.cmi

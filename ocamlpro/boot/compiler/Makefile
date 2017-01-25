@@ -16,6 +16,7 @@ COMPFLAGS=$(INCLUDES)
 
 .mli.cmi:
 	$(CAMLC) $(COMPFLAGS) -c $<
+	touch witness
 
 -include .depend
 

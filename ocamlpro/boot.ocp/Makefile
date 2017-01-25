@@ -1,4 +1,5 @@
 
+UTILS_MLIS=
 
 CMIS=asttypes.cmi longident.cmi clflags.cmi docstrings.cmi parser.cmi	\
   config.cmi lexer.cmi parsetree.cmi misc.cmi location.cmi		\

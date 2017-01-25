@@ -14,7 +14,8 @@ LAST_MLS:=$(LAST_CMOS:.cmo=.ml)
 
 all: ../$(BOOTDIR)/last-plugin.cma
 
-../$(BOOTDIR)/last-plugin.cma: $(LAST_CMOS)
+../$(BOOTDIR)/last-plugin.cma: \
+   $(ROOTDIR)/$(BOOTDIR)/ocamlc ../$(BOOTDIR)/compiler/witness $(LAST_CMOS)
 	$(CAMLC) -a -o ../$(BOOTDIR)/last-plugin.cma $(LAST_CMOS)
 	rm -f *.cmi *.cmti *.cmo *.cmt
 

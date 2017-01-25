@@ -21,6 +21,7 @@ let command cmdline =
     prerr_string cmdline;
     prerr_newline()
   end;
+  Msvc.maybe_detect_env ();
   Sys.command cmdline
 
 let run_command cmdline = ignore(command cmdline)
@@ -94,12 +95,23 @@ let compile_file name =
             outputs (in fairness, the tedious thing is that there's no switch to
             disable this behaviour). In the absence of the Unix module, use
             a temporary file to filter the output (cannot pipe the output to a
-            filter because this removes the exit status of cl, which is wanted.
+            filter because this removes the exit status of cl, which is wanted).
           *)
          pipe) in
   if pipe <> ""
   then display_msvc_output file name;
-  exit
+  (* Compiler file has generated a file with an extension different
+     from what we were expecting. *)
+  if exit = 0 && Config.ext_obj <> Config.ext_cc_obj then begin
+    let basename = Filename.chop_extension (Filename.basename name) in
+    let generated = basename ^ Config.ext_cc_obj in
+    let target = basename ^ Config.ext_obj in
+    (try Sys.remove target with _ -> ());
+    try Sys.rename generated target; 0 with _ ->
+      Printf.eprintf "Error: could not rename %S to %S\n" generated target;
+      1
+  end
+  else exit
 
 let create_archive archive file_list =
   Misc.remove_file archive;

@@ -129,3 +129,9 @@ let ocaml_version = "%%VERSION%%"
 (* Optimization *)
 
 external opaque_identity : 'a -> 'a = "%opaque"
+
+let system cmdline =
+  command (
+    (* Under Windows, system argument is sent to 'cmd' without the quotes,
+       so we need to add them before !*)
+    if win32 then "\"" ^ cmdline ^ "\"" else cmdline)

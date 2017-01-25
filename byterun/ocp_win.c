@@ -95,7 +95,7 @@ static DWORD TranslateDwType(value dwType_v)
 }
 
 
-#endif
+#endif // _WIN32
 
 /*
 hroot_v: 0 = HKEY_CURRENT_USER

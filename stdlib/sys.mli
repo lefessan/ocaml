@@ -327,3 +327,5 @@ external opaque_identity : 'a -> 'a = "%opaque"
 
     @since 4.03.0
 *)
+
+val system : string -> int

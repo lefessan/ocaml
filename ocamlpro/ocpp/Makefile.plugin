@@ -16,7 +16,9 @@ OCPP_MLS:=$(OCPP_CMOS:.cmo=.ml)
 
 all: ../$(BOOTDIR)/ocpp-plugin.cma
 
-../$(BOOTDIR)/ocpp-plugin.cma: $(OCPP_CMOS)
+../$(BOOTDIR)/ocpp-plugin.cma: \
+   $(ROOTDIR)/$(BOOTDIR)/ocamlc $(OCPP_MLS) ../$(BOOTDIR)/compiler/witness
+	$(MAKE) -f Makefile.plugin $(OCPP_CMOS)
 	$(CAMLC) -a -o ../$(BOOTDIR)/ocpp-plugin.cma $(OCPP_CMOS)
 	cp -f ocpp.cmi ../$(BOOTDIR)/
 	rm -f *.cmi *.cmti *.cmo *.cmt
@@ -39,7 +41,7 @@ ocpp_lexer.ml: ocpp_lexer.mll
 	$(CAMLLEX) ocpp_lexer.mll
 
 depend: beforedepend
-	$(CAMLDEP) $(INCLUDES) *.ml *.mli > .depend.plugin
+	$(CAMLDEP) $(INCLUDES) *.ml *.mli > .depend.$(BOOTDIR)
 
 .SUFFIXES: .ml .mli .cmo .cmi .cmx
 
@@ -49,6 +51,6 @@ depend: beforedepend
 .mli.cmi:
 	$(CAMLC) $(COMPFLAGS) -c $<
 
-include .depend.plugin
+-include .depend.$(BOOTDIR)
 
 
