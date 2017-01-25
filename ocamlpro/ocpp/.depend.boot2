@@ -1,0 +1,36 @@
+ocpp.cmo : ../boot2/compiler/warnings.cmi \
+    ../boot2/compiler/syntaxerr.cmi ../boot2/compiler/parser.cmi \
+    ocpp_version.cmo ocpp_types.cmi ocpp_parser.cmi \
+    ../boot2/compiler/misc.cmi ../boot2/compiler/longident.cmi \
+    ../boot2/compiler/location.cmi ../boot2/compiler/lexer.cmi \
+    ../boot2/compiler/docstrings.cmi ../boot2/compiler/config.cmi \
+    ../boot2/compiler/clflags.cmi ocpp.cmi
+ocpp.cmx : ../boot2/compiler/warnings.cmi \
+    ../boot2/compiler/syntaxerr.cmi ../boot2/compiler/parser.cmi \
+    ocpp_version.cmx ocpp_types.cmx ocpp_parser.cmx \
+    ../boot2/compiler/misc.cmi ../boot2/compiler/longident.cmi \
+    ../boot2/compiler/location.cmi ../boot2/compiler/lexer.cmi \
+    ../boot2/compiler/docstrings.cmi ../boot2/compiler/config.cmi \
+    ../boot2/compiler/clflags.cmi ocpp.cmi
+ocpp.cmi : ../boot2/compiler/parser.cmi ../boot2/compiler/location.cmi
+ocpp_lexer.cmo :
+ocpp_lexer.cmx :
+ocpp_main.cmo : ocpp_version.cmo ocpp.cmi ../boot2/compiler/misc.cmi \
+    ../boot2/compiler/clflags.cmi
+ocpp_main.cmx : ocpp_version.cmx ocpp.cmx ../boot2/compiler/misc.cmi \
+    ../boot2/compiler/clflags.cmi
+ocpp_parser.cmo : ocpp_types.cmi ../boot2/compiler/longident.cmi \
+    ../boot2/compiler/location.cmi ocpp_parser.cmi
+ocpp_parser.cmx : ocpp_types.cmx ../boot2/compiler/longident.cmi \
+    ../boot2/compiler/location.cmi ocpp_parser.cmi
+ocpp_parser.cmi : ocpp_types.cmi ../boot2/compiler/location.cmi
+ocpp_plugin.cmo : ocpp.cmi
+ocpp_plugin.cmx : ocpp.cmx
+ocpp_types.cmo : ../boot2/compiler/longident.cmi \
+    ../boot2/compiler/location.cmi ocpp_types.cmi
+ocpp_types.cmx : ../boot2/compiler/longident.cmi \
+    ../boot2/compiler/location.cmi ocpp_types.cmi
+ocpp_types.cmi : ../boot2/compiler/longident.cmi \
+    ../boot2/compiler/location.cmi
+ocpp_version.cmo : ../boot2/compiler/parser.cmi ocpp_parser.cmi
+ocpp_version.cmx : ../boot2/compiler/parser.cmi ocpp_parser.cmx

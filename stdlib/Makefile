@@ -16,7 +16,7 @@
 include ../config/Makefile
 CAMLRUN ?= ../boot/ocamlrun
 CAMLYACC ?= ../boot/ocamlyacc
-BOOTDIR ?= boot.ocp
+BOOTDIR ?= boot2
 HAS_MEMPROF ?= -D HAS_MEMPROF
 TARGET_BINDIR ?= $(BINDIR)
 

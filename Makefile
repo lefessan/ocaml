@@ -14,7 +14,7 @@
 #**************************************************************************
 
 # The main Makefile
-BOOTDIR ?= boot.ocp
+BOOTDIR ?= boot2
 HAS_MEMPROF ?= -D HAS_MEMPROF
 MAKEREC=$(MAKE)
 include Makefile.shared
@@ -110,12 +110,12 @@ coldstart:
 	if test -d stdlib/caml; then :; else \
 	  ln -s ../byterun/caml stdlib/caml; fi
 
-boot.ocp/ocamlc: boot/ocamlc
-	mkdir -p boot.ocp
+boot2/ocamlc: boot/ocamlc
+	mkdir -p boot2
 	$(MAKE) BOOTDIR="boot" HAS_MEMPROF=""  coldstart
 	$(MAKE) BOOTDIR="boot" HAS_MEMPROF=""  ocamlc
-	mv ./ocamlc ./boot.ocp/ocamlc
-	cp -f boot/*.cmi ocamlpro/boot.ocp/stdlib
+	mv ./ocamlc ./boot2/ocamlc
+	cp -f boot/*.cmi ocamlpro/boot2/stdlib
 	$(MAKE) partialclean
 
 # Build the core system: the minimum needed to make depend and bootstrap
@@ -817,7 +817,7 @@ partialclean::
 	cd ocamlpro/last-plugin; $(MAKE) -f Makefile.plugin partialclean
 
 ocp-clean::
-	rm -f boot.ocp/ocamlc
-	rm -f ocamlpro/boot.ocp/stdlib/*.cm?
-	rm -f ocamlpro/boot.ocp/compiler/*.cm?
-	rm -f ocamlpro/boot.ocp/*.cm?
+	rm -f boot2/ocamlc
+	rm -f ocamlpro/boot2/stdlib/*.cm?
+	rm -f ocamlpro/boot2/compiler/*.cm?
+	rm -f ocamlpro/boot2/*.cm?

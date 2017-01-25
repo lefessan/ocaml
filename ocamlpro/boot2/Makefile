@@ -10,7 +10,7 @@ CMIS=asttypes.cmi longident.cmi clflags.cmi docstrings.cmi parser.cmi	\
 
 MLIS=$(CMIS:.cmi=.mli)
 
-BOOTDIR=boot.ocp
+BOOTDIR=boot2
 
 ROOTDIR=../..
 CAMLRUN:=$(ROOTDIR)/boot/ocamlrun
