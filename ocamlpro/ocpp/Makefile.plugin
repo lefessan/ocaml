@@ -1,4 +1,5 @@
 
+BOOTDIR ?= boot2
 ROOTDIR=../..
 
 INCLUDES=-I ../$(BOOTDIR)/stdlib -I ../$(BOOTDIR)/compiler
@@ -39,6 +40,9 @@ ocpp_parser.ml ocpp_parser.mli: ocpp_parser.mly
 	$(CAMLYACC) ocpp_parser.mly
 ocpp_lexer.ml: ocpp_lexer.mll
 	$(CAMLLEX) ocpp_lexer.mll
+
+clean:
+	rm -f *.cm?
 
 depend: beforedepend
 	$(CAMLDEP) $(INCLUDES) *.ml *.mli > .depend.$(BOOTDIR)

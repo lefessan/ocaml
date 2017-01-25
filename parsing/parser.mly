@@ -412,6 +412,105 @@ let package_type_of_module_type pmty =
         "only module type identifier and 'with type' constraints are supported"
 
 
+
+(* tryocaml: direct implementation of js_of_ocaml syntax extension *)
+(* tryocaml: direct building of exp idents *)
+let mkexpid lid = mkexp (Pexp_ident (mkloc lid (symbol_rloc())))
+(*let ghexpid lid = ghexp (Pexp_ident (mkloc lid (symbol_gloc()))) *)
+let rnd = Random.State.make [| (0x5135 lsr 16) lor 0x11d4|]
+
+let random_var () =
+  Format.sprintf "a%08Lx" (Random.State.int64 rnd 0x100000000L)
+let fresh_type () = mktyp (Ptyp_var (random_var ()))
+
+let unescape lab =
+  assert (lab <> "");
+  let lab =
+    if lab.[0] = '_' then String.sub lab 1 (String.length lab - 1) else lab
+  in
+  try
+    let i = String.rindex lab '_' in
+    if i = 0 then raise Not_found;
+    String.sub lab 0 i
+  with Not_found ->
+    lab
+
+ let js_unsafe s = mkexpid(Ldot(Ldot(Lident "Js","Unsafe"), s))
+
+let js_prop_type field_name field_type =
+  mktyp( Ptyp_constr(
+      mkloc (Ldot( Lident "Js", "gen_prop" )) Location.none,
+      [mktyp(Ptyp_object ([
+        mkloc field_name Location.none,
+        [],
+               mktyp( Ptyp_poly( [], field_type ))], Open);
+           ) ]) )
+
+let js_field_type expr field_name field_type =
+  mkexp( Pexp_constraint(
+      expr,
+      mktyp( Ptyp_constr(
+            mkloc (Ldot( Lident "Js", "t" )) Location.none,
+            [mktyp( Ptyp_object ([
+              mkloc field_name Location.none,
+              [],
+              mktyp( Ptyp_poly( [], field_type ))], Open)
+            )]))) )
+
+let make_js_get expr label =
+  let var = fresh_type () in
+  let t_var = js_prop_type "get" var in
+  let expr = js_field_type expr label t_var in
+  let call = mkexp(Pexp_apply(
+        js_unsafe "get",
+        [ Nolabel, expr;
+          Nolabel, mkexp(Pexp_constant(Pconst_string (unescape label,None)))] )) in
+  mkexp( Pexp_constraint( call, var ))
+
+let make_js_set expr label param =
+  let var = fresh_type () in
+  let t_var = js_prop_type "set"
+      ( mktyp( Ptyp_arrow(
+        Nolabel, var,
+        mktyp (Ptyp_constr (mkloc (Lident "unit") Location.none,
+                []))) )) in
+  let expr = js_field_type expr label t_var in
+  mkexp(Pexp_apply(
+      js_unsafe "set",
+      [ Nolabel, expr;
+        Nolabel, mkexp(Pexp_constant(Pconst_string (unescape label,None)));
+        Nolabel, mkexp (Pexp_constraint( param, var )) ] ))
+
+let make_inject (expr,typ) =
+  mkexp(Pexp_apply(
+      js_unsafe "inject",
+      [ Nolabel,
+        mkexp (Pexp_constraint(
+            expr,
+             typ ))]))
+
+let make_js_call expr label args =
+  let args = List.map (fun p -> p,fresh_type ()) args in
+  let ret_type = fresh_type () in
+  let method_type =
+    List.fold_right
+      (fun (_, arg_ty) rem_ty ->
+        mktyp ( Ptyp_arrow ( Nolabel, arg_ty, rem_ty )))
+      args
+      ( mktyp ( Ptyp_constr(
+            mkloc (Ldot( Lident "Js", "meth" )) Location.none, [ ret_type ] )))
+  in
+  let args = mkexp( Pexp_array( List.map make_inject args )) in
+  let expr = js_field_type expr label method_type in
+  let call = mkexp( Pexp_apply(
+        js_unsafe "meth_call",
+        [ Nolabel, expr;
+          Nolabel, mkexp( Pexp_constant( Pconst_string( unescape label,None )));
+          Nolabel, args ] )) in
+  mkexp( Pexp_constraint( call, ret_type ))
+
+
+
 %}
 
 /* Tokens */
@@ -534,6 +633,7 @@ let package_type_of_module_type pmty =
 %token WITH
 %token <string * Location.t> COMMENT
 %token <Docstrings.docstring> DOCSTRING
+%token SHARPJS
 
 %token EOL
 
@@ -593,7 +693,7 @@ The precedences must be listed from low to high.
 %nonassoc prec_constr_appl              /* above AS BAR COLONCOLON COMMA */
 %nonassoc below_HASH
 %nonassoc HASH                         /* simple_expr/toplevel_directive */
-%left     HASHOP
+%left     HASHOP SHARPJS
 %nonassoc below_DOT
 %nonassoc DOT
 /* Finally, the first tokens of simple_expr are above everything else. */
@@ -1541,6 +1641,18 @@ simple_expr:
       { unclosed "(" 3 ")" 8 }
   | extension
       { mkexp (Pexp_extension $1) }
+
+    /* tryocaml: direct implementation of js_of_ocaml syntax extension */
+  | simple_expr SHARPJS label
+      { make_js_get $1 $3 }
+  | simple_expr SHARPJS label LESSMINUS simple_expr
+      { make_js_set $1 $3 $5 }
+  | simple_expr SHARPJS label LPAREN expr_comma_list RPAREN
+      { make_js_call $1 $3 (List.rev $5) }
+  | simple_expr SHARPJS label LPAREN simple_expr RPAREN
+      { make_js_call $1 $3 [$5] }
+  | simple_expr SHARPJS label LPAREN RPAREN
+      { make_js_call $1 $3 [] }
 ;
 simple_labeled_expr_list:
     labeled_simple_expr

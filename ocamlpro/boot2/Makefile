@@ -10,7 +10,7 @@ CMIS=asttypes.cmi longident.cmi clflags.cmi docstrings.cmi parser.cmi	\
 
 MLIS=$(CMIS:.cmi=.mli)
 
-BOOTDIR=boot2
+BOOTDIR ?= boot2
 
 ROOTDIR=../..
 CAMLRUN:=$(ROOTDIR)/boot/ocamlrun
@@ -18,8 +18,7 @@ CAMLC:=$(CAMLRUN) $(ROOTDIR)/$(BOOTDIR)/ocamlc
 CAMLYACC:=$(ROOTDIR)/yacc/ocamlyacc
 CAMLLEX=$(CAMLRUN) $(ROOTDIR)/boot/ocamllex
 
-default:
-	@echo No default rule
+default: all
 
 update:
 	rm -rf compiler compiler-srcs

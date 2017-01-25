@@ -139,3 +139,7 @@ val default_error_reporter : formatter -> error -> unit
 
 val report_exception: formatter -> exn -> unit
   (* Reraise the exception if it is unknown. *)
+
+val report_backtrace : string -> unit
+  (* Attach a printed backtrace to the current exception. Be careful that
+     it must be the last exception of the program. *)
