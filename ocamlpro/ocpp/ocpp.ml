@@ -234,6 +234,13 @@ let name_of_token token =
       Printf.sprintf "DOCSTRING { ds_body = %S }"
         (Docstrings.docstring_body docstring)
 
+        (*
+With boot/ocamlc, this _ is useless.
+With boot2/ocamlc, this _ is for SHARPJS
+        *)
+  | _ -> "SHARPJS"
+
+
 (*  | _ -> Ocpp_version.name_of_token token *)
 
 let string_of_token token =
@@ -362,8 +369,9 @@ let string_of_token token =
     | NONREC -> "nonrec"
     | HASHOP op -> Printf.sprintf "hashop(%S)" op
     | DOCSTRING _docstring -> "docstring _"
-    | HASH -> "#"
 
+    | HASH -> "#"
+    | _ -> "##"
 
 (*  | _ -> Ocpp_version.string_of_token token *)
 

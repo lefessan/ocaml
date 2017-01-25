@@ -116,6 +116,7 @@ type token =
   | WITH
   | COMMENT of (string * Location.t)
   | DOCSTRING of (Docstrings.docstring)
+  | SHARPJS
   | EOL
 
 val implementation :

@@ -443,13 +443,25 @@ let () =
 
 external reraise : exn -> 'a = "%reraise"
 
+let backtrace = ref None
+let report_backtrace bt =
+  match !backtrace with
+  | None -> backtrace := Some bt
+  | Some _ -> ()
+
 let rec report_exception_rec n ppf exn =
   try match error_of_exn exn with
   | Some err ->
       fprintf ppf "@[%a@]@." report_error err
-  | None -> reraise exn
+  | None ->
+    match !backtrace with
+    | None -> reraise exn
+    | Some bt ->
+      fprintf ppf "Exception: %s@ Backtrace: %s@."
+        (Printexc.to_string exn) bt
   with exn when n > 0 ->
     report_exception_rec (n-1) ppf exn
+
 
 let report_exception ppf exn = report_exception_rec 5 ppf exn
 

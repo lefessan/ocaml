@@ -1,4 +1,5 @@
 
+BOOTDIR ?= boot2
 ROOTDIR=../../..
 CAMLRUN:=$(ROOTDIR)/boot/ocamlrun
 CAMLC:=$(CAMLRUN) $(ROOTDIR)/$(BOOTDIR)/ocamlc
