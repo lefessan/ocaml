@@ -1,4 +1,4 @@
 patch add_primitive_flags {
-  prim_flags = [ "!memprof" ]
+  prim_flags = [ "memprof" ]
   prim_names = [ "caml_output_value_to_string" ]
 }

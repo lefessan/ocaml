@@ -1,0 +1,17 @@
+ocpp.cmo : ocpp_version.cmo ocpp_types.cmi ocpp_parser.cmi ocpp.cmi
+ocpp.cmx : ocpp_version.cmx ocpp_types.cmx ocpp_parser.cmx ocpp.cmi
+ocpp.cmi :
+ocpp_lexer.cmo :
+ocpp_lexer.cmx :
+ocpp_main.cmo : ocpp_version.cmo ocpp.cmi
+ocpp_main.cmx : ocpp_version.cmx ocpp.cmx
+ocpp_parser.cmo : ocpp_types.cmi ocpp_parser.cmi
+ocpp_parser.cmx : ocpp_types.cmx ocpp_parser.cmi
+ocpp_parser.cmi : ocpp_types.cmi
+ocpp_plugin.cmo : ocpp.cmi
+ocpp_plugin.cmx : ocpp.cmx
+ocpp_types.cmo : ocpp_types.cmi
+ocpp_types.cmx : ocpp_types.cmi
+ocpp_types.cmi :
+ocpp_version.cmo : ocpp_parser.cmi
+ocpp_version.cmx : ocpp_parser.cmx

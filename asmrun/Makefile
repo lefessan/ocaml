@@ -180,10 +180,10 @@ distclean: clean
 ifneq "$(TOOLCHAIN)" "msvc"
 .PHONY: depend
 depend: $(COBJS:.$(O)=.c) $(LINKEDFILES)
-	$(CC) -MM $(FLAGS) *.c > .depend
-	$(CC) -MM $(FLAGS) -DPROFILING *.c | sed -e 's/\.o/.p.o/' >> .depend
-	$(CC) -MM $(FLAGS) -DDEBUG *.c | sed -e 's/\.o/.d.o)/' >> .depend
-	$(CC) -MM $(FLAGS) -DCAML_INSTR *.c | sed -e 's/\.o/.i.o' >> .depend
+	$(CC) -MM $(FLAGS) *.c > .depend.memprof
+	$(CC) -MM $(FLAGS) -DPROFILING *.c | sed -e 's/\.o/.p.o/' >> .depend.memprof
+	$(CC) -MM $(FLAGS) -DDEBUG *.c | sed -e 's/\.o/.d.o)/' >> .depend.memprof
+	$(CC) -MM $(FLAGS) -DCAML_INSTR *.c | sed -e 's/\.o/.i.o/' >> .depend.memprof
 endif
 
 ifeq "$(UNIX_OR_WIN32)" "win32"
@@ -193,5 +193,5 @@ ifeq "$(UNIX_OR_WIN32)" "win32"
 include .depend.nt
 
 else
-include .depend
+include .depend.memprof
 endif

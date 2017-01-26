@@ -1,10 +1,11 @@
 
-BOOTDIR ?= boot2
+PRE ?= boot2
+POST ?= .
 ROOTDIR=../..
 
-INCLUDES=-I ../$(BOOTDIR)/stdlib -I ../$(BOOTDIR)/compiler
+INCLUDES=-I ../$(POST)/stdlib -I ../$(POST)/compiler
 CAMLRUN=$(ROOTDIR)/boot/ocamlrun
-CAMLC=$(CAMLRUN) $(ROOTDIR)/$(BOOTDIR)/ocamlc $(INCLUDES)
+CAMLC=$(CAMLRUN) $(ROOTDIR)/$(PRE)/ocamlc $(INCLUDES)
 CAMLDEP=$(CAMLRUN) $(ROOTDIR)/boot/ocamldep
 CAMLLEX=$(CAMLRUN) $(ROOTDIR)/boot/ocamllex
 CAMLYACC=../../yacc/ocamlyacc
@@ -15,13 +16,15 @@ OCPP_CMOS:= ocpp_types.cmo ocpp_version.cmo \
 
 OCPP_MLS:=$(OCPP_CMOS:.cmo=.ml)
 
-all: ../$(BOOTDIR)/ocpp-plugin.cma
+PLUGIN_CMA=../../$(POST)/ocpp-plugin.cma
 
-../$(BOOTDIR)/ocpp-plugin.cma: \
-   $(ROOTDIR)/$(BOOTDIR)/ocamlc $(OCPP_MLS) ../$(BOOTDIR)/compiler/witness
+all: $(PLUGIN_CMA)
+
+$(PLUGIN_CMA): \
+   $(ROOTDIR)/$(PRE)/ocamlc $(OCPP_MLS) ../$(POST)/compiler/witness
 	$(MAKE) -f Makefile.plugin $(OCPP_CMOS)
-	$(CAMLC) -a -o ../$(BOOTDIR)/ocpp-plugin.cma $(OCPP_CMOS)
-	cp -f ocpp.cmi ../$(BOOTDIR)/
+	$(CAMLC) -a -o $(PLUGIN_CMA) $(OCPP_CMOS)
+	cp -f ocpp.cmi ../sempatch/
 	rm -f *.cmi *.cmti *.cmo *.cmt
 
 beforedepend:: $(OCPP_MLS)
@@ -45,7 +48,7 @@ clean:
 	rm -f *.cm?
 
 depend: beforedepend
-	$(CAMLDEP) $(INCLUDES) *.ml *.mli > .depend.$(BOOTDIR)
+	$(CAMLDEP) $(INCLUDES) *.ml *.mli > .depend.$(PRE)$(POST)
 
 .SUFFIXES: .ml .mli .cmo .cmi .cmx
 
@@ -55,6 +58,6 @@ depend: beforedepend
 .mli.cmi:
 	$(CAMLC) $(COMPFLAGS) -c $<
 
--include .depend.$(BOOTDIR)
+-include .depend.$(PRE)$(POST)
 
 

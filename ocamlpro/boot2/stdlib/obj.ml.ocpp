@@ -1,8 +1,8 @@
 patch add_primitive_flags {
-  prim_flags = [ "!memprof" ]
+  prim_flags = [ "memprof" ]
   prim_names = [ "caml_obj_block" ]
 }
 patch add_primitive_flags {
-  prim_flags = [ "!noalloc" ]
+  prim_flags = [ "noalloc" ]
   prim_names = [ "caml_obj_is_block" "caml_obj_set_tag" "caml_obj_tag" ]
 }

@@ -1,9 +1,9 @@
 
 ROOTDIR=../..
 
-INCLUDES=-I ../$(BOOTDIR)/stdlib -I ../$(BOOTDIR)/compiler
+INCLUDES=-I ../$(POST)/stdlib -I ../$(POST)/compiler
 CAMLRUN=$(ROOTDIR)/boot/ocamlrun
-CAMLC=$(CAMLRUN) $(ROOTDIR)/$(BOOTDIR)/ocamlc $(INCLUDES)
+CAMLC=$(CAMLRUN) $(ROOTDIR)/$(PRE)/ocamlc $(INCLUDES)
 CAMLDEP=$(CAMLRUN) $(ROOTDIR)/boot/ocamldep
 CAMLLEX=$(CAMLRUN) $(ROOTDIR)/boot/ocamllex
 CAMLYACC=../../yacc/ocamlyacc
@@ -12,11 +12,13 @@ LAST_CMOS:= last_plugin.cmo
 
 LAST_MLS:=$(LAST_CMOS:.cmo=.ml)
 
-all: ../$(BOOTDIR)/last-plugin.cma
+PLUGIN_CMA=../../$(POST)/last-plugin.cma
 
-../$(BOOTDIR)/last-plugin.cma: \
-   $(ROOTDIR)/$(BOOTDIR)/ocamlc ../$(BOOTDIR)/compiler/witness $(LAST_CMOS)
-	$(CAMLC) -a -o ../$(BOOTDIR)/last-plugin.cma $(LAST_CMOS)
+all: $(PLUGIN_CMA)
+
+$(PLUGIN_CMA): \
+   $(ROOTDIR)/$(PRE)/ocamlc ../$(PRE)/compiler/witness $(LAST_CMOS)
+	$(CAMLC) -a -o $(PLUGIN_CMA) $(LAST_CMOS)
 	rm -f *.cmi *.cmti *.cmo *.cmt
 
 beforedepend:: $(LAST_MLS)

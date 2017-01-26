@@ -15,6 +15,7 @@
 
 # The lexer generator
 include ../config/Makefile
+BOOTDIR ?= boot2
 CAMLRUN ?= ../boot/ocamlrun
 CAMLYACC ?= ../boot/ocamlyacc
 
@@ -26,7 +27,7 @@ else
 export OCAML_FLEXLINK:=$(ROOTDIR)/boot/ocamlrun $(ROOTDIR)/flexdll/flexlink.exe
 endif
 
-CAMLC=$(CAMLRUN) ../boot/ocamlc -strict-sequence -nostdlib -I ../boot \
+CAMLC=$(CAMLRUN) ../$(BOOTDIR)/ocamlc -strict-sequence -nostdlib -I ../boot \
       -use-prims ../byterun/primitives
 CAMLOPT=$(CAMLRUN) ../ocamlopt -nostdlib -I ../stdlib
 COMPFLAGS=$(INCLUDES) -absname -w +a-4-9-41-42-44-45-48 -warn-error A \

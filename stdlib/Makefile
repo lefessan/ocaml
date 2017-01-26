@@ -20,7 +20,7 @@ BOOTDIR ?= boot2
 HAS_MEMPROF ?= -D HAS_MEMPROF
 TARGET_BINDIR ?= $(BINDIR)
 
-PLUGINDIR ?= ../ocamlpro/$(BOOTDIR)
+PLUGINDIR ?= ../$(BOOTDIR)
 PLUGINS=\
   -plugin $(PLUGINDIR)/ocpp-plugin.cma \
   -plugin $(PLUGINDIR)/sempatch-plugin.cma \
@@ -249,12 +249,20 @@ clean::
 	rm -f *~
 	rm -f camlheader*
 
-include .depend
+include .depend.memprof
 
 # Note that .p.cmx targets do not depend (for compilation) upon other
 # .p.cmx files.  When the compiler imports another compilation unit,
 # it looks for the .cmx file (not .p.cmx).
 .PHONY: depend
+
+
+BOOTPLUGINS=\
+   -plugin ../boot/ocpp-plugin.cma \
+   -plugin ../boot/sempatch-plugin.cma \
+   -plugin ../boot/last-plugin.cma 
+BOOTCAMLDEP=../boot/ocamlrun ../boot/ocamldep $(BOOTPLUGINS)
+
 depend:
-	$(CAMLDEP) -slash *.mli *.ml > .depend
-	$(CAMLDEP) -slash *.ml | sed -e 's/\.cmx : /.p.cmx : /g' >>.depend
+	$(BOOTCAMLDEP) -slash *.mli *.ml > .depend.memprof
+	$(BOOTCAMLDEP) -slash *.ml | sed -e 's/\.cmx : /.p.cmx : /g' >>.depend.memprof

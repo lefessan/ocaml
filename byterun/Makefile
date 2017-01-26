@@ -230,12 +230,12 @@ libcamlrun_shared.$(SO): $(PICOBJS)
 ifneq "$(TOOLCHAIN)" "msvc"
 .PHONY: depend
 depend : prims.c caml/opnames.h caml/jumptbl.h caml/version.h
-	-$(CC) -MM $(BYTECCCOMPOPTS) *.c > .depend
+	-$(CC) -MM $(BYTECCCOMPOPTS) *.c > .depend.memprof
 	-$(CC) -MM $(BYTECCCOMPOPTS) -DDEBUG *.c | sed -e 's/\.o/.d.o/' \
-	       >> .depend
+	       >> .depend.memprof
 	-$(CC) -MM $(BYTECCCOMPOPTS) -DCAML_INSTR *.c | sed -e 's/\.o/.i.o/' \
-	       >> .depend
-	-$(CC) -MM $(BYTECCCOMPOPTS) *.c | sed -e 's/\.o/.pic.o/' >> .depend
+	       >> .depend.memprof
+	-$(CC) -MM $(BYTECCCOMPOPTS) *.c | sed -e 's/\.o/.pic.o/' >> .depend.memprof
 endif
 
 ifeq "$(UNIX_OR_WIN32)" "win32"
@@ -260,7 +260,7 @@ ifeq "$(UNIX_OR_WIN32)" "win32"
 include .depend.nt
 
 else
-include .depend
+include .depend.memprof
 endif
 
 .PHONY: COMMIT.tmp
