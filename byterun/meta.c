@@ -51,6 +51,12 @@ CAMLprim value caml_get_section_table(value unit)
                                      caml_section_table_size);
 }
 
+CAMLprim value caml_prepare_reify_bytecode(value memprof_info_v)
+{
+  caml_ocp_bytecode_init(String_val(memprof_info_v));
+  return Val_unit;
+}
+
 /* We expect "ocaml" to call caml_ocp_bytecode_init() before
    calling this function !!! */
 

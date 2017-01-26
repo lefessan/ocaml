@@ -208,6 +208,7 @@ let clear_crc_interfaces () =
 (* Record compilation events *)
 
 let debug_info = ref ([] : (int * Instruct.debug_event list * string list) list)
+let memprof_info = ref ([] : Cmo_format.memprof_info list)
 
 (* Link in a compilation unit *)
 
@@ -227,6 +228,7 @@ let link_compunit ppf output_fun currpos_fun inchan file_name compunit =
       else file_path :: debug_dirs in
     debug_info := (currpos_fun(), debug_event_list, debug_dirs) :: !debug_info
   end;
+  memprof_info := !memprof_info @ compunit.cu_memprof;
   Array.iter output_fun code_block;
   if !Clflags.link_everything then
     List.iter Symtable.require_primitive compunit.cu_primitives
@@ -287,6 +289,11 @@ let output_debug_info oc =
     !debug_info;
   debug_info := []
 
+let output_memprof_info oc =
+  let mp_info = !memprof_info in
+  memprof_info := [];
+  output_bytes oc (Symtable.string_of_memprof_info mp_info)
+
 (* Output a list of strings with 0-termination *)
 
 let output_stringlist oc l =
@@ -342,7 +349,11 @@ let link_bytecode ppf tolink exec_name standalone =
       Dll.init_compile !Clflags.no_std_include;
       Dll.add_path !load_path;
       try Dll.open_dlls Dll.For_checking sharedobjs
-      with Failure reason -> raise(Error(Cannot_open_dll reason))
+      with Failure reason ->
+      (* for ocpwin *)
+      Format.fprintf ppf "Warning on dynamically loaded library: %s"
+        reason;
+      Clflags.no_check_prims := true
     end;
     let output_fun = output_bytes outchan
     and currpos_fun () = pos_out outchan - start_code in
@@ -355,7 +366,9 @@ let link_bytecode ppf tolink exec_name standalone =
     (* DLL stuff *)
     if standalone then begin
       (* The extra search path for DLLs *)
-      output_stringlist outchan !Clflags.dllpaths;
+      output_stringlist outchan ( (* ocpwin *)
+        (Filename.concat Config.standard_library "stublibs") ::
+        !Clflags.dllpaths);
       Bytesections.record outchan "DLPT";
       (* The names of the DLLs *)
       output_stringlist outchan sharedobjs;
@@ -384,6 +397,9 @@ let link_bytecode ppf tolink exec_name standalone =
       output_debug_info outchan;
       Bytesections.record outchan "DBUG"
     end;
+    (* Memprof info *)
+    output_memprof_info outchan;
+    Bytesections.record outchan "MEMP";
     (* The table of contents and the trailer *)
     Bytesections.write_toc_and_trailer outchan;
     close_out outchan
@@ -516,6 +532,8 @@ let link_bytecode_as_c ppf tolink outfile =
 (* Build a custom runtime *)
 
 let build_custom_runtime prim_name exec_name =
+  (* ocpwin *)
+  Msvc.maybe_detect_env ();
   let runtime_lib = "-lcamlrun" ^ !Clflags.runtime_variant in
   Ccomp.call_linker Ccomp.Exe exec_name
     ([prim_name] @ List.rev !Clflags.ccobjs @ [runtime_lib])
@@ -528,7 +546,7 @@ let append_bytecode_and_cleanup bytecode_name exec_name prim_name =
   close_in ic;
   close_out oc;
   remove_file bytecode_name;
-  remove_file prim_name
+  remove_file prim_name (* line removed in ocpwin ? *)
 
 (* Fix the name of the output file, if the C compiler changes it behind
    our back. *)

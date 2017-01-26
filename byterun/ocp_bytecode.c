@@ -50,8 +50,13 @@ CAMLexport code_t caml_ocp_bytecode_translation_table = NULL;
 #include <stdlib.h>
 #include <stdio.h>
 
+static int debug_print = 0;
+
+#define XXX if(debug_print)
+
 char* memprof_info = NULL;
 void caml_ocp_bytecode_init(char *memprof_section){
+  XXX fprintf(stderr, "memprof_info %ld\n", (value)memprof_info);
   memprof_info = memprof_section;
 }
 
@@ -87,10 +92,6 @@ static int getint()
   memprof_info = memprof_info + sizeof(uint32_t);
   return p;
 }
-
-static int debug_print = 0;
-
-#define XXX if(debug_print)
 
 #include "caml/instruct.h"
 
@@ -148,6 +149,8 @@ code_t caml_ocp_bytecode_fix_locids(code_t src_code, asize_t* src_size)
   if( getenv("MEMP_DEBUG") != NULL ) debug_print = 1;
   if( getenv("MEMP_DISABLED") != NULL ) memprof_info = NULL;
 
+  XXX fprintf(stderr, "memprof_info %ld\n", (value)memprof_info);
+  
   opcode_nargs = caml_init_opcode_nargs();
   final_src_index = (*src_size) / sizeof(opcode_t);
 
@@ -183,6 +186,7 @@ code_t caml_ocp_bytecode_fix_locids(code_t src_code, asize_t* src_size)
   } else {
     nlocids = getint();
     ntables = getint();
+    XXX fprintf(stderr, "nlocids=%d ntables=%d\n", nlocids, ntables);
     final_dst_index = final_src_index + nlocids;
   }
   final_size = final_dst_index * sizeof(opcode_t);
@@ -217,7 +221,8 @@ code_t caml_ocp_bytecode_fix_locids(code_t src_code, asize_t* src_size)
 	  cmo_offset = getint();
 	  XXX fprintf(stderr, "cmo_offset = %d\n", cmo_offset);
 	  table_string_size = getint();
-	  table = memprof_info;	  memprof_info += table_string_size + 1;
+	  table = memprof_info;
+          memprof_info += table_string_size + 1;
 	  table_size = getint();
 
 	  XXX fprintf(stderr, "table_size = %d/%d\n", 

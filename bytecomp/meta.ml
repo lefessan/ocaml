@@ -21,7 +21,19 @@ external static_resize : bytes -> int -> bytes = "caml_static_resize"
 external static_release_bytecode : bytes -> int -> unit
                                  = "caml_static_release_bytecode"
 type closure = unit -> Obj.t
+
+external prepare_reify_bytecode : bytes -> unit = "caml_prepare_reify_bytecode"
 external reify_bytecode : bytes -> int -> closure = "caml_reify_bytecode"
+
+let reify_bytecode ?memp code len =
+  begin
+    match memp with
+    | None -> ()
+    | Some memp ->
+      prepare_reify_bytecode memp;
+  end;
+  reify_bytecode code len
+
 external invoke_traced_function : Obj.t -> Obj.t -> Obj.t -> Obj.t
                                 = "caml_invoke_traced_function"
 external get_section_table : unit -> (string * Obj.t) list

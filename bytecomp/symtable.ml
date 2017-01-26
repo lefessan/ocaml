@@ -132,6 +132,12 @@ let output_primitive_table outchan =
 (* Initialization for batch linking *)
 
 let init () =
+
+  (* ocpwin: empty c_prim_table, because in the /fat/ ocamlc, it might
+     have been already filled by toploop.ml initialization, leading to
+     double declarations of primitives and errors. *)
+  c_prim_table := empty_numtable;
+
   (* Enter the predefined exceptions *)
   Array.iteri
     (fun i name ->
@@ -388,3 +394,53 @@ let reset () =
   global_table := empty_numtable;
   literal_table := [];
   c_prim_table := empty_numtable
+
+
+
+
+
+(* This could be moved into Memprof. However, it would introduce
+   a need to link Memprof in dynlink.cma. Maybe we should divide
+   Memprof into ByteMemprof and AsmMemprof ? *)
+
+let buf_binary_int b int =
+  Buffer.add_char b (Char.unsafe_chr (int asr 24));
+  Buffer.add_char b (Char.unsafe_chr (int asr 16));
+  Buffer.add_char b (Char.unsafe_chr (int asr 8));
+  Buffer.add_char b (Char.unsafe_chr int);
+  ()
+
+let string_of_memprof_info memprof_info =
+  let oc = Buffer.create 10000 in
+(*  Printf.eprintf "output_memprof_info: %d blocks\n%!"
+    (List.length memprof_info); *)
+  let nlocids = ref 0 in
+  List.iter (fun mp ->
+    nlocids := !nlocids + Array.length mp.mp_locids;
+  ) memprof_info;
+  let nlocids = !nlocids in
+  buf_binary_int oc nlocids;
+(*  Printf.eprintf "nlocids=%d\n"  nlocids; *)
+  buf_binary_int oc (List.length memprof_info);
+(*  Printf.eprintf "ntables=%d\n" (List.length memprof_info); *)
+  let position = ref 0 in
+  List.iter (fun mp ->
+    if mp.mp_table_size <> 0 then
+      Printf.eprintf "Empty memprof locid table for %s\n%!" mp.mp_name;
+        buf_binary_int oc !position;
+        position := !position + mp.mp_nopcodes;
+        buf_binary_int oc (String.length mp.mp_table);
+        Buffer.add_string oc mp.mp_table;
+        Buffer.add_char oc '\000';
+        buf_binary_int oc mp.mp_table_size;
+        buf_binary_int oc (Array.length mp.mp_locids);
+        Array.iter (fun (pos, locid) ->
+            buf_binary_int oc pos;
+            let patch = match locid with
+              | Lambda.NoAlloc -> 0
+              | Lambda.LocId n -> n+1 in
+            (*      Printf.eprintf "  %d @ %d\n" patch pos; *)
+            buf_binary_int oc patch)
+          mp.mp_locids;
+  )  memprof_info;
+  Buffer.to_bytes oc
