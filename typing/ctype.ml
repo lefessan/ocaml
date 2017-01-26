@@ -4332,14 +4332,16 @@ let rec nondep_type_rec env id ty =
       end;
     ty'
 
+external reraise : exn -> 'a = "%reraise"
+
 let nondep_type env id ty =
   try
     let ty' = nondep_type_rec env id ty in
     clear_hash ();
     ty'
-  with Not_found ->
+  with Not_found as exn ->
     clear_hash ();
-    raise Not_found
+    reraise exn
 
 let () = nondep_type' := nondep_type
 

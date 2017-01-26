@@ -89,7 +89,7 @@ let rec apply_coercion loc strict restr arg =
                                                            (Lvar param)];
                                    ap_inlined=Default_inline;
                                    ap_specialised=Default_specialise})})
-  | Tcoerce_primitive { pc_loc; pc_desc; pc_env; pc_type; } ->
+  | Tcoerce_primitive ({ pc_loc; pc_desc; pc_env; pc_type; }, _loc) ->
       transl_primitive pc_loc pc_desc pc_env pc_type None
   | Tcoerce_alias (path, cc) ->
       name_lambda strict arg
@@ -133,8 +133,8 @@ let rec compose_coercions c1 c2 =
       in
       Tcoerce_structure
         (List.map
-          (function (p1, Tcoerce_primitive p) ->
-                      (p1, Tcoerce_primitive p)
+          (function (p1, Tcoerce_primitive (p, loc)) ->
+                      (p1, Tcoerce_primitive (p, loc))
                   | (p1, c1) ->
                       let (p2, c2) = v2.(p1) in (p2, compose_coercions c1 c2))
              pc1,
@@ -429,7 +429,7 @@ and transl_structure loc fields cc rootpath final_env = function
                   List.map
                     (fun (pos, cc) ->
                       match cc with
-                        Tcoerce_primitive p ->
+                        Tcoerce_primitive (p, _loc) ->
                           transl_primitive p.pc_loc
                             p.pc_desc p.pc_env p.pc_type None
                       | _ -> apply_coercion loc Strict cc (get_field pos))
@@ -742,7 +742,7 @@ let field_of_str loc str =
   let ids = Array.of_list (defined_idents str.str_items) in
   fun (pos, cc) ->
     match cc with
-    | Tcoerce_primitive { pc_loc; pc_desc; pc_env; pc_type; } ->
+    | Tcoerce_primitive ({ pc_loc; pc_desc; pc_env; pc_type; }, _loc) ->
         transl_primitive pc_loc pc_desc pc_env pc_type None
     | _ -> apply_coercion loc Strict cc (Lvar ids.(pos))
 
@@ -993,7 +993,7 @@ let build_ident_map restr idlist more_ids =
         let rec export_map pos map prims undef = function
         [] ->
           natural_map pos map prims undef
-          | (_source_pos, Tcoerce_primitive p) :: rem ->
+          | (_source_pos, Tcoerce_primitive (p, _loc) ) :: rem ->
             export_map (pos + 1) map ((pos, p) :: prims) undef rem
           | (source_pos, cc) :: rem ->
             let id = idarray.(source_pos) in

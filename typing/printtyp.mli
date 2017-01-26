@@ -88,3 +88,7 @@ val report_ambiguous_type_error:
 (* for toploop *)
 val print_items: (Env.t -> signature_item -> 'a option) ->
   Env.t -> signature_item list -> (out_sig_item * 'a option) list
+
+(* for memprof *)
+val mark_expanded_loops: type_expr -> unit
+val expanded_type_expr: formatter -> type_expr -> unit

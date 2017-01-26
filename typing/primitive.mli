@@ -25,7 +25,7 @@ type native_repr =
   | Unboxed_integer of boxed_integer
   | Untagged_int
 
-type description = private
+type description =
   { prim_name: string;         (* Name of primitive  or C function *)
     prim_arity: int;           (* Number of arguments *)
     prim_alloc: bool;          (* Does it allocates or raise? *)

@@ -1,0 +1,4 @@
+patch add_function_argument {
+  fun_new_argument = "expand"
+  fun_names = [ "mark_loops_rec" "tree_of_typexp" "tree_of_row_field" "tree_of_typlist" "tree_of_typobject" "tree_of_typfields" "typexp" ]
+}
