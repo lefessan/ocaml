@@ -15,6 +15,14 @@
 
 # FIXME reduce redundancy by including ../Makefile
 
+BOOTDIR?=.
+PLUGINDIR ?= ../../$(BOOTDIR)
+PLUGINS=\
+  -plugin $(PLUGINDIR)/ocpp-plugin.cma \
+  -plugin $(PLUGINDIR)/sempatch-plugin.cma \
+  -plugin $(PLUGINDIR)/last-plugin.cma \
+  $(HAS_MEMPROF)
+
 include ../../config/Makefile
 CAMLRUN ?= ../../boot/ocamlrun
 CAMLYACC ?= ../../boot/ocamlyacc
@@ -25,7 +33,7 @@ ROOTDIR=../..
 CAMLC=$(CAMLRUN) $(ROOTDIR)/ocamlc -nostdlib \
       -I $(ROOTDIR)/stdlib -I $(ROOTDIR)/otherlibs/unix
 MKLIB=$(CAMLRUN) ../../tools/ocamlmklib
-COMPFLAGS=-w +33..39 -warn-error A -bin-annot -g -safe-string
+COMPFLAGS=-w +33..39 -warn-error A -bin-annot -g -safe-string $(PLUGINS)
 
 C_OBJS=scheduler.o
 

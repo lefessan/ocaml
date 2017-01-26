@@ -1,4 +1,4 @@
 patch add_primitive_flags {
-  prim_flags = [ "!memprof" ]
+  prim_flags = [ "memprof" ]
   prim_names = [ "caml_make_vect" "caml_array_sub" "caml_array_concat" "caml_array_append" ]
 }

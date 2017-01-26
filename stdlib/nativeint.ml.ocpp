@@ -1,4 +1,4 @@
 patch add_primitive_flags {
-  prim_flags = [ "!memprof" ]
+  prim_flags = [ "memprof" ]
   prim_names = [ "caml_nativeint_of_float" "caml_nativeint_to_float" "caml_nativeint_format" "caml_nativeint_of_string" ]
 }

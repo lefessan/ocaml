@@ -22,7 +22,7 @@ CAMLRUN ?= boot/ocamlrun
 CAMLYACC ?= boot/ocamlyacc
 include stdlib/StdlibModules
 
-PLUGINDIR=./ocamlpro/$(BOOTDIR)
+PLUGINDIR=./$(BOOTDIR)
 PLUGINS=\
    -plugin $(PLUGINDIR)/ocpp-plugin.cma \
    -plugin $(PLUGINDIR)/sempatch-plugin.cma \
@@ -39,7 +39,7 @@ LINKFLAGS=
 YACCFLAGS=-v --strict
 CAMLLEX=$(CAMLRUN) boot/ocamllex
 CAMLDEP=$(CAMLRUN) tools/ocamldep
-DEPFLAGS=$(INCLUDES) $(PLUGINS)
+DEPFLAGS=$(INCLUDES)
 
 OCAMLBUILDBYTE=$(WITH_OCAMLBUILD:=.byte)
 OCAMLBUILDNATIVE=$(WITH_OCAMLBUILD:=.native)

@@ -30,6 +30,7 @@ type description =
   { prim_name: string;         (* Name of primitive  or C function *)
     prim_arity: int;           (* Number of arguments *)
     prim_alloc: bool;          (* Does it allocates or raise? *)
+    prim_memprof: bool;        (* Result only is allocated *)
     prim_native_name: string;  (* Name of C function for the nat. code gen. *)
     prim_native_repr_args: native_repr list;
     prim_native_repr_res: native_repr }
@@ -69,6 +70,16 @@ let simple ~name ~arity ~alloc =
   {prim_name = name;
    prim_arity = arity;
    prim_alloc = alloc;
+   prim_memprof = false;
+   prim_native_name = "";
+   prim_native_repr_args = make_native_repr_args arity Same_as_ocaml_repr;
+   prim_native_repr_res = Same_as_ocaml_repr}
+
+let simple_memprof ~name ~arity ~alloc =
+  {prim_name = name;
+   prim_arity = arity;
+   prim_alloc = alloc;
+   prim_memprof = true;
    prim_native_name = "";
    prim_native_repr_args = make_native_repr_args arity Same_as_ocaml_repr;
    prim_native_repr_res = Same_as_ocaml_repr}
@@ -77,6 +88,16 @@ let make ~name ~alloc ~native_name ~native_repr_args ~native_repr_res =
   {prim_name = name;
    prim_arity = List.length native_repr_args;
    prim_alloc = alloc;
+   prim_memprof = false;
+   prim_native_name = native_name;
+   prim_native_repr_args = native_repr_args;
+   prim_native_repr_res = native_repr_res}
+
+let make_memprof ~name ~alloc ~native_name ~native_repr_args ~native_repr_res =
+  {prim_name = name;
+   prim_arity = List.length native_repr_args;
+   prim_alloc = alloc;
+   prim_memprof = true;
    prim_native_name = native_name;
    prim_native_repr_args = native_repr_args;
    prim_native_repr_res = native_repr_res}
@@ -96,6 +117,10 @@ let parse_declaration valdecl ~native_repr_args ~native_repr_res =
   in
   let noalloc_attribute =
     Attr_helper.has_no_payload_attribute ["noalloc"; "ocaml.noalloc"]
+      valdecl.pval_attributes
+  in
+  let memprof_attribute =
+    Attr_helper.has_no_payload_attribute ["memprof"; "ocaml.memprof"]
       valdecl.pval_attributes
   in
   if old_style_float &&
@@ -129,9 +154,17 @@ let parse_declaration valdecl ~native_repr_args ~native_repr_res =
     else
       (native_repr_args, native_repr_res)
   in
+  (* why can a function have @@noalloc and @@unboxed together ?
+
+  if memprof_attribute && noalloc then begin
+    Printf.eprintf "Warning: primitive %S has both tags noalloc and memprof\n%!"
+      name;
+  end;
+  *)
   {prim_name = name;
    prim_arity = arity;
    prim_alloc = not noalloc;
+   prim_memprof = memprof_attribute;
    prim_native_name = native_name;
    prim_native_repr_args = native_repr_args;
    prim_native_repr_res = native_repr_res}
@@ -156,6 +189,7 @@ let rec add_native_repr_attributes ty attrs =
 let oattr_unboxed = { oattr_name = "unboxed" }
 let oattr_untagged = { oattr_name = "untagged" }
 let oattr_noalloc = { oattr_name = "noalloc" }
+let oattr_memprof = { oattr_name = "memprof" }
 
 let print p osig_val_decl =
   let prims =
@@ -170,6 +204,7 @@ let print p osig_val_decl =
   let all_unboxed = for_all is_unboxed in
   let all_untagged = for_all is_untagged in
   let attrs = if p.prim_alloc then [] else [oattr_noalloc] in
+  let attrs = if p.prim_memprof then attrs else oattr_memprof :: attrs in
   let attrs =
     if all_unboxed then
       oattr_unboxed :: attrs

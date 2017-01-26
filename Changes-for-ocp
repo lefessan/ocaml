@@ -58,6 +58,10 @@ semantic patches
 * ocamlpro/boot{.ocp}: build a file compiler/witness after changing any
    .cmi, to force recompilation of plugins
 
+2017-01-26:
+* build with PRE and POST to create different plugins for boot/ocamlc,
+   boot2/ocamlc and ./ocamlc
+
 A VERIFIER:
 ===========
 * caml_alloc_shr_no_raise fournit un profinfo = 0, pourquoi ?
