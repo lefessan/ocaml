@@ -775,6 +775,14 @@ clean::
 
 .SUFFIXES: .ml .mli .cmo .cmi .cmx
 
+
+%.cmo: %.ml %.ml.ocpp
+	$(CAMLC) $(COMPFLAGS) -c $<
+%.cmx: %.ml %.ml.ocpp
+	$(CAMLOPT) $(COMPFLAGS) -c $<
+%.cmi: %.mli %.mli.ocpp
+	$(CAMLC) $(COMPFLAGS) -c $<
+
 .ml.cmo:
 	$(CAMLC) $(COMPFLAGS) -c $<
 

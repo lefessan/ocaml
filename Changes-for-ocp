@@ -57,10 +57,14 @@ semantic patches
 2017-01-25:
 * ocamlpro/boot{.ocp}: build a file compiler/witness after changing any
    .cmi, to force recompilation of plugins
+* tout parsing/
 
 2017-01-26:
 * build with PRE and POST to create different plugins for boot/ocamlc,
    boot2/ocamlc and ./ocamlc
+* Use .depend.memprof instead of .depend to avoid conflicts on .depend
+  (we need to restore .depend from trunk)
+* Tout typing/
 
 A VERIFIER:
 ===========
@@ -70,6 +74,10 @@ A VERIFIER:
   ALLOCPROF_SMALL_ALLOC dans Alloc_small_with_profinfo a été remplacé
   par un appel à CAML_ALLOC_SMALL_HOOK(wosize), qui n'est utilisé que
   avec --gc-hooks
+* Pour etre sur de n'oublier aucune primitive, on pourrait les lister
+  toutes, de facon a avoir un warning quand on en rajoute une
+
+
 
 BYTECODE:
 =========
@@ -83,3 +91,4 @@ COQ:
 
 Pour être compatible avec Coq, il faudrait que Coq puisse utiliser
 le Make_header d'OCaml. Cela peut se faire via CAML_INTERNALS
+

@@ -25,6 +25,8 @@ open Types
 open Btype
 open Outcometree
 
+let expand = false (* false *)
+
 (* Print a long identifier *)
 
 let rec longident ppf = function
@@ -263,6 +265,7 @@ let rec normalize_type_path ?(cache=false) env p =
     let params = List.map repr params in
     match repr ty with
       {desc = Tconstr (p1, tyl, _)} ->
+        if Path.same p1 p then (p, Id) else (* memprof *)
         let tyl = List.map repr tyl in
         if List.length params = List.length tyl
         && List.for_all2 (==) params tyl
@@ -475,7 +478,7 @@ let namable_row row =
     row.row_fields
 
 let rec mark_loops_rec visited ty =
-  let ty = repr ty in
+  let ty = if expand then expand_head !printing_env ty else repr ty in
   let px = proxy ty in
   if List.memq px visited && aliasable ty then add_alias px else
     let visited = px :: visited in
@@ -550,7 +553,7 @@ let reset_and_mark_loops_list tyl =
 let print_labels = ref true
 
 let rec tree_of_typexp sch ty =
-  let ty = repr ty in
+  let ty = if expand then expand_head !printing_env ty else repr ty in
   let px = proxy ty in
   if List.mem_assq px !names && not (List.memq px !delayed) then
    let mark = is_non_gen sch ty in
@@ -722,11 +725,14 @@ and tree_of_typfields sch rest = function
 let typexp sch ppf ty =
   !Oprint.out_type ppf (tree_of_typexp sch ty)
 
-let type_expr ppf ty = typexp false ppf ty
+let type_expr ppf ty =
+  typexp false ppf ty
 
-and type_sch ppf ty = typexp true ppf ty
+and type_sch ppf ty =
+  typexp true ppf ty
 
-and type_scheme ppf ty = reset_and_mark_loops ty; typexp true ppf ty
+and type_scheme ppf ty =
+  reset_and_mark_loops ty; typexp true ppf ty
 
 (* Maxence *)
 let type_scheme_max ?(b_reset_names=true) ppf ty =
@@ -734,7 +740,8 @@ let type_scheme_max ?(b_reset_names=true) ppf ty =
   typexp true ppf ty
 (* End Maxence *)
 
-let tree_of_type_scheme ty = reset_and_mark_loops ty; tree_of_typexp true ty
+let tree_of_type_scheme ty =
+  reset_and_mark_loops ty; tree_of_typexp true ty
 
 (* Print one type declaration *)
 
@@ -1576,3 +1583,13 @@ let report_ambiguous_type_error ppf env (tp0, tp0') tpl txt1 txt2 txt3 =
            @]"
           txt2 type_path_list tpl
           txt3 (type_path_expansion tp0) tp0')
+
+(* for memprof *)
+
+let expanded_type_expr ppf ty =
+  let expand = true in
+  typexp false ppf ty
+
+let mark_expanded_loops ty =
+  let expand = true in
+  normalize_type Env.empty ty; mark_loops_rec [] ty;;
