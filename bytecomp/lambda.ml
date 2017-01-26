@@ -17,6 +17,25 @@ open Misc
 open Path
 open Asttypes
 
+(* for memprof  *)
+(* Instead of using an integer for locids, we use a full record. This
+   way, we are able to extract the location and path information,
+   reducing the amount of parameters to pass to all functions. Also,
+   the locid is always a lazy, to delay its computation and reduce the
+   number of allocated locids *)
+type alloc = Memprof.alloc =
+  | NoAlloc
+  | LocId of int
+type delayed_alloc = Memprof.delayed_alloc
+type location = Memprof.location = { l:Location.t; p: Path.t }
+type locid = Memprof.locid = { loc: location; id:delayed_alloc ref }
+let newl lp loc = { lp with l = loc }
+let newp lp path = { lp with p = path }
+let lp l p = { l;p }
+let unitlp unitname = { l = Location.none;
+                         p = Pident (Ident.create_persistent unitname) }
+(* /for memprof  *)
+
 type compile_time_constant =
   | Big_endian
   | Word_size

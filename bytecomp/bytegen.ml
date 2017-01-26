@@ -23,6 +23,9 @@ open Lambda
 open Switch
 open Instruct
 
+
+let tmpalloc = NoAlloc
+
 (**** Label generation ****)
 
 let label_counter = ref 0
@@ -306,20 +309,20 @@ let comp_bint_primitive bi suff args =
     match bi with Pnativeint -> "caml_nativeint_"
                 | Pint32 -> "caml_int32_"
                 | Pint64 -> "caml_int64_" in
-  Kccall(pref ^ suff, List.length args)
+  Kccall(pref ^ suff, List.length args, tmpalloc)
 
 let comp_primitive p args =
   match p with
     Pgetglobal id -> Kgetglobal id
   | Psetglobal id -> Ksetglobal id
   | Pintcomp cmp -> Kintcomp cmp
-  | Pmakeblock(tag, _mut, _) -> Kmakeblock(List.length args, tag)
+  | Pmakeblock(tag, _mut, _) -> Kmakeblock(List.length args, tag, tmpalloc)
   | Pfield n -> Kgetfield n
   | Psetfield(n, _ptr, _init) -> Ksetfield n
-  | Pfloatfield n -> Kgetfloatfield n
+  | Pfloatfield n -> Kgetfloatfield (n, tmpalloc)
   | Psetfloatfield (n, _init) -> Ksetfloatfield n
-  | Pduprecord _ -> Kccall("caml_obj_dup", 1)
-  | Pccall p -> Kccall(p.prim_name, p.prim_arity)
+  | Pduprecord _ -> Kccall("caml_obj_dup", 1, tmpalloc)
+  | Pccall p -> Kccall(p.prim_name, p.prim_arity, tmpalloc)
   | Pnegint -> Knegint
   | Paddint -> Kaddint
   | Psubint -> Ksubint
@@ -334,45 +337,45 @@ let comp_primitive p args =
   | Pasrint -> Kasrint
   | Poffsetint n -> Koffsetint n
   | Poffsetref n -> Koffsetref n
-  | Pintoffloat -> Kccall("caml_int_of_float", 1)
-  | Pfloatofint -> Kccall("caml_float_of_int", 1)
-  | Pnegfloat -> Kccall("caml_neg_float", 1)
-  | Pabsfloat -> Kccall("caml_abs_float", 1)
-  | Paddfloat -> Kccall("caml_add_float", 2)
-  | Psubfloat -> Kccall("caml_sub_float", 2)
-  | Pmulfloat -> Kccall("caml_mul_float", 2)
-  | Pdivfloat -> Kccall("caml_div_float", 2)
-  | Pfloatcomp Ceq -> Kccall("caml_eq_float", 2)
-  | Pfloatcomp Cneq -> Kccall("caml_neq_float", 2)
-  | Pfloatcomp Clt -> Kccall("caml_lt_float", 2)
-  | Pfloatcomp Cgt -> Kccall("caml_gt_float", 2)
-  | Pfloatcomp Cle -> Kccall("caml_le_float", 2)
-  | Pfloatcomp Cge -> Kccall("caml_ge_float", 2)
-  | Pstringlength -> Kccall("caml_ml_string_length", 1)
-  | Pbyteslength -> Kccall("caml_ml_bytes_length", 1)
-  | Pstringrefs -> Kccall("caml_string_get", 2)
-  | Pbytesrefs -> Kccall("caml_bytes_get", 2)
-  | Pbytessets -> Kccall("caml_bytes_set", 3)
+  | Pintoffloat -> Kccall("caml_int_of_float", 1, tmpalloc)
+  | Pfloatofint -> Kccall("caml_float_of_int", 1, tmpalloc)
+  | Pnegfloat -> Kccall("caml_neg_float", 1, tmpalloc)
+  | Pabsfloat -> Kccall("caml_abs_float", 1, tmpalloc)
+  | Paddfloat -> Kccall("caml_add_float", 2, tmpalloc)
+  | Psubfloat -> Kccall("caml_sub_float", 2, tmpalloc)
+  | Pmulfloat -> Kccall("caml_mul_float", 2, tmpalloc)
+  | Pdivfloat -> Kccall("caml_div_float", 2, tmpalloc)
+  | Pfloatcomp Ceq -> Kccall("caml_eq_float", 2, tmpalloc)
+  | Pfloatcomp Cneq -> Kccall("caml_neq_float", 2, tmpalloc)
+  | Pfloatcomp Clt -> Kccall("caml_lt_float", 2, tmpalloc)
+  | Pfloatcomp Cgt -> Kccall("caml_gt_float", 2, tmpalloc)
+  | Pfloatcomp Cle -> Kccall("caml_le_float", 2, tmpalloc)
+  | Pfloatcomp Cge -> Kccall("caml_ge_float", 2, tmpalloc)
+  | Pstringlength -> Kccall("caml_ml_string_length", 1, tmpalloc)
+  | Pbyteslength -> Kccall("caml_ml_bytes_length", 1, tmpalloc)
+  | Pstringrefs -> Kccall("caml_string_get", 2, tmpalloc)
+  | Pbytesrefs -> Kccall("caml_bytes_get", 2, tmpalloc)
+  | Pbytessets -> Kccall("caml_bytes_set", 3, tmpalloc)
   | Pstringrefu | Pbytesrefu -> Kgetstringchar
   | Pbytessetu -> Ksetstringchar
-  | Pstring_load_16(_) -> Kccall("caml_string_get16", 2)
-  | Pstring_load_32(_) -> Kccall("caml_string_get32", 2)
-  | Pstring_load_64(_) -> Kccall("caml_string_get64", 2)
-  | Pstring_set_16(_) -> Kccall("caml_string_set16", 3)
-  | Pstring_set_32(_) -> Kccall("caml_string_set32", 3)
-  | Pstring_set_64(_) -> Kccall("caml_string_set64", 3)
+  | Pstring_load_16(_) -> Kccall("caml_string_get16", 2, tmpalloc)
+  | Pstring_load_32(_) -> Kccall("caml_string_get32", 2, tmpalloc)
+  | Pstring_load_64(_) -> Kccall("caml_string_get64", 2, tmpalloc)
+  | Pstring_set_16(_) -> Kccall("caml_string_set16", 3, tmpalloc)
+  | Pstring_set_32(_) -> Kccall("caml_string_set32", 3, tmpalloc)
+  | Pstring_set_64(_) -> Kccall("caml_string_set64", 3, tmpalloc)
   | Parraylength _ -> Kvectlength
-  | Parrayrefs Pgenarray -> Kccall("caml_array_get", 2)
-  | Parrayrefs Pfloatarray -> Kccall("caml_array_get_float", 2)
-  | Parrayrefs _ -> Kccall("caml_array_get_addr", 2)
-  | Parraysets Pgenarray -> Kccall("caml_array_set", 3)
-  | Parraysets Pfloatarray -> Kccall("caml_array_set_float", 3)
-  | Parraysets _ -> Kccall("caml_array_set_addr", 3)
-  | Parrayrefu Pgenarray -> Kccall("caml_array_unsafe_get", 2)
-  | Parrayrefu Pfloatarray -> Kccall("caml_array_unsafe_get_float", 2)
+  | Parrayrefs Pgenarray -> Kccall("caml_array_get", 2, tmpalloc)
+  | Parrayrefs Pfloatarray -> Kccall("caml_array_get_float", 2, tmpalloc)
+  | Parrayrefs _ -> Kccall("caml_array_get_addr", 2, tmpalloc)
+  | Parraysets Pgenarray -> Kccall("caml_array_set", 3, tmpalloc)
+  | Parraysets Pfloatarray -> Kccall("caml_array_set_float", 3, tmpalloc)
+  | Parraysets _ -> Kccall("caml_array_set_addr", 3, tmpalloc)
+  | Parrayrefu Pgenarray -> Kccall("caml_array_unsafe_get", 2, tmpalloc)
+  | Parrayrefu Pfloatarray -> Kccall("caml_array_unsafe_get_float", 2, tmpalloc)
   | Parrayrefu _ -> Kgetvectitem
-  | Parraysetu Pgenarray -> Kccall("caml_array_unsafe_set", 3)
-  | Parraysetu Pfloatarray -> Kccall("caml_array_unsafe_set_float", 3)
+  | Parraysetu Pgenarray -> Kccall("caml_array_unsafe_set", 3, tmpalloc)
+  | Parraysetu Pfloatarray -> Kccall("caml_array_unsafe_set_float", 3, tmpalloc)
   | Parraysetu _ -> Ksetvectitem
   | Pctconst c ->
      let const_name = match c with
@@ -384,18 +387,18 @@ let comp_primitive p args =
        | Ostype_win32 -> "ostype_win32"
        | Ostype_cygwin -> "ostype_cygwin"
        | Backend_type -> "backend_type" in
-     Kccall(Printf.sprintf "caml_sys_const_%s" const_name, 1)
+     Kccall(Printf.sprintf "caml_sys_const_%s" const_name, 1, tmpalloc)
   | Pisint -> Kisint
   | Pisout -> Kisout
-  | Pbittest -> Kccall("caml_bitvect_test", 2)
+  | Pbittest -> Kccall("caml_bitvect_test", 2, tmpalloc)
   | Pbintofint bi -> comp_bint_primitive bi "of_int" args
   | Pintofbint bi -> comp_bint_primitive bi "to_int" args
-  | Pcvtbint(Pint32, Pnativeint) -> Kccall("caml_nativeint_of_int32", 1)
-  | Pcvtbint(Pnativeint, Pint32) -> Kccall("caml_nativeint_to_int32", 1)
-  | Pcvtbint(Pint32, Pint64) -> Kccall("caml_int64_of_int32", 1)
-  | Pcvtbint(Pint64, Pint32) -> Kccall("caml_int64_to_int32", 1)
-  | Pcvtbint(Pnativeint, Pint64) -> Kccall("caml_int64_of_nativeint", 1)
-  | Pcvtbint(Pint64, Pnativeint) -> Kccall("caml_int64_to_nativeint", 1)
+  | Pcvtbint(Pint32, Pnativeint) -> Kccall("caml_nativeint_of_int32", 1, tmpalloc)
+  | Pcvtbint(Pnativeint, Pint32) -> Kccall("caml_nativeint_to_int32", 1, tmpalloc)
+  | Pcvtbint(Pint32, Pint64) -> Kccall("caml_int64_of_int32", 1, tmpalloc)
+  | Pcvtbint(Pint64, Pint32) -> Kccall("caml_int64_to_int32", 1, tmpalloc)
+  | Pcvtbint(Pnativeint, Pint64) -> Kccall("caml_int64_of_nativeint", 1, tmpalloc)
+  | Pcvtbint(Pint64, Pnativeint) -> Kccall("caml_int64_to_nativeint", 1, tmpalloc)
   | Pnegbint bi -> comp_bint_primitive bi "neg" args
   | Paddbint bi -> comp_bint_primitive bi "add" args
   | Psubbint bi -> comp_bint_primitive bi "sub" args
@@ -408,24 +411,24 @@ let comp_primitive p args =
   | Plslbint bi -> comp_bint_primitive bi "shift_left" args
   | Plsrbint bi -> comp_bint_primitive bi "shift_right_unsigned" args
   | Pasrbint bi -> comp_bint_primitive bi "shift_right" args
-  | Pbintcomp(_, Ceq) -> Kccall("caml_equal", 2)
-  | Pbintcomp(_, Cneq) -> Kccall("caml_notequal", 2)
-  | Pbintcomp(_, Clt) -> Kccall("caml_lessthan", 2)
-  | Pbintcomp(_, Cgt) -> Kccall("caml_greaterthan", 2)
-  | Pbintcomp(_, Cle) -> Kccall("caml_lessequal", 2)
-  | Pbintcomp(_, Cge) -> Kccall("caml_greaterequal", 2)
-  | Pbigarrayref(_, n, _, _) -> Kccall("caml_ba_get_" ^ string_of_int n, n + 1)
-  | Pbigarrayset(_, n, _, _) -> Kccall("caml_ba_set_" ^ string_of_int n, n + 2)
-  | Pbigarraydim(n) -> Kccall("caml_ba_dim_" ^ string_of_int n, 1)
-  | Pbigstring_load_16(_) -> Kccall("caml_ba_uint8_get16", 2)
-  | Pbigstring_load_32(_) -> Kccall("caml_ba_uint8_get32", 2)
-  | Pbigstring_load_64(_) -> Kccall("caml_ba_uint8_get64", 2)
-  | Pbigstring_set_16(_) -> Kccall("caml_ba_uint8_set16", 3)
-  | Pbigstring_set_32(_) -> Kccall("caml_ba_uint8_set32", 3)
-  | Pbigstring_set_64(_) -> Kccall("caml_ba_uint8_set64", 3)
-  | Pbswap16 -> Kccall("caml_bswap16", 1)
+  | Pbintcomp(_, Ceq) -> Kccall("caml_equal", 2, tmpalloc)
+  | Pbintcomp(_, Cneq) -> Kccall("caml_notequal", 2, tmpalloc)
+  | Pbintcomp(_, Clt) -> Kccall("caml_lessthan", 2, tmpalloc)
+  | Pbintcomp(_, Cgt) -> Kccall("caml_greaterthan", 2, tmpalloc)
+  | Pbintcomp(_, Cle) -> Kccall("caml_lessequal", 2, tmpalloc)
+  | Pbintcomp(_, Cge) -> Kccall("caml_greaterequal", 2, tmpalloc)
+  | Pbigarrayref(_, n, _, _) -> Kccall("caml_ba_get_" ^ string_of_int n, n + 1, tmpalloc)
+  | Pbigarrayset(_, n, _, _) -> Kccall("caml_ba_set_" ^ string_of_int n, n + 2, tmpalloc)
+  | Pbigarraydim(n) -> Kccall("caml_ba_dim_" ^ string_of_int n, 1, tmpalloc)
+  | Pbigstring_load_16(_) -> Kccall("caml_ba_uint8_get16", 2, tmpalloc)
+  | Pbigstring_load_32(_) -> Kccall("caml_ba_uint8_get32", 2, tmpalloc)
+  | Pbigstring_load_64(_) -> Kccall("caml_ba_uint8_get64", 2, tmpalloc)
+  | Pbigstring_set_16(_) -> Kccall("caml_ba_uint8_set16", 3, tmpalloc)
+  | Pbigstring_set_32(_) -> Kccall("caml_ba_uint8_set32", 3, tmpalloc)
+  | Pbigstring_set_64(_) -> Kccall("caml_ba_uint8_set64", 3, tmpalloc)
+  | Pbswap16 -> Kccall("caml_bswap16", 1, tmpalloc)
   | Pbbswap(bi) -> comp_bint_primitive bi "bswap" args
-  | Pint_as_pointer -> Kccall("caml_int_as_pointer", 1)
+  | Pint_as_pointer -> Kccall("caml_int_as_pointer", 1, tmpalloc)
   | _ -> fatal_error "Bytegen.comp_primitive"
 
 let is_immed n = immed_min <= n && n <= immed_max
@@ -511,7 +514,7 @@ let rec comp_expr env exp sz cont =
           free_vars = fv; num_defs = 1; rec_vars = []; rec_pos = 0 } in
       Stack.push to_compile functions_to_compile;
       comp_args env (List.map (fun n -> Lvar n) fv) sz
-        (Kclosure(lbl, List.length fv) :: cont)
+        (Kclosure(lbl, List.length fv, tmpalloc) :: cont)
   | Llet(_str, _k, id, arg, body) ->
       comp_expr env arg sz
         (Kpush :: comp_expr (add_var id (sz+1) env) body (sz+1)
@@ -536,7 +539,7 @@ let rec comp_expr env exp sz cont =
           | _ -> assert false in
         let lbls = comp_fun 0 decl in
         comp_args env (List.map (fun n -> Lvar n) fv) sz
-          (Kclosurerec(lbls, List.length fv) ::
+          (Kclosurerec(lbls, List.length fv, tmpalloc) ::
             (comp_expr (add_vars rec_idents (sz+1) env) body (sz + ndecl)
                        (add_pop ndecl cont)))
       end else begin
@@ -546,17 +549,17 @@ let rec comp_expr env exp sz cont =
           | [] -> comp_nonrec new_env sz ndecl decl_size
           | (id, _exp, RHS_floatblock blocksize) :: rem ->
               Kconst(Const_base(Const_int blocksize)) ::
-              Kccall("caml_alloc_dummy_float", 1) :: Kpush ::
+              Kccall("caml_alloc_dummy_float", 1, tmpalloc) :: Kpush ::
               comp_init (add_var id (sz+1) new_env) (sz+1) rem
           | (id, _exp, RHS_block blocksize) :: rem ->
               Kconst(Const_base(Const_int blocksize)) ::
-              Kccall("caml_alloc_dummy", 1) :: Kpush ::
+              Kccall("caml_alloc_dummy", 1, tmpalloc) :: Kpush ::
               comp_init (add_var id (sz+1) new_env) (sz+1) rem
           | (id, _exp, RHS_function (blocksize,arity)) :: rem ->
               Kconst(Const_base(Const_int arity)) ::
               Kpush ::
               Kconst(Const_base(Const_int blocksize)) ::
-              Kccall("caml_alloc_dummy_function", 2) :: Kpush ::
+              Kccall("caml_alloc_dummy_function", 2, tmpalloc) :: Kpush ::
               comp_init (add_var id (sz+1) new_env) (sz+1) rem
           | (id, _exp, RHS_nonrec) :: rem ->
               Kconst(Const_base(Const_int 0)) :: Kpush ::
@@ -574,7 +577,7 @@ let rec comp_expr env exp sz cont =
           | (_id, exp, (RHS_block _ | RHS_floatblock _ | RHS_function _))
             :: rem ->
               comp_expr new_env exp sz
-                (Kpush :: Kacc i :: Kccall("caml_update_dummy", 2) ::
+                (Kpush :: Kacc i :: Kccall("caml_update_dummy", 2, tmpalloc) ::
                  comp_rec new_env sz (i-1) rem)
           | (_id, _exp, RHS_nonrec) :: rem ->
               comp_rec new_env sz (i-1) rem
@@ -647,15 +650,15 @@ let rec comp_expr env exp sz cont =
   | Lprim(Pmakearray (kind, _), args, _) ->
       begin match kind with
         Pintarray | Paddrarray ->
-          comp_args env args sz (Kmakeblock(List.length args, 0) :: cont)
+          comp_args env args sz (Kmakeblock(List.length args, 0, tmpalloc) :: cont)
       | Pfloatarray ->
-          comp_args env args sz (Kmakefloatblock(List.length args) :: cont)
+          comp_args env args sz (Kmakefloatblock(List.length args, tmpalloc) :: cont)
       | Pgenarray ->
           if args = []
-          then Kmakeblock(0, 0) :: cont
+          then Kmakeblock(0, 0, tmpalloc) :: cont
           else comp_args env args sz
-                 (Kmakeblock(List.length args, 0) ::
-                  Kccall("caml_make_array", 1) :: cont)
+                 (Kmakeblock(List.length args, 0, tmpalloc) ::
+                  Kccall("caml_make_array", 1, tmpalloc) :: cont)
       end
   | Lprim (Pduparray (kind, mutability),
            [Lprim (Pmakearray (kind',_),args,_)], loc) ->
@@ -917,7 +920,7 @@ let comp_block env exp sz cont =
   let used_safe = !max_stack_used + Config.stack_safety_margin in
   if used_safe > Config.stack_threshold then
     Kconst(Const_base(Const_int used_safe)) ::
-    Kccall("caml_ensure_stack_capacity", 1) ::
+    Kccall("caml_ensure_stack_capacity", 1, tmpalloc) ::
     code
   else
     code
@@ -936,7 +939,7 @@ let comp_function tc cont =
   let cont =
     comp_block env tc.body arity (Kreturn arity :: cont) in
   if arity > 1 then
-    Krestart :: Klabel tc.label :: Kgrab(arity - 1) :: cont
+    Krestart :: Klabel tc.label :: Kgrab(arity - 1, tmpalloc) :: cont
   else
     Klabel tc.label :: cont
 

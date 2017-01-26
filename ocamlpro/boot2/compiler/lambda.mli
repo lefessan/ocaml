@@ -17,6 +17,19 @@
 
 open Asttypes
 
+(* for memprof  *)
+type alloc = Memprof.alloc =
+  | NoAlloc
+  | LocId of int
+type delayed_alloc = Memprof.delayed_alloc
+type location = Memprof.location = { l:Location.t; p: Path.t }
+type locid = Memprof.locid = { loc: location; id:delayed_alloc ref }
+val newl : location -> Location.t -> location
+val newp : location -> Path.t -> location
+val lp : Location.t -> Path.t -> location
+val unitlp : string -> location
+(* /for memprof  *)
+
 type compile_time_constant =
   | Big_endian
   | Word_size

@@ -92,3 +92,23 @@ COQ:
 Pour être compatible avec Coq, il faudrait que Coq puisse utiliser
 le Make_header d'OCaml. Cela peut se faire via CAML_INTERNALS
 
+
+Format of the MEMP section:
+===========================
+
+nlocids: uint32; // total number of locids to add
+ntables: uint32; // number of tables to read
+tables[ntables]: TABLE
+
+TABLE:
+position: uint32; // initial position in bytecode section
+table_string_size: uint32;
+table_string: char[table_string_size]; // marshaled version of memprof info
+table_string_terminator: char; // 0
+table_size: uint32;
+table_nlocids: uint32;
+table_locids: LOCID[table_nlocids];
+
+LOCID:
+locid_pos: uint32;
+locid: uint32; // locid+1

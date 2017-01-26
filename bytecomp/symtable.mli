@@ -63,3 +63,7 @@ open Format
 val report_error: formatter -> error -> unit
 
 val reset: unit -> unit
+
+
+(* for memprof *)
+val string_of_memprof_info : Cmo_format.memprof_info list -> bytes

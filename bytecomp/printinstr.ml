@@ -32,10 +32,10 @@ let instruction ppf = function
       fprintf ppf "\tappterm %i, %i" n m
   | Kreturn n -> fprintf ppf "\treturn %i" n
   | Krestart -> fprintf ppf "\trestart"
-  | Kgrab n -> fprintf ppf "\tgrab %i" n
-  | Kclosure(lbl, n) ->
+  | Kgrab (n, _alloc) -> fprintf ppf "\tgrab %i" n
+  | Kclosure(lbl, n, _alloc) ->
       fprintf ppf "\tclosure L%i, %i" lbl n
-  | Kclosurerec(lbls, n) ->
+  | Kclosurerec(lbls, n, _alloc) ->
       fprintf ppf "\tclosurerec";
       List.iter (fun lbl -> fprintf ppf " %i" lbl) lbls;
       fprintf ppf ", %i" n
@@ -44,13 +44,13 @@ let instruction ppf = function
   | Ksetglobal id -> fprintf ppf "\tsetglobal %a" Ident.print id
   | Kconst cst ->
       fprintf ppf "@[<10>\tconst@ %a@]" Printlambda.structured_constant cst
-  | Kmakeblock(n, m) ->
+  | Kmakeblock(n, m, _alloc) ->
       fprintf ppf "\tmakeblock %i, %i" n m
-  | Kmakefloatblock(n) ->
+  | Kmakefloatblock(n, _alloc) ->
       fprintf ppf "\tmakefloatblock %i" n
   | Kgetfield n -> fprintf ppf "\tgetfield %i" n
   | Ksetfield n -> fprintf ppf "\tsetfield %i" n
-  | Kgetfloatfield n -> fprintf ppf "\tgetfloatfield %i" n
+  | Kgetfloatfield (n, _alloc) -> fprintf ppf "\tgetfloatfield %i" n
   | Ksetfloatfield n -> fprintf ppf "\tsetfloatfield %i" n
   | Kvectlength -> fprintf ppf "\tvectlength"
   | Kgetvectitem -> fprintf ppf "\tgetvectitem"
@@ -72,7 +72,7 @@ let instruction ppf = function
   | Kpoptrap -> fprintf ppf "\tpoptrap"
   | Kraise k-> fprintf ppf "\t%s" (Lambda.raise_kind k)
   | Kcheck_signals -> fprintf ppf "\tcheck_signals"
-  | Kccall(s, n) ->
+  | Kccall(s, n, _alloc) ->
       fprintf ppf "\tccall %s, %i" s n
   | Knegint -> fprintf ppf "\tnegint"
   | Kaddint -> fprintf ppf "\taddint"
