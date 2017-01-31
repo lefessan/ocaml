@@ -112,6 +112,7 @@ end
 module MakeMap(Map : MapArgument) : sig
   val map_structure : Parsetree.structure -> Parsetree.structure
   val map_signature : Parsetree.signature -> Parsetree.signature
+  val map_expression : Parsetree.expression -> Parsetree.expression
 end
 
 module DefaultMapArgument : MapArgument

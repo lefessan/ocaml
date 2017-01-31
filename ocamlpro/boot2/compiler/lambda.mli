@@ -26,7 +26,7 @@ type location = Memprof.location = { l:Location.t; p: Path.t }
 type locid = Memprof.locid = { loc: location; id:delayed_alloc ref }
 val newl : location -> Location.t -> location
 val newp : location -> Path.t -> location
-val lp : Location.t -> Path.t -> location
+val newlp : Location.t -> Path.t -> location
 val unitlp : string -> location
 (* /for memprof  *)
 
@@ -65,7 +65,9 @@ type is_safe =
   | Safe
   | Unsafe
 
-type primitive =
+type primitive = locid raw_primitive
+
+and 'a raw_primitive =
   | Pidentity
   | Pbytes_to_string
   | Pbytes_of_string
@@ -278,7 +280,9 @@ and lfunction =
     params: Ident.t list;
     body: lambda;
     attr: function_attribute; (* specified with [@inline] attribute *)
-    loc : Location.t; }
+    loc: Location.t;
+    flocid: locid; (* for memprof *)
+  }
 
 and lambda_apply =
   { ap_func : lambda;
@@ -286,7 +290,9 @@ and lambda_apply =
     ap_loc : Location.t;
     ap_should_be_tailcall : bool;       (* true if [@tailcall] was specified *)
     ap_inlined : inline_attribute; (* specified with the [@inlined] attribute *)
-    ap_specialised : specialise_attribute; }
+    ap_specialised : specialise_attribute;
+    ap_lp : location; (* for memprof *)
+  }
 
 and lambda_switch =
   { sw_numconsts: int;                  (* Number of integer cases *)

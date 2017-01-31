@@ -98,7 +98,7 @@ coldstart:
 	cd byterun; $(MAKE) all
 	cp byterun/ocamlrun$(EXE) boot/ocamlrun$(EXE)
 	cd yacc; $(MAKE) all
-	cd ocamlpro/$(BOOTDIR); $(MAKE) all BOOTDIR="$(BOOTDIR)" HAS_MEMPROF="$(HAS_MEMPROF)"
+	cd ocamlpro/$(BOOTDIR); $(MAKE) all BOOTDIR=boot HAS_MEMPROF="$(HAS_MEMPROF)"
 	cd ocamlpro/ocpp; $(MAKE) -f Makefile.plugin PRE=boot POST="$(BOOTDIR)" HAS_MEMPROF="$(HAS_MEMPROF)"
 	cd ocamlpro/sempatch; $(MAKE) -f Makefile.plugin PRE=boot POST="$(BOOTDIR)" HAS_MEMPROF="$(HAS_MEMPROF)"
 	cd ocamlpro/last-plugin; $(MAKE) -f Makefile.plugin PRE=boot POST="$(BOOTDIR)" HAS_MEMPROF="$(HAS_MEMPROF)"
@@ -660,7 +660,7 @@ library-cross:
 	cd stdlib; $(MAKE) CAMLRUN=../byterun/ocamlrun all
 
 libraryopt:
-	cd stdlib; $(MAKE) allopt
+	cd stdlib; $(MAKE) BOOTDIR=$(POST) allopt
 
 partialclean::
 	cd stdlib; $(MAKE) clean

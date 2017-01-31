@@ -23,6 +23,7 @@ open Lambda
 open Parmatch
 open Printf
 
+let locid = Memprof.nolocid
 
 let dbg = false
 
@@ -612,6 +613,7 @@ let simplify_cases args cls = match args with
     let rec simplify = function
       | [] -> []
       | ((pat :: patl, action) as cl) :: rem ->
+          let lp = newl lp pat.pat_loc in
           begin match pat.pat_desc with
           | Tpat_var (id, _) ->
               (omega :: patl, bind Alias id arg action) ::
@@ -1530,7 +1532,9 @@ let inline_lazy_force_cond arg loc =
                        ap_func=force_fun;
                        ap_args=[varg];
                        ap_inlined=Default_inline;
-                       ap_specialised=Default_specialise},
+                       ap_specialised=Default_specialise;
+                       ap_lp = lp;
+                      },
                 (* ... arg *)
                   varg))))
 
@@ -1553,7 +1557,9 @@ let inline_lazy_force_switch arg loc =
                            ap_func=force_fun;
                            ap_args=[varg];
                            ap_inlined=Default_inline;
-                           ap_specialised=Default_specialise}) ];
+                           ap_specialised=Default_specialise;
+                           ap_lp = lp;
+                          }) ];
                sw_failaction = Some varg } ))))
 
 let inline_lazy_force arg loc =
@@ -1634,6 +1640,7 @@ let matcher_record num_fields p rem = match p.pat_desc with
 let make_record_matching loc all_labels def = function
     [] -> fatal_error "Matching.make_record_matching"
   | ((arg, _mut) :: argl) ->
+    ignore lp; (* memprof: remove when adding lp to Lprim *)
       let rec make_args pos =
         if pos >= Array.length all_labels then argl else begin
           let lbl = all_labels.(pos) in
@@ -1658,6 +1665,7 @@ let make_record_matching loc all_labels def = function
 
 let divide_record all_labels p ctx pm =
   let get_args = get_args_record (Array.length all_labels) in
+  let lp = newl lp p.pat_loc in
   divide_line
     (filter_ctx p)
     (make_record_matching p.pat_loc all_labels)
@@ -1838,8 +1846,8 @@ let share_actions_tree sw d =
   let acts = store.Switch.act_get_shared () in
 
 (* Array of actual actions *)
-  let hs,handle_shared = handle_shared () in
-  let acts = Array.map handle_shared acts in
+  let hs,handle_shared2 = handle_shared () in
+  let acts = Array.map handle_shared2 acts in
 
 (* Reconstruct default and switch list *)
   let d = match d with
@@ -1888,7 +1896,7 @@ let make_test_sequence loc fail tst lt_tst arg const_lambda_list =
   let hs,const_lambda_list,fail =
     share_actions_tree const_lambda_list fail in
 
-  let rec make_test_sequence const_lambda_list =
+  let rec make_test_sequence_rec const_lambda_list =
     if List.length const_lambda_list >= 4 && lt_tst <> Pignore then
       split_sequence const_lambda_list
     else match fail with
@@ -1901,13 +1909,14 @@ let make_test_sequence loc fail tst lt_tst arg const_lambda_list =
     Lifthenelse(Lprim(lt_tst,
                       [arg; Lconst(Const_base (fst(List.hd list2)))],
                       loc),
-                make_test_sequence list1, make_test_sequence list2)
+                make_test_sequence_rec list1, make_test_sequence_rec list2)
   in
-  hs (make_test_sequence const_lambda_list)
+  hs (make_test_sequence_rec const_lambda_list)
 
 
 module SArg = struct
   type primitive = Lambda.primitive
+  type location = Lambda.location
 
   let eqint = Pintcomp Ceq
   let neint = Pintcomp Cneq
@@ -1944,7 +1953,7 @@ module SArg = struct
              sw_numblocks = 0 ; sw_blocks =  []  ;
              sw_failaction = None})
   let make_catch  = make_catch_delayed
-  let make_exit = make_exit
+  let make_exit i = make_exit i
 
 end
 
@@ -1966,8 +1975,8 @@ let share_actions_sw sw =
       (fun (i,e) -> i,store.Switch.act_store e)
       sw.sw_blocks in
   let acts = store.Switch.act_get_shared () in
-  let hs,handle_shared = handle_shared () in
-  let acts = Array.map handle_shared acts in
+  let hs,handle_shared2 = handle_shared () in
+  let acts = Array.map handle_shared2 acts in
   let fail = match fail with
   | None -> None
   | Some fail -> Some (acts.(fail)) in
@@ -2137,7 +2146,7 @@ let as_interval fail low high l =
 let call_switcher fail arg low high int_lambda_list =
   let edges, (cases, actions) =
     as_interval fail low high int_lambda_list in
-  Switcher.zyva edges arg cases actions
+  Switcher.zyva lp edges arg cases actions
 
 
 let rec list_as_pat = function
@@ -2990,8 +2999,8 @@ let simple_for_let loc param pat body =
 *)
 
 let rec map_return f = function
-  | Llet (str, k, id, l1, l2) -> Llet (str, k, id, l1, map_return f l2)
-  | Lletrec (l1, l2) -> Lletrec (l1, map_return f l2)
+  | Llet (str, k, id, l1, l2,lp) -> Llet (str, k, id, l1, map_return f l2)
+  | Lletrec (l1, l2,locid) -> Lletrec (l1, map_return f l2)
   | Lifthenelse (lcond, lthen, lelse) ->
       Lifthenelse (lcond, map_return f lthen, map_return f lelse)
   | Lsequence (l1, l2) -> Lsequence (l1, map_return f l2)
@@ -3065,8 +3074,8 @@ let for_let loc param pat body =
       let opt = ref false in
       let nraise = next_raise_count () in
       let catch_ids = pat_bound_idents pat in
-      let bind = map_return (assign_pat opt nraise catch_ids loc pat) param in
-      if !opt then Lstaticcatch(bind, (nraise, catch_ids), body)
+      let binder = map_return (assign_pat opt nraise catch_ids loc pat) param in
+      if !opt then Lstaticcatch(binder, (nraise, catch_ids), body)
       else simple_for_let loc param pat body
 
 (* Handling of tupled functions and matchings *)

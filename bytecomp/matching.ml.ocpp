@@ -1,0 +1,57 @@
+patch add_function_argument {
+  fun_new_argument = "lp"
+  fun_names = [
+  "make_lazy_matching" "divide_lazy" "inline_lazy_force_cond"
+  "split_or" "bind" "make_exit" "make_catch"
+  "simplify_cases" "precompile_or" "split_naive" "split_exc"
+  "precompile_var" "split_constr" "split_precompile"
+  "expand_stringswitch" "handle_shared"
+  "share_actions_tree"
+  "make_test_sequence"
+  "share_actions_sw" "reintroduce_fail"
+  "call_switcher"
+  "combine_constant" "combine_constructor"
+  "make_test_sequence_variant_constant"
+  "call_switcher_variant_constant"
+  "call_switcher_variant_constr"
+  "combine_variant" "Switcher.test_sequence"
+  "combine_array"
+(*  "compile_list" *)
+  "compile_orhandlers"
+  "lower_bind"
+  "bind_check"
+  "comp_exit"
+  "compile_match"
+  "do_compile_matching_pr"
+  "do_compile_matching"
+  "compile_no_test"
+  "compile_matching"
+      "for_function";
+    "for_trywith";
+    "for_let";
+    "for_multiple_match"; (* actually Location.t should be replaced *)
+    "for_tupled_function"; (* actually Location.t should be replaced *)
+    "expand_stringswitch";
+    "inline_lazy_force"; (* actually Location.t should be replaced *)
+    "simple_for_let"
+    "assign_pat"
+    "compile_flattened"
+    "do_for_multiple_match"
+    "Lambda.bind" "bind_opt"
+    "divide_record"
+    "make_record_matching"
+      "inline_lazy_force_switch" 
+        "inline_lazy_force_cond"
+        "bind_sw"
+        "make_string_test_sequence"
+        "do_make_string_test_tree"
+        "mk_failaction_neg"
+        "mk_failaction_pos"
+        "compile_test"
+        "event_branch"
+  ]
+}
+
+include "lambda_lambda_patany.sempatch"
+include "lambda_prims_exp.sempatch"
+include "lambda_lambda_exp.sempatch"

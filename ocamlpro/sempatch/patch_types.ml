@@ -28,8 +28,9 @@ type patches = patch list
 and patch =
 | PatchNone
 | PatchAddFunctionArgument of add_function_argument
-| PatchAddConstructorArguments of add_constructors_arguments
-| PatchAddConstructorArgumentsExp of add_constructors_arguments_exp
+| PatchAddConstructorArgumentsPat of add_constructors_arguments
+| PatchAddConstructorArgumentsExp of add_constructors_arguments
+| PatchAddConstructorArgumentsTyp of add_constructors_arguments
 | PatchAddRecordFields of add_record_fields
 | PatchBoxConstructors of box_constructors
 | PatchAddMethodArguments of add_method_arguments
@@ -38,7 +39,7 @@ and patch =
 | Patch of string * string * string list
 
 and add_function_argument = {
-  fun_new_argument : string;
+  fun_new_arguments : string list;
   fun_names : string list;
 }
 
@@ -46,12 +47,7 @@ and add_constructors_arguments = {
   constr_names : string list;
   constr_position : argpos;
   constr_new_arguments : string list;
-}
-
-and add_constructors_arguments_exp = {
-  constr_exp_names : string list;
-  constr_exp_position : argpos;
-  constr_exp_new_arguments : string list;
+  constr_total_nargs : int;
 }
 
 and add_record_fields = {

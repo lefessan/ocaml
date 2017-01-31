@@ -898,3 +898,8 @@ let iter_signature iterator signature =
   let module IA = (val iterator : IteratorArgument) in
   let module I = (MakeIterator(IA)) in
   I.iter_signature signature
+
+let iter_expression iterator signature =
+  let module IA = (val iterator : IteratorArgument) in
+  let module I = (MakeIterator(IA)) in
+  I.iter_expression signature

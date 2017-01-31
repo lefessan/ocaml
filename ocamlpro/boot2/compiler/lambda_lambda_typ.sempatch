@@ -1,0 +1,37 @@
+
+patch add_constructor_arguments_typ {
+   constr_names = [ "Lletrec"; "Lstaticraise" ]
+   constr_position = "end"
+   constr_new_arguments = [ "location" ]
+   constr_prev_nargs = 2;
+}
+
+patch add_constructor_arguments_typ {
+   constr_names = [ "Lstringswitch" ]
+   constr_position = "end"
+   constr_new_arguments = [ "location" ]
+   constr_prev_nargs = 4;
+}
+
+patch add_constructor_arguments_typ {
+   constr_names = [ "Llet" "Lsend" ]
+   constr_position = "end"
+   constr_new_arguments = [ "location" ]
+   constr_prev_nargs = 5;
+}
+
+patch add_constructor_arguments_typ {
+   constr_names = [ "Lletrec" ]
+   constr_position = "end"
+   constr_new_arguments = [ "locid" ]
+   constr_prev_nargs = 2;
+}
+
+(*
+patch add_constructor_arguments_typ {
+   constr_names = [ "Lprim" ]
+   constr_position = "end"
+   constr_new_arguments = [ "locid" ]
+   constr_prev_nargs = 3;
+}
+*)

@@ -464,3 +464,15 @@ let concrete name str =
   in
 
   (id, subst, Mty_signature (concrete_structure str))
+
+
+let init_location_table module_name str =
+  Memprof.init (concrete module_name str)
+
+let init_toplevel_location_table =
+  let cpt = ref 0 in
+  fun str ->
+    incr cpt;
+    Memprof.init (
+      concrete ("_TOP_" ^ string_of_int !cpt) str
+    )

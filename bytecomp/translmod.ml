@@ -30,6 +30,8 @@ open Translclass
 type error =
   Circular_dependency of Ident.t
 
+let locid = Memprof.nolocid
+let flocid = locid
 
 exception Error of Location.t * error
 
@@ -75,6 +77,7 @@ let rec apply_coercion loc strict restr arg =
         wrap_id_pos_list loc id_pos_list get_field lam)
   | Tcoerce_functor(cc_arg, cc_res) ->
       let param = Ident.create "funarg" in
+      let ap_lp = lp in
       name_lambda strict arg (fun id ->
         Lfunction{kind = Curried; params = [param];
                   attr = { default_function_attribute with
@@ -277,6 +280,7 @@ let eval_rec_bindings bindings cont =
   | (_id, None, _rhs) :: rem ->
       bind_inits rem
   | (id, Some(loc, shape), _rhs) :: rem ->
+      let ap_lp = lp in
       Llet(Strict, Pgenval, id,
            Lapply{ap_should_be_tailcall=false;
                   ap_loc=Location.none;
@@ -298,6 +302,7 @@ let eval_rec_bindings bindings cont =
   | (_id, None, _rhs) :: rem ->
       patch_forwards rem
   | (id, Some(_loc, shape), rhs) :: rem ->
+      let ap_lp = lp in
       Lsequence(Lapply{ap_should_be_tailcall=false;
                        ap_loc=Location.none;
                        ap_func=mod_prim "update_mod";
@@ -338,8 +343,8 @@ let transl_class_bindings cl_list =
   let ids = List.map (fun (ci, _) -> ci.ci_id_class) cl_list in
   (ids,
    List.map
-     (fun ({ci_id_class=id; ci_expr=cl; ci_virt=vf}, meths) ->
-       (id, transl_class ids id meths cl vf))
+     (fun ({ci_id_class=id; ci_expr=cl; ci_virt=vf; ci_id_class_type}, meths) ->
+       (id, transl_class ci_id_class_type ids id meths cl vf))
      cl_list)
 
 (* Compile a module expression *)
@@ -391,6 +396,7 @@ let rec transl_module cc rootpath mexp =
           let inlined_attribute, funct =
             Translattribute.get_and_remove_inlined_attribute_on_module funct
           in
+          let ap_lp = lp in
           oo_wrap mexp.mod_env true
             (apply_coercion loc Strict cc)
             (Lapply{ap_should_be_tailcall=false;
@@ -560,7 +566,7 @@ and pure_module m =
 
 (* Update forward declaration in Translcore *)
 let _ =
-  Translcore.transl_module := transl_module
+  Translcore.transl_module := (fun lp cc po me -> transl_module cc po me)
 
 (* Introduce dependencies on modules referenced only by "external". *)
 
@@ -602,6 +608,9 @@ let transl_implementation_flambda module_name (str, cc) =
   primitive_declarations := [];
   Hashtbl.clear used_primitives;
   let module_id = Ident.create_persistent module_name in
+  let lp = newlp (match str.str_items with
+      { str_loc } :: _ -> str_loc
+    | _ -> Location.in_file !Location.input_name) (Pident module_id) in
   let body, size =
     Translobj.transl_label_init
       (fun () -> transl_struct Location.none [] cc
@@ -613,6 +622,7 @@ let transl_implementation_flambda module_name (str, cc) =
     code = body }
 
 let transl_implementation module_name (str, cc) =
+  Globalize.init_location_table module_name str;
   let implementation =
     transl_implementation_flambda module_name (str, cc)
   in
@@ -1015,15 +1025,21 @@ let transl_store_gen module_name ({ str_items = str }, restr) topl =
   let module_id = Ident.create_persistent module_name in
   let (map, prims, size) =
     build_ident_map restr (defined_idents str) (more_idents str) in
+  let lp = newlp (match str with
+       { str_loc } :: _ -> str_loc
+     | _ -> Location.in_file !Location.input_name) (Pident module_id) in
+  (*  Memprof.save_global_map map prims size; TODO *)
   let f = function
-    | [ { str_desc = Tstr_eval (expr, _attrs) } ] when topl ->
-        assert (size = 0);
+    | [ { str_desc = Tstr_eval (expr, _attrs); str_loc } ] when topl ->
+      assert (size = 0);
+        let lp  = newl lp str_loc in
         subst_lambda !transl_store_subst (transl_exp expr)
     | str -> transl_store_structure module_id map prims str in
   transl_store_label_init module_id size f str
   (*size, transl_label_init (transl_store_structure module_id map prims str)*)
 
 let transl_store_phrases module_name str =
+  Globalize.init_location_table module_name str;
   transl_store_gen module_name (str,Tcoerce_none) true
 
 let transl_store_implementation module_name (str, restr) =
@@ -1031,6 +1047,7 @@ let transl_store_implementation module_name (str, restr) =
   transl_store_subst := Ident.empty;
   let (i, code) = transl_store_gen module_name (str, restr) false in
   transl_store_subst := s;
+  Globalize.init_location_table module_name str;
   { Lambda.main_module_block_size = i;
     code;
     (* module_ident is not used by closure, but this allow to share
@@ -1039,6 +1056,9 @@ let transl_store_implementation module_name (str, restr) =
     required_globals = required_globals ~flambda:true code }
 
 (* Compile a toplevel phrase *)
+
+(* Memprof: no need to profile the toplevel *)
+let lp = Lambda.unitlp "//toplevel//"
 
 let toploop_ident = Ident.create_persistent "Toploop"
 let toploop_getvalue_pos = 0 (* position of getvalue in module Toploop *)
@@ -1055,6 +1075,7 @@ let toplevel_name id =
   with Not_found -> Ident.name id
 
 let toploop_getvalue id =
+  let ap_lp = lp in
   Lapply{ap_should_be_tailcall=false;
          ap_loc=Location.none;
          ap_func=Lprim(Pfield toploop_getvalue_pos,
@@ -1065,6 +1086,7 @@ let toploop_getvalue id =
          ap_specialised=Default_specialise}
 
 let toploop_setvalue id lam =
+  let ap_lp = lp in
   Lapply{ap_should_be_tailcall=false;
          ap_loc=Location.none;
          ap_func=Lprim(Pfield toploop_setvalue_pos,
@@ -1179,6 +1201,9 @@ let transl_package_flambda component_names coercion =
            Location.none))
 
 let transl_package component_names target_name coercion =
+  Memprof.init_package_location_table target_name;
+  let locid = Memprof.package_locid (Ident.name target_name) in
+  let lp = locid.Memprof.loc in
   let components =
     Lprim(Pmakeblock(0, Immutable, None),
           List.map get_component component_names, Location.none) in
@@ -1202,6 +1227,9 @@ let transl_package component_names target_name coercion =
    *)
 
 let transl_store_package component_names target_name coercion =
+  Memprof.init_package_location_table target_name;
+  let locid = Memprof.package_locid (Ident.name target_name) in
+  let lp = locid.Lambda.loc in
   let rec make_sequence fn pos arg =
     match arg with
       [] -> lambda_unit

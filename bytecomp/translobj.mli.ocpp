@@ -1,0 +1,15 @@
+
+patch add_function_argument {
+  fun_new_argument = "Lambda.location"
+  fun_names = [
+    "transl_label_init";
+    "transl_store_label_init";
+  ]
+}
+
+patch add_function_argument {
+  fun_new_argument = "Lambda.locid"
+  fun_names = [
+    "oo_add_class";
+  ]
+}

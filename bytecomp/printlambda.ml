@@ -19,6 +19,10 @@ open Primitive
 open Types
 open Lambda
 
+let locid ppf locid =
+  match Memprof.get_alloc locid.id with
+  | NoAlloc -> ()
+  | LocId offset -> Format.pp_print_int ppf offset
 
 let rec struct_const ppf = function
   | Const_base(Const_int n) -> fprintf ppf "%i" n

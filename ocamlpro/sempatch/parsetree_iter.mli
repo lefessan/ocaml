@@ -114,3 +114,4 @@ module DefaultIteratorArgument : IteratorArgument
 
 val iter_structure : (module IteratorArgument) -> Parsetree.structure -> unit
 val iter_signature : (module IteratorArgument) -> Parsetree.signature -> unit
+val iter_expression : (module IteratorArgument) -> Parsetree.expression -> unit

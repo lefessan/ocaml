@@ -1,0 +1,13 @@
+
+patch add_function_argument {
+  fun_new_argument = "Lambda.location"
+  fun_names = [
+    "for_function";
+    "for_trywith";
+    "for_let";
+    "for_multiple_match"; (* actually Location.t should be replaced *)
+    "for_tupled_function"; (* actually Location.t should be replaced *)
+    "expand_stringswitch";
+    "inline_lazy_force"; (* actually Location.t should be replaced *)
+  ]
+}

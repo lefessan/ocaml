@@ -1,0 +1,12 @@
+
+include "../bytecomp/lambda_lambda_exp.sempatch"
+include "../bytecomp/lambda_lambda_patany.sempatch"
+include "../bytecomp/lambda_prims_exp.sempatch"
+include "../bytecomp/lambda_prims_patany.sempatch"
+
+patch add_function_argument {
+  fun_new_argument = "locid"
+  fun_names = [
+    "Simplif.split_default_wrapper"
+  ]
+}

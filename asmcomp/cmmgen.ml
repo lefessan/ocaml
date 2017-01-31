@@ -25,6 +25,9 @@ open Clambda
 open Cmm
 open Cmx_format
 
+let locid = Memprof.nolocid
+let lp = Lambda.unitlp "cmmgen"
+
 (* Local binding of complex expressions *)
 
 let bind name arg fn =
@@ -1338,6 +1341,7 @@ let make_switch arg cases actions dbg =
 module SArgBlocks =
 struct
   type primitive = operation
+  type location = Lambda.location
 
   let eqint = Ccmpi Ceq
   let neint = Ccmpi Cne
@@ -1357,7 +1361,7 @@ struct
   let make_if cond ifso ifnot = Cifthenelse (cond, ifso, ifnot)
   let make_switch arg cases actions =
     make_switch arg cases actions Debuginfo.none
-  let bind arg body = bind "switcher" arg body
+  let bind _ arg body = bind "switcher" arg body
 
   let make_catch handler = match handler with
   | Cexit (i,[]) -> i,fun e -> e
@@ -1375,7 +1379,7 @@ struct
           else body
       | _ ->  ccatch (i,[],body,handler))
 
-  let make_exit i = Cexit (i,[])
+  let make_exit _ i = Cexit (i,[])
 
 end
 

@@ -1,0 +1,21 @@
+include "lambda_lambda_exp.sempatch"
+include "lambda_lambda_pat.sempatch"
+include "lambda_prims_exp.sempatch"
+
+patch add_function_argument {
+  fun_new_argument = "lp"
+  fun_names = [
+    "transl_label_init";
+    "transl_store_label_init";
+    "transl_label_init_general";
+    "transl_label_init_flambda";
+  ]
+}
+
+patch add_function_argument {
+  fun_new_argument = "locid"
+  fun_names = [
+    "oo_add_class";
+  ]
+}
+

@@ -1,0 +1,2 @@
+include "lambda_lambda_patany.sempatch"
+include "lambda_prims_patany.sempatch"

@@ -29,8 +29,15 @@ PLUGINS=\
    -plugin $(PLUGINDIR)/last-plugin.cma \
    $(HAS_MEMPROF)
 
+# ./ocamlopt is equivalent to ./ocamlc, so we shouldn't use plugins from boot2
+PLUGINSOPT=\
+   -plugin ocpp-plugin.cma \
+   -plugin sempatch-plugin.cma \
+   -plugin last-plugin.cma \
+   $(HAS_MEMPROF)
+
 CAMLC=$(CAMLRUN) $(BOOTDIR)/ocamlc $(PLUGINS) -nostdlib -I boot -use-prims byterun/primitives
-CAMLOPT=$(CAMLRUN) ./ocamlopt -nostdlib -I stdlib -I otherlibs/dynlink
+CAMLOPT=$(CAMLRUN) ./ocamlopt $(PLUGINSOPT) -nostdlib -I stdlib -I otherlibs/dynlink
 COMPFLAGS=-g -strict-sequence -principal -absname -w +a-4-9-41-42-44-45-48 \
 	  -warn-error A \
           -bin-annot -safe-string -strict-formats $(INCLUDES)
@@ -81,11 +88,10 @@ TYPING=typing/ident.cmo typing/path.cmo \
   typing/cmt_format.cmo typing/untypeast.cmo \
   typing/includemod.cmo typing/typetexp.cmo typing/parmatch.cmo \
   typing/stypes.cmo typing/typedecl.cmo typing/typecore.cmo \
-  typing/typeclass.cmo typing/typemod.cmo \
-  typing/globalize.cmo
+  typing/typeclass.cmo typing/typemod.cmo
 
 COMP= \
-  bytecomp/memprof.cmo \
+  bytecomp/memprof.cmo  bytecomp/globalize.cmo \
   bytecomp/lambda.cmo bytecomp/printlambda.cmo \
   bytecomp/semantics_of_primitives.cmo \
   bytecomp/typeopt.cmo bytecomp/switch.cmo bytecomp/matching.cmo \

@@ -22,6 +22,11 @@ open Lambda
 open Switch
 open Clambda
 
+let locid = Memprof.nolocid
+let flocid = Memprof.nolocid
+let lp = Lambda.unitlp "closure"
+let ap_lp = lp
+
 module Storer =
   Switch.Store
     (struct
