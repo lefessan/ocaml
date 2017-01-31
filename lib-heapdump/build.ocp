@@ -1,0 +1,37 @@
+
+begin library "heapdump"
+
+  c_files = [
+        "c_common.c"    (* common features to all profilers *)
+        "c_heapprof.c" "c_heapprof.h" (* profiling by heap snapshots *)
+        "c_process_info.c" (* profiling by heap snapshots *)
+         "c_allocprof.c"            (* profiling allocations by backtraces *)
+          "c_gcprof.c"              (* profiling GC by counters *)
+          "c_control.c"
+          "%{ocaml-ocamlpro-files_FULL_SRC_DIR}%/memprof.h"
+  ]
+
+  build_targets = [ "ocp-memprof-bytecode.so" "ocp-memprof-native.so" ]
+  build_rules = [
+
+    "ocp-memprof-bytecode.so" (
+      sources = [ c_files
+           "c_bytecode.c" (* rewrite bytecode instrs with locids *)
+                ]
+      commands = [{ "make" "ocp-memprof-bytecode.so" }]
+      build_target = true
+    )
+
+    "ocp-memprof-native.so" (
+      sources = c_files
+      commands = [{ "make" "ocp-memprof-native.so" }]
+      build_target = true
+    )
+
+  ]
+
+    files = [
+    "heapdump.ml"
+  ]
+  requires = [ "ocaml-ocamlpro-files" ]
+end

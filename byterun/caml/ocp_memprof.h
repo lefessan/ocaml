@@ -34,7 +34,7 @@ extern "C" {
 
 #ifdef MEMPROF_INSIDE
 
-CAMLextern int64 ocp_memprof_seed(void);
+CAMLextern int64_t ocp_memprof_seed(void);
 CAMLextern void ocp_memprof_scanmult (char *opt, uintnat *var);
 CAMLextern void ocp_dump_after_gc(void);
 CAMLextern void ocp_memprof_init();
