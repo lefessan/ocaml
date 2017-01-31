@@ -50,6 +50,22 @@ open Longident
 open Parsetree
 open Parsetree_map
 
+let is_longident s =
+  let len = String.length s in
+  len > 0 &&
+          (match s.[0] with
+            'a'..'z'| 'A'..'Z' |'_' -> true
+          | _ -> false)
+  &&
+    (try
+       for i = 1 to len - 1 do
+         match s.[i] with
+           'a'..'z'| 'A'..'Z' | '0' ..'9' | '.' | '_' -> ()
+         | _ -> raise Exit
+       done;
+       true
+     with Exit -> false)
+
 #if OCAML_VERSION >= "4.03"
 let nolabel = Nolabel
 #else
@@ -60,6 +76,7 @@ exception Patch_failure
 
 (* module StringSet = Set.Make(String)*)
 module StringMap = Map.Make(String)
+module StringSet = Set.Make(String)
 module LongidentMap = Map.Make(struct
   type t = Longident.t
   let compare = compare
@@ -95,12 +112,56 @@ let add_to_map set list v =
     set := StringMap.add s (v, ref false) !set) list
 
 let add_method_arguments = ref StringMap.empty
-let add_function_argument = ref StringMap.empty
+let add_function_arguments = ref StringMap.empty
 let replace_ident = ref StringMap.empty
 let add_external_flags = ref StringMap.empty
-let add_constructor_arguments = ref StringMap.empty
+let add_constructor_arguments_pat = ref StringMap.empty
+let add_constructor_arguments_typ = ref StringMap.empty
 let add_constructor_arguments_exp = ref StringMap.empty
 let add_record_fields = ref StringMap.empty
+
+let free_vars exp =
+  let set = ref StringSet.empty in
+  let module Iterator = Parsetree_iter.MakeIterator(struct
+    open Parsetree_iter
+    include DefaultIteratorArgument
+
+    let enter_expression exp =
+      match exp.pexp_desc with
+      | Pexp_ident { txt = lident } ->
+        let n = Longident.to_string lident in
+        set := StringSet.add n !set
+      | _ -> ()
+  end) in
+  Iterator.iter_expression exp;
+  !set
+
+let force_loc = ref Location.none
+module RelocPatch = Parsetree_map.MakeMap(struct
+  include DefaultMapArgument
+
+  let leave_expression exp =
+    match exp.pexp_desc with
+    | Pexp_ident { txt } ->
+      { exp with
+        pexp_desc = Pexp_ident { txt; loc = !force_loc };
+        pexp_loc = !force_loc }
+    | _ ->
+      { exp with pexp_loc = !force_loc }
+end)
+
+let parse_expression_with_loc arg loc =
+  Lexer.init ();
+  Location.input_name := "//toplevel//";
+  let lexbuf = Lexing.from_string arg in
+  Location.init lexbuf "//toplevel//";
+  try
+    force_loc := loc;
+    RelocPatch.map_expression (Parser.parse_expression Lexer.token lexbuf)
+  with exn ->
+    let b = Printexc.get_backtrace () in
+    Printf.eprintf "Patch: Parsing error in \"%s\"\n%s\n%s\n%!" arg (Printexc.to_string exn) b;
+    raise exn
 
 module CmmgenPatch = Parsetree_map.MakeMap(struct
   include DefaultMapArgument
@@ -145,11 +206,12 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
   let leave_pattern pat =
     match pat.ppat_desc with
 #if OCAML_VERSION = "4.01.0+ocp1"
-    | Ppat_construct({ txt = Lident constr} as loc, exp, bool) ->
+    | Ppat_construct({ txt = constr} as loc, exp, bool) ->
 #else
-    | Ppat_construct({ txt = Lident constr} as loc, exp) ->
+    | Ppat_construct({ txt = constr} as loc, exp) ->
 #endif
-      begin try
+  let constr = String.concat "." (Longident.flatten constr) in
+  begin try
               let (idents, used) = StringMap.find constr !box_constructors in
               used := true;
               match idents with
@@ -160,8 +222,8 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
                       Lident ident}, pat], Closed); }
         with Not_found ->
           try
-            let ((pos,args), used) =
-              StringMap.find constr !add_constructor_arguments
+            let ((pos,args,total), used) =
+              StringMap.find constr !add_constructor_arguments_pat
             in
             used := true;
             let add_args =
@@ -198,6 +260,7 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
             in
             match exp with
             | Some ({ ppat_desc = Ppat_tuple pat_args } as arg_pat) ->
+              if total >= 0 && total <> List.length pat_args then raise Not_found;
               {
                 pat with ppat_desc = Ppat_construct(loc, Some
                   { arg_pat with ppat_desc = Ppat_tuple (
@@ -208,8 +271,28 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
                   )
 #endif
       }
-            | Some { ppat_desc = Ppat_any } -> pat
-            | Some ({ ppat_desc = Ppat_var _var } as arg_pat) ->
+  | Some { ppat_desc = Ppat_any } when total <> 1 ->      pat
+            | Some ({ ppat_desc =
+                    ( Ppat_var _
+                    | Ppat_any
+                    | Ppat_record _
+                    | Ppat_alias (_, _)
+                    | Ppat_constant _
+                    | Ppat_interval (_, _)
+                    | Ppat_construct (_, _)
+                    | Ppat_variant (_, _)
+                    | Ppat_array _
+                    | Ppat_or (_, _)
+                    | Ppat_constraint (_, _)
+                    | Ppat_type _
+                    | Ppat_lazy _
+                    | Ppat_unpack _
+                    | Ppat_exception _
+                    | Ppat_extension _
+                    | Ppat_open (_, _)
+                    )
+                    } as arg_pat) ->
+              if total >= 0 && total <> 1 then raise Not_found;
               {
                 pat with ppat_desc = Ppat_construct(loc, Some
                   { ppat_desc = Ppat_tuple (add_list [arg_pat]);
@@ -226,6 +309,7 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
 #endif
               }
             | None ->
+              if total >= 0 && total <> 0 then raise Not_found;
               {
                 pat with ppat_desc = Ppat_construct(loc, Some
                   { ppat_desc = begin
@@ -249,14 +333,130 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
                   )
 #endif
               }
-            | _ -> Printf.kprintf failwith "cannot add argument to %S" constr
+(*
+            |  Some
+                {ppat_desc=(Ppat_alias (_, _)|Ppat_constant _|Ppat_interval (_, _)|
+             Ppat_construct (_, _)|Ppat_variant (_, _)|Ppat_array _|
+             Ppat_or (_, _)|Ppat_constraint (_, _)|Ppat_type _|Ppat_lazy _|
+             Ppat_unpack _|Ppat_exception _|Ppat_extension _|
+             Ppat_open (_, _)); } ->
+              Location.print Format.err_formatter loc.loc;
+  Printf.kprintf failwith "cannot add argument to %S" constr *)
           with Not_found ->
           pat
       end
     | _ -> pat
 
+
+
+  let rec mk_function pats exp =
+    match pats with
+    | [] -> exp
+    | pat :: pats ->
+      let exp = mk_function pats exp in
+      let pexp_desc =
+#if OCAML_VERSION = "4.01.0+ocp1"
+        Pexp_function("", None, [ pat, exp])
+#else
+        Pexp_fun(nolabel, None, pat, exp)
+#endif
+      in
+      { exp with pexp_desc }
+
+
+  let do_add_primitive_flags val_desc =
+    let prim = List.hd val_desc.pval_prim in
+    let (flags, used) = StringMap.find prim !add_external_flags in
+    used := true;
+    if verbose then
+      Printf.eprintf "Patch: prim %S add flags %s\n%!" prim
+        (String.concat " + " flags);
+    { val_desc with
+#if OCAML_VERSION < "4.04"
+    pval_prim = val_desc.pval_prim @ flags;
+#else
+    pval_attributes = val_desc.pval_attributes @
+                (List.map (fun attr ->
+                  { val_desc.pval_name with txt = attr }, PStr[]) flags);
+#endif
+    }
+
+  let do_add_function_argument really_need_dbi values =
+        List.map (fun
+#if OCAML_VERSION = "4.01.0+ocp1"
+            (pvb_pat, pvb_expr) ->
+#else
+          ({ pvb_pat; pvb_expr } as pvb) ->
+#endif
+
+        let pvb_pat, pvb_expr =
+          match pvb_pat, pvb_expr with
+          | { ppat_desc = Ppat_var ({ txt=fname} as loc)},
+#if OCAML_VERSION = "4.01.0+ocp1"
+            { pexp_desc = Pexp_function _ }  ->
+#else
+            { pexp_desc = Pexp_function _ | Pexp_fun _ }  ->
+#endif
+            begin
+           try
+             let (args, used) = StringMap.find fname !add_function_arguments in
+             used := true;
+             if verbose then begin
+               List.iter (fun arg ->
+                 Printf.eprintf
+                   "patch function definition %S: add argument %S\n%!" fname arg;
+               ) args;
+             end;
+             let pvb_expr = mk_function
+               (List.map (fun arg ->
+                 { pvb_pat with ppat_desc = Ppat_var {loc with txt=arg}})
+                  args)
+                 pvb_expr  in
+             needy_functions := StringMap.add fname ([], ref false)
+               !needy_functions ;
+                 (*          Printf.eprintf "need dbi: %S\n%!" fname; *)
+             pvb_pat,pvb_expr
+
+           with Not_found ->
+             let really_need_dbi = really_need_dbi ||
+               StringMap.mem fname !needy_functions in
+             if not ( really_need_dbi && !flag_add_dbi ) then begin
+               if !flag_add_dbi then
+                 Printf.eprintf "leave_structure_item: %S is NOT needy %b %b\n%!" fname
+                   really_need_dbi !flag_add_dbi;
+               pvb_pat,pvb_expr
+
+             end else begin
+
+               if StringMap.mem fname !ignore_functions then
+                 pvb_pat, pvb_expr
+               else
+                 let pvb_expr = mk_function
+                   [{ pvb_pat with ppat_desc = Ppat_var {loc with txt="dbi"}}]
+                     pvb_expr in
+                 if verbose then
+                   Printf.eprintf "leave_structure_item: %S is needy\n%!" fname;
+                 needy_functions := StringMap.add fname ([], ref false)
+                   !needy_functions;
+                     (*          Printf.eprintf "need dbi: %S\n%!" fname; *)
+                 pvb_pat,pvb_expr
+             end
+         end
+            | _ -> pvb_pat, pvb_expr
+        in
+#if OCAML_VERSION = "4.01.0+ocp1"
+           (pvb_pat, pvb_expr)
+#else
+          { pvb with pvb_pat; pvb_expr }
+#endif
+        ) values
+
   let leave_expression exp =
     match exp.pexp_desc with
+
+    | Pexp_let (rec_flag, values, e) ->
+      let values = do_add_function_argument false values in
+      { exp with pexp_desc = Pexp_let (rec_flag, values, e) }
 
     | Pexp_record (fields, None) ->
 
@@ -290,10 +490,11 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
       end
 
 #if OCAML_VERSION = "4.01.0+ocp1"
-    | Pexp_construct({ txt = Lident constr} as loc, expo, bool) ->
+    | Pexp_construct({ txt = constr} as loc, expo, bool) ->
 #else
-    | Pexp_construct({ txt = Lident constr} as loc, expo) ->
+    | Pexp_construct({ txt = constr} as loc, expo) ->
 #endif
+      let constr = String.concat "." (Longident.flatten constr) in
       begin try
               let (idents, used) = StringMap.find constr !box_constructors in
               used := true;
@@ -310,19 +511,15 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
                               Pexp_ident {loc with txt = Lident ident }}
                         ) idents, None); }
         with Not_found -> try
-            let ((pos,args), used) =
+            let ((pos,args,total), used) =
               StringMap.find constr !add_constructor_arguments_exp in
             used := true;
             let arg_to_exp arg =
-              Lexer.init ();
-              Location.input_name := "//toplevel//";
-              let lexbuf = Lexing.from_string arg in
-              Location.init lexbuf "//toplevel//";
-              try Parser.parse_expression Lexer.token lexbuf
-              with exn ->
-                let b = Printexc.get_backtrace () in
-                Printf.eprintf "Patch: Parsing error in \"%s\"\n%s\n%s\n%!" arg (Printexc.to_string exn) b;
-                raise exn
+              if is_longident arg then
+                let lident = Longident.parse arg in
+                { exp with pexp_desc = Pexp_ident { loc with txt = lident } }
+              else
+              parse_expression_with_loc arg loc.loc
             in
             let exps = List.map arg_to_exp args in
             Parsing.clear_parser ();
@@ -353,6 +550,7 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
             in
             match expo with
             | None ->
+              if total >= 0 && total <> 0 then raise Not_found;
               begin
                 match exps with
                 | [] -> exp
@@ -382,6 +580,7 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
                   }
               end
             | Some ({ pexp_desc = Pexp_tuple expl } as etup) ->
+              if total >= 0 && total <> List.length expl then raise Not_found;
               {exp with pexp_desc = Pexp_construct (loc,
                  Some {etup with pexp_desc = Pexp_tuple (add_list expl)}
 #if OCAML_VERSION = "4.01.0+ocp1"
@@ -391,6 +590,7 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
 #endif
               }
             | Some (earg) ->
+              if total >= 0 && total <> 1 then raise Not_found;
               {exp with pexp_desc = Pexp_construct (loc,
                  Some {earg with pexp_desc = Pexp_tuple (add_list [earg])}
 #if OCAML_VERSION = "4.01.0+ocp1"
@@ -449,14 +649,18 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
           { exp with pexp_desc = Pexp_ident { loc with txt = new_ident } }
         with Not_found ->
       try
-        let (arg, used) = StringMap.find fname !add_function_argument in
+        let (args, used) = StringMap.find fname !add_function_arguments in
         used := true;
-        if verbose then
-          Printf.eprintf "patch function use %S: add argument %S\n%!" fname arg;
+        if verbose then begin
+          List.iter (fun arg ->
+            Printf.eprintf "patch function use %S: add argument %S\n%!" fname arg;
+          ) args
+        end;
         { exp with pexp_desc =
             Pexp_apply(exp,
-                       [nolabel,{ exp with pexp_desc =
-                           Pexp_ident {loc with txt = Lident arg }}])
+                       List.map (fun arg ->
+                         nolabel,{ exp with pexp_desc =
+                             Pexp_ident {loc with txt = Longident.parse arg }}) args)
         }
       with Not_found ->
         if  !flag_add_dbi && StringMap.mem fname !needy_functions then begin
@@ -472,20 +676,6 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
 
   | _ -> exp
 
-
-  let rec mk_function pats exp =
-    match pats with
-    | [] -> exp
-    | pat :: pats ->
-      let exp = mk_function pats exp in
-      let pexp_desc =
-#if OCAML_VERSION = "4.01.0+ocp1"
-        Pexp_function("", None, [ pat, exp])
-#else
-        Pexp_fun(nolabel, None, pat, exp)
-#endif
-      in
-      { exp with pexp_desc }
 
   let mk_pat ppat_desc ppat_loc =
 #if OCAML_VERSION = "4.01.0+ocp1"
@@ -582,24 +772,6 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
     str
 
 
-  let add_primitive_flags val_desc =
-    let prim = List.hd val_desc.pval_prim in
-    let (flags, used) = StringMap.find prim !add_external_flags in
-    used := true;
-    if verbose then
-      Printf.eprintf "Patch: prim %S add flags %s\n%!" prim
-        (String.concat " + " flags);
-    { val_desc with
-#if OCAML_VERSION < "4.04"
-    pval_prim = val_desc.pval_prim @ flags;
-#else
-    pval_attributes = val_desc.pval_attributes @
-                (List.map (fun attr ->
-                  { val_desc.pval_name with txt = attr }, PStr[]) flags);
-#endif
-    }
-
-
   let leave_signature_item sg =
     match sg.psig_desc with
 #if OCAML_VERSION = "4.01.0+ocp1"
@@ -609,7 +781,7 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
 #endif
         when val_desc.pval_prim <> [] ->
   begin try
-          let newval = add_primitive_flags val_desc in
+          let newval = do_add_primitive_flags val_desc in
               { sg with psig_desc =
 #if OCAML_VERSION = "4.01.0+ocp1"
                   Psig_value(loc, newval)
@@ -628,24 +800,28 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
                    pval_prim = []; pval_type } as val_desc)) ->
       begin
         try
-          let (argtype, used) = StringMap.find name !add_function_argument in
+          let (argtypes, used) = StringMap.find name !add_function_arguments in
           used := true;
-              if verbose then
-                Printf.eprintf "Patch: val %S add argument %s\n%!" name argtype;
-              let argtype = Longident.parse argtype in
-              { sg with psig_desc =
+          if verbose then begin
+            List.iter (fun argtype ->
+              Printf.eprintf "Patch: val %S add argument %s\n%!" name argtype;
+            ) argtypes
+          end;
+          { sg with psig_desc =
 #if OCAML_VERSION = "4.01.0+ocp1"
-                  Psig_value(loc,
+   Psig_value(loc,
 #else
                   Psig_value(
 #endif
-                             {
-                    val_desc with
-                      pval_type = { pval_type with
-                        ptyp_desc = Ptyp_arrow(nolabel,
-                                               mk_type pval_type argtype,
-                                               pval_type) }
-                  }) }
+  {
+    val_desc with
+      pval_type = List.fold_left (fun pval_type argtype ->
+                  let argtype = Longident.parse argtype in
+        { pval_type with
+          ptyp_desc = Ptyp_arrow(nolabel,
+                                 mk_type pval_type argtype,
+                                 pval_type) }) pval_type argtypes;
+   })}
         with Not_found -> sg
       end
 
@@ -661,70 +837,7 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
     );
     match str.pstr_desc with
     | Pstr_value(recflag, values) ->
-      let values =
-        List.map (fun
-#if OCAML_VERSION = "4.01.0+ocp1"
-            (pvb_pat, pvb_expr) ->
-#else
-          ({ pvb_pat; pvb_expr } as pvb) ->
-#endif
-
-        let pvb_pat, pvb_expr =
-          match pvb_pat, pvb_expr with
-          | { ppat_desc = Ppat_var ({ txt=fname} as loc)},
-#if OCAML_VERSION = "4.01.0+ocp1"
-            { pexp_desc = Pexp_function _ }  ->
-#else
-            { pexp_desc = Pexp_function _ | Pexp_fun _ }  ->
-#endif
-            begin
-           try
-             let (arg, used) = StringMap.find fname !add_function_argument in
-             used := true;
-             if verbose then
-               Printf.eprintf
-                 "patch function definition %S: add argument %S\n%!" fname arg;
-             let pvb_expr = mk_function
-               [{ pvb_pat with ppat_desc = Ppat_var {loc with txt=arg}}]
-                 pvb_expr  in
-             needy_functions := StringMap.add fname ([], ref false)
-               !needy_functions ;
-                 (*          Printf.eprintf "need dbi: %S\n%!" fname; *)
-             pvb_pat,pvb_expr
-
-           with Not_found ->
-             let really_need_dbi = really_need_dbi ||
-               StringMap.mem fname !needy_functions in
-             if not ( really_need_dbi && !flag_add_dbi ) then begin
-               if !flag_add_dbi then
-                 Printf.eprintf "leave_structure_item: %S is NOT needy %b %b\n%!" fname
-                   really_need_dbi !flag_add_dbi;
-               pvb_pat,pvb_expr
-
-             end else begin
-
-               if StringMap.mem fname !ignore_functions then
-                 pvb_pat, pvb_expr
-               else
-                 let pvb_expr = mk_function
-                   [{ pvb_pat with ppat_desc = Ppat_var {loc with txt="dbi"}}]
-                     pvb_expr in
-                 if verbose then
-                   Printf.eprintf "leave_structure_item: %S is needy\n%!" fname;
-                 needy_functions := StringMap.add fname ([], ref false)
-                   !needy_functions;
-                     (*          Printf.eprintf "need dbi: %S\n%!" fname; *)
-                 pvb_pat,pvb_expr
-             end
-         end
-            | _ -> pvb_pat, pvb_expr
-        in
-#if OCAML_VERSION = "4.01.0+ocp1"
-           (pvb_pat, pvb_expr)
-#else
-          { pvb with pvb_pat; pvb_expr }
-#endif
-        ) values in
+      let values = do_add_function_argument really_need_dbi values in
       { str with pstr_desc = Pstr_value(recflag, values) }
 #if OCAML_VERSION = "4.01.0+ocp1"
     | Pstr_primitive (loc, val_desc ) ->
@@ -732,7 +845,7 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
     | Pstr_primitive val_desc ->
 #endif
       begin try
-              let newval = add_primitive_flags val_desc in
+              let newval = do_add_primitive_flags val_desc in
 
               { str with pstr_desc =
 #if OCAML_VERSION = "4.01.0+ocp1"
@@ -746,6 +859,77 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
       end
 
     | _ -> str
+
+     let build_constructor_arguments_typ ptyp_loc args =
+       List.map (fun arg ->
+         let ptyp_desc =
+           if is_longident arg then
+             let lident = Longident.parse arg in
+             Ptyp_constr ({ txt = lident; loc = ptyp_loc }, [])
+           else
+             let len = String.length arg in
+             if len > 0 && arg.[0] = '\'' then
+               Ptyp_var (String.sub arg 1 (len-1))
+             else assert false
+         in
+         {
+           ptyp_desc;
+           ptyp_attributes = [];
+           ptyp_loc;
+         }
+       ) args
+
+
+     let rec do_add_constructor_arguments_typ pos args new_args =
+       if pos = 0 then new_args @ args
+       else
+       match args with
+       | [] -> failwith "bad position"
+       | arg :: args ->
+         arg :: do_add_constructor_arguments_typ (pos-1) args new_args
+
+     let do_add_constructor_arguments_typ = function
+#if OCAML_VERSION < "4.02"
+       | ( (name, pcd_args, pcd_res, pcd_loc) as cstr )
+#else
+       | { pcd_args = Pcstr_record _ } as cstr -> cstr
+       | { pcd_name = { txt = name }; pcd_loc;
+           pcd_args = Pcstr_tuple pcd_args } as cstr
+#endif
+           ->
+     try
+       let ( (pos, new_args, total), used ) = StringMap.find name
+         !add_constructor_arguments_typ in
+       used := true;
+       if total >= 0 && List.length pcd_args <> total then raise Not_found;
+       if verbose then
+         Printf.eprintf "Patching constructor %S with arg %S\n%!" name
+              (String.concat " " new_args);
+       let new_args = build_constructor_arguments_typ pcd_loc new_args in
+       let pcd_args =
+         match pos with
+         | Start -> new_args @ pcd_args
+         | End -> pcd_args @ new_args
+         | Pos pos ->
+           do_add_constructor_arguments_typ pos pcd_args new_args in
+#if OCAML_VERSION < "4.02"
+         ( name, pcd_args, cto, pcd_loc)
+#else
+         { cstr with pcd_args = Pcstr_tuple pcd_args }
+#endif
+     with Not_found ->
+       cstr
+
+   let leave_type_declaration decl =
+     match decl.ptype_kind with
+#if OCAML_VERSION >= "4.02"
+      | Ptype_open
+#endif
+     | Ptype_abstract
+     | Ptype_record _ -> decl
+     | Ptype_variant list ->
+       let list = List.map do_add_constructor_arguments_typ list in
+       { decl with ptype_kind = Ptype_variant list }
 
 end)
 
@@ -908,32 +1092,46 @@ let rewrite_file map_ast  source_file patches ast =
     box_constructors := StringMap.empty;
     ignore_functions := StringMap.empty;
     add_method_arguments := StringMap.empty;
-    add_function_argument := StringMap.empty;
+    add_function_arguments := StringMap.empty;
     replace_ident := StringMap.empty;
     add_external_flags := StringMap.empty;
-    add_constructor_arguments := StringMap.empty;
+    add_constructor_arguments_pat := StringMap.empty;
+    add_constructor_arguments_exp := StringMap.empty;
+    add_constructor_arguments_typ := StringMap.empty;
     add_record_fields := StringMap.empty;
 
     List.iter (fun patch ->
       match patch with
       | PatchNone -> ()
 
-      | PatchAddFunctionArgument { fun_names; fun_new_argument } ->
-        add_to_map add_function_argument fun_names fun_new_argument
+      | PatchAddFunctionArgument { fun_names; fun_new_arguments } ->
+        add_to_map add_function_arguments fun_names fun_new_arguments
 
-      | PatchAddConstructorArguments
-          { constr_names; constr_position; constr_new_arguments } ->
+      | PatchAddConstructorArgumentsPat
+          { constr_names; constr_position;
+            constr_new_arguments; constr_total_nargs} ->
         add_to_map
-          add_constructor_arguments
+          add_constructor_arguments_pat
           constr_names
-          (constr_position, constr_new_arguments)
+          (constr_position, constr_new_arguments, constr_total_nargs)
 
       | PatchAddConstructorArgumentsExp
-          { constr_exp_names; constr_exp_position; constr_exp_new_arguments } ->
+          { constr_names; constr_position;
+            constr_new_arguments; constr_total_nargs } ->
         add_to_map
           add_constructor_arguments_exp
-          constr_exp_names
-          (constr_exp_position, constr_exp_new_arguments)
+          constr_names
+          (constr_position, constr_new_arguments,
+           constr_total_nargs)
+
+      | PatchAddConstructorArgumentsTyp
+          { constr_names; constr_position;
+            constr_new_arguments; constr_total_nargs } ->
+        add_to_map
+          add_constructor_arguments_typ
+          constr_names
+          (constr_position, constr_new_arguments,
+           constr_total_nargs)
 
       | PatchAddRecordFields { record_labels; record_new_labels } ->
         add_to_map add_record_fields record_labels record_new_labels
@@ -966,7 +1164,7 @@ let rewrite_file map_ast  source_file patches ast =
           end
 
         | "matching.ml" ->
-          add_to_map add_function_argument matching_functions "loc"
+          add_to_map add_function_arguments matching_functions ["loc"]
 
         | "selectgen.ml" ->
           add_to_map box_constructors cmm_constructors dbg_record;
@@ -1007,9 +1205,11 @@ let rewrite_file map_ast  source_file patches ast =
     let ast = map_ast ast in
     check_all_used "replace_ident" !replace_ident;
     check_all_used "add_method_arguments" !add_method_arguments;
-    check_all_used "add_function_argument" !add_function_argument;
+    check_all_used "add_function_arguments" !add_function_arguments;
     check_all_used "add_external_flags" !add_external_flags;
-    check_all_used "add_constructor_arguments" !add_constructor_arguments;
+    check_all_used "add_constructor_arguments_pat" !add_constructor_arguments_pat;
+    check_all_used "add_constructor_arguments_exp" !add_constructor_arguments_exp;
+    check_all_used "add_constructor_arguments_typ" !add_constructor_arguments_typ;
     check_all_used "add_record_fields" !add_record_fields;
     ast
 

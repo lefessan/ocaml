@@ -20,6 +20,12 @@ open Lambda
 open Translobj
 open Translcore
 
+(*
+let nolocid = Memprof.nolocid
+*)
+let locid = Memprof.nolocid
+let flocid = locid
+
 (* XXX Rajouter des evenements... | Add more events... *)
 
 type error = Illegal_class_expr | Tags of label * label
@@ -46,6 +52,7 @@ let lapply ap =
       Lapply ap
 
 let mkappl (func, args) =
+  let ap_lp = lp in
   Lapply {ap_should_be_tailcall=false;
           ap_loc=Location.none;
           ap_func=func;
@@ -471,6 +478,7 @@ let transl_class_rebind ids cl vf =
     let obj_init = Ident.create "obj_init"
     and self = Ident.create "self" in
     let obj_init0 =
+      let ap_lp = lp in
       lapply {ap_should_be_tailcall=false;
               ap_loc=Location.none;
               ap_func=Lvar obj_init;
@@ -635,6 +643,7 @@ let prerr_ids msg ids =
 
 let transl_class ids cl_id pub_meths cl vflag =
   (* First check if it is not only a rebind *)
+  let lp = locid.Memprof.loc in
   let rebind = transl_class_rebind ids cl vflag in
   if rebind <> lambda_unit then rebind else
 
@@ -878,11 +887,12 @@ let transl_class ids cl_id pub_meths cl vflag =
   let vflag = vf in
 *)
 
-let transl_class ids id pub_meths cl vf =
+let transl_class _cl_class_id ids id pub_meths cl vf =
   oo_wrap cl.cl_env false (transl_class ids id pub_meths cl) vf
 
 let () =
-  transl_object := (fun id meths cl -> transl_class [] id meths cl Concrete)
+  transl_object := (fun locid id meths cl ->
+    transl_class id [] id meths cl Concrete)
 
 (* Error report *)
 

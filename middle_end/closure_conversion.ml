@@ -16,6 +16,9 @@
 
 [@@@ocaml.warning "+a-4-9-30-40-41-42"]
 
+let lp = Lambda.unitlp "closure_conversion"
+let locid = Memprof.nolocid
+
 module Env = Closure_conversion_aux.Env
 module Function_decls = Closure_conversion_aux.Function_decls
 module Function_decl = Function_decls.Function_decl
@@ -414,6 +417,7 @@ let rec close t env (lam : Lambda.lambda) : Flambda.t =
       { ap_func = funct;
         ap_args = [arg];
         ap_loc = loc;
+        ap_lp = lp;
         ap_should_be_tailcall = false;
         (* CR-someday lwhite: it would be nice to be able to give
            inlined attributes to functions applied with the application

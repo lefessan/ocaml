@@ -208,7 +208,11 @@ let () =
       | _ -> None
     )
 
-let parse_file ~tool_name invariant_fun apply_hooks kind ppf sourcefile =
+let save_source = try Some (Sys.getenv "OCP_SAVE_SOURCE")
+  with Not_found -> None
+
+
+let parse_file ~tool_name invariant_fun apply_hooks kind ppf sourcefile print_fun =
   Location.input_name := sourcefile;
   let inputfile = preprocess sourcefile in
   let ast =
@@ -220,6 +224,16 @@ let parse_file ~tool_name invariant_fun apply_hooks kind ppf sourcefile =
   in
   remove_preprocessed inputfile;
   let ast = apply_hooks { Misc.sourcefile } ast in
+
+  begin
+    match save_source with
+    | None -> ()
+    | Some filename ->
+      let oc = open_out filename in
+      let ppf = Format.formatter_of_out_channel oc in
+      fprintf ppf "%a@." print_fun ast;
+      close_out oc
+  end;
   ast
 
 module ImplementationHooks = Misc.MakeHooks(struct
@@ -232,6 +246,8 @@ module InterfaceHooks = Misc.MakeHooks(struct
 let parse_implementation ppf ~tool_name sourcefile =
   parse_file ~tool_name Ast_invariants.structure
     ImplementationHooks.apply_hooks Structure ppf sourcefile
+    Pprintast.structure
 let parse_interface ppf ~tool_name sourcefile =
   parse_file ~tool_name Ast_invariants.signature
     InterfaceHooks.apply_hooks Signature ppf sourcefile
+    Pprintast.signature

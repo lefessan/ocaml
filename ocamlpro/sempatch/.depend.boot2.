@@ -1,0 +1,29 @@
+cleanup.cmo :
+cleanup.cmx :
+ocpp.cmi :
+ocpstd.cmo : ocpstd.cmi
+ocpstd.cmx : ocpstd.cmi
+ocpstd.cmi :
+parsetree_iter.cmo : parsetree_iter.cmi
+parsetree_iter.cmx : parsetree_iter.cmi
+parsetree_iter.cmi :
+parsetree_map.cmo : parsetree_map.cmi
+parsetree_map.cmx : parsetree_map.cmi
+parsetree_map.cmi :
+patch_engine.cmo : patch_types.cmo parsetree_map.cmi parsetree_iter.cmi
+patch_engine.cmx : patch_types.cmx parsetree_map.cmx parsetree_iter.cmx
+patch_lexer.cmo : stringCompat.cmo
+patch_lexer.cmx : stringCompat.cmx
+patch_main.cmo : stringCompat.cmo patch_types.cmo patch_parser.cmi \
+    patch_lexer.cmo patch_engine.cmo ocpstd.cmi ocpp.cmi
+patch_main.cmx : stringCompat.cmx patch_types.cmx patch_parser.cmx \
+    patch_lexer.cmx patch_engine.cmx ocpstd.cmx ocpp.cmi
+patch_parser.cmo : patch_types.cmo patch_parser.cmi
+patch_parser.cmx : patch_types.cmx patch_parser.cmi
+patch_parser.cmi : patch_types.cmo
+patch_types.cmo :
+patch_types.cmx :
+sempatch_plugin.cmo :
+sempatch_plugin.cmx :
+stringCompat.cmo :
+stringCompat.cmx :

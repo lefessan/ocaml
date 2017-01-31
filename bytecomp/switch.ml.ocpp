@@ -1,0 +1,4 @@
+patch add_function_argument {
+  fun_new_argument = "lp"
+  fun_names = [ "c_test" "make_if_in" "make_if_out" "make_clusters" "test_sequence" "do_zyva" "abstract_shared" ]
+}

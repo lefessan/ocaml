@@ -1,0 +1,10 @@
+
+patch add_function_argument {
+  fun_new_argument = "Lambda.location"
+  fun_names = [
+    "transl_exp";
+    "transl_apply";
+    "transl_let";
+    "transl_primitive";
+  ]
+}

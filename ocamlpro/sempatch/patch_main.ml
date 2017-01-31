@@ -30,21 +30,32 @@ let read_patches filename =
 
       | "add_function_argument" ->
         PatchAddFunctionArgument
-          { fun_new_argument=arg;
+          { fun_new_arguments=[arg];
             fun_names=args }
 
-      | "add_constructor_arguments" ->
-        PatchAddConstructorArguments {
+      | "add_constructor_arguments"
+      | "add_constructor_arguments_pat" ->
+        PatchAddConstructorArgumentsPat {
           constr_names = args;
           constr_position = End;
           constr_new_arguments = split arg ';';
+          constr_total_nargs = -1;
         }
 
       | "add_constructor_arguments_exp" ->
         PatchAddConstructorArgumentsExp {
-          constr_exp_names = args;
-          constr_exp_position = End;
-          constr_exp_new_arguments = split arg ';';
+          constr_names = args;
+          constr_position = End;
+          constr_new_arguments = split arg ';';
+          constr_total_nargs = -1;
+        }
+
+      | "add_constructor_arguments_typ" ->
+        PatchAddConstructorArgumentsExp {
+          constr_names = args;
+          constr_position = End;
+          constr_new_arguments = split arg ';';
+          constr_total_nargs = -1;
         }
 
       | "add_record_fields" ->
@@ -91,15 +102,20 @@ let read_patches filename =
     Printf.eprintf "  record_labels = [ \"%s\" ]\n" (String.concat "\" \"" record_labels);
     Printf.eprintf "  record_new_labels = [ \"%s\" ]\n" (String.concat "\" \"" record_new_labels);
     Printf.eprintf "}\n"
-  | PatchAddConstructorArguments { constr_names; constr_new_arguments } ->
+  | PatchAddConstructorArgumentsPat { constr_names; constr_new_arguments } ->
     Printf.eprintf "patch %s {\n" "add_constructor_arguments";
     Printf.eprintf "  constr_names = [ \"%s\" ]\n" (String.concat "\" \"" constr_names);
     Printf.eprintf "  constr_new_arguments = [ \"%s\" ]\n" (String.concat "\" \"" constr_new_arguments);
     Printf.eprintf "}\n"
-  | PatchAddConstructorArgumentsExp { constr_exp_names; constr_exp_new_arguments } ->
+  | PatchAddConstructorArgumentsExp { constr_names; constr_new_arguments } ->
     Printf.eprintf "patch %s {\n" "add_constructor_arguments_exp";
-    Printf.eprintf "  constr_exp_names = [ \"%s\" ]\n" (String.concat "\" \"" constr_exp_names);
-    Printf.eprintf "  constr_exp_new_arguments = [ \"%s\" ]\n" (String.concat "\" \"" constr_exp_new_arguments);
+    Printf.eprintf "  constr_exp_names = [ \"%s\" ]\n" (String.concat "\" \"" constr_names);
+    Printf.eprintf "  constr_exp_new_arguments = [ \"%s\" ]\n" (String.concat "\" \"" constr_new_arguments);
+    Printf.eprintf "}\n"
+  | PatchAddConstructorArgumentsTyp { constr_names; constr_new_arguments } ->
+    Printf.eprintf "patch %s {\n" "add_constructor_arguments_typ";
+    Printf.eprintf "  constr_names = [ \"%s\" ]\n" (String.concat "\" \"" constr_names);
+    Printf.eprintf "  constr_new_arguments = [ \"%s\" ]\n" (String.concat "\" \"" constr_new_arguments);
     Printf.eprintf "}\n"
   | PatchReplaceIdents { replace_idents; replace_with } ->
     Printf.eprintf "patch %s {\n" "replace_idents";
@@ -111,9 +127,10 @@ let read_patches filename =
     Printf.eprintf "  prim_flags = [ \"%s\" ]\n" (String.concat "\" \"" prim_flags);
     Printf.eprintf "  prim_names = [ \"%s\" ]\n" (String.concat "\" \"" prim_names);
     Printf.eprintf "}\n"
-  | PatchAddFunctionArgument { fun_names; fun_new_argument } ->
-    Printf.eprintf "patch %s {\n" "add_function_argument";
-    Printf.eprintf "  fun_new_argument = \"%s\"\n" fun_new_argument;
+  | PatchAddFunctionArgument { fun_names; fun_new_arguments } ->
+    Printf.eprintf "patch %s {\n" "add_function_arguments";
+    Printf.eprintf "  fun_new_arguments = [ \"%s\" ]\n"
+      (String.concat "\" \"" fun_new_arguments);
     Printf.eprintf "  fun_names = [ \"%s\" ]\n" (String.concat "\" \"" fun_names);
     Printf.eprintf "}\n"
 
@@ -155,7 +172,7 @@ let token_of_token = function
       | L.Kwd "{" -> P.LBRACE
       | L.Kwd "}" -> P.RBRACE
       | L.Kwd "#" -> P.SHARP
-      | L.Int n -> P.INT n
+      | L.Int n -> P.STRING (string_of_int n)
       | L.Float _
       | L.Char _ -> failwith "Unexpected token (int/float/char)"
       | L.Kwd kwd -> Printf.kprintf failwith "Unexpected keyword %S" kwd
@@ -255,46 +272,73 @@ and interp_patch filename patch parameters =
     PatchAddMethodArguments { meth_names = !meth_names;
                               meth_new_arguments = !meth_new_arguments }
 
-  | "add_function_argument" ->
-    let fun_new_argument = ref "" in
+  | "add_function_argument"
+  | "add_function_arguments"
+    ->
+    let fun_new_argument = ref [] in
     let fun_names = ref [] in
     parse_parameters patch parameters [
-      "fun_new_argument", STRING fun_new_argument;
+      "fun_new_argument", LIST fun_new_argument;
       "fun_names", LIST fun_names;
     ];
     PatchAddFunctionArgument {
-      fun_new_argument = !fun_new_argument;
+      fun_new_arguments = !fun_new_argument;
       fun_names = !fun_names;
     }
 
-  | "add_constructor_arguments" ->
+  | "add_constructor_arguments"
+  | "add_constructor_arguments_pat" ->
     let constr_names = ref [] in
     let constr_position = ref "end" in
     let constr_new_arguments = ref [] in
+    let constr_total_nargs = ref "-1" in
     parse_parameters patch parameters [
       "constr_names", LIST constr_names;
       "constr_position", STRING constr_position;
       "constr_new_arguments", LIST constr_new_arguments;
+      "constr_prev_nargs", STRING constr_total_nargs;
     ];
-    PatchAddConstructorArguments {
+    PatchAddConstructorArgumentsPat {
       constr_names = !constr_names;
       constr_position = string_to_argpos !constr_position;
       constr_new_arguments = !constr_new_arguments;
+      constr_total_nargs = int_of_string !constr_total_nargs;
     }
 
   | "add_constructor_arguments_exp" ->
-    let constr_exp_names = ref [] in
-    let constr_exp_position = ref "end" in
-    let constr_exp_new_arguments = ref [] in
+    let constr_names = ref [] in
+    let constr_position = ref "end" in
+    let constr_new_arguments = ref [] in
+    let constr_total_nargs = ref "-1" in
     parse_parameters patch parameters [
-      "constr_exp_names", LIST constr_exp_names;
-      "constr_exp_position", STRING constr_exp_position;
-      "constr_exp_new_arguments", LIST constr_exp_new_arguments;
+      "constr_names", LIST constr_names;
+      "constr_position", STRING constr_position;
+      "constr_new_arguments", LIST constr_new_arguments;
+      "constr_prev_nargs", STRING constr_total_nargs;
     ];
     PatchAddConstructorArgumentsExp {
-      constr_exp_names = !constr_exp_names;
-      constr_exp_position = string_to_argpos !constr_exp_position;
-      constr_exp_new_arguments = !constr_exp_new_arguments;
+      constr_names = !constr_names;
+      constr_position = string_to_argpos !constr_position;
+      constr_new_arguments = !constr_new_arguments;
+      constr_total_nargs = int_of_string !constr_total_nargs;
+    }
+
+  | "add_constructor_arguments_typ" ->
+    let constr_names = ref [] in
+    let constr_position = ref "end" in
+    let constr_new_arguments = ref [] in
+    let constr_total_nargs = ref "-1" in
+    parse_parameters patch parameters [
+      "constr_names", LIST constr_names;
+      "constr_position", STRING constr_position;
+      "constr_new_arguments", LIST constr_new_arguments;
+      "constr_prev_nargs", STRING constr_total_nargs;
+    ];
+    PatchAddConstructorArgumentsTyp {
+      constr_names = !constr_names;
+      constr_position = string_to_argpos !constr_position;
+      constr_new_arguments = !constr_new_arguments;
+      constr_total_nargs = int_of_string !constr_total_nargs;
     }
 
   | "add_record_fields" ->

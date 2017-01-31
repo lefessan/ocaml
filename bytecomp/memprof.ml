@@ -108,7 +108,7 @@ let dump_concrete = try
                       ignore (Sys.getenv "MEMPROF_DUMP_CONCRETE"); true
   with Not_found -> false
 
-let init id mty s =
+let init (id, s, mty) =
   if dump_concrete then
     Format.eprintf "%a@." Printtyp.modtype mty;
   data := (id, mty);
@@ -131,20 +131,8 @@ let save_global_map map prims size =
   ) prims;
   globals := t
 
-let init_location_table module_name str =
-  let (id, subst, mty) = Globalize.concrete module_name str in
-  init id mty subst
-
-let init_toplevel_location_table =
-  let cpt = ref 0 in
-  fun str ->
-    incr cpt;
-    let (id, subst, mty) =
-      Globalize.concrete ("_TOP_" ^ string_of_int !cpt) str in
-    init id mty subst
-
 let init_package_location_table target_name =
-  init target_name (Mty_signature []) Subst.identity
+  init (target_name, Subst.identity, Mty_signature [])
 
 let get_alloc delayed =
   match !delayed with
@@ -384,3 +372,6 @@ module Subst = struct
     Array.map (block_info_raw' s) l
 
     end
+
+let location_none = { l = Location.none; p = Path.Pident (Ident.create "") }
+let nolocid = noalloc location_none.l location_none.p

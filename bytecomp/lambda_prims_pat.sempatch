@@ -1,0 +1,88 @@
+
+patch add_constructor_arguments_pat {
+   constr_names = [
+                "Pintoffloat"
+                "Pfloatofint"
+"Pintoffloat"
+"Pfloatofint"
+"Pnegfloat"
+"Pabsfloat"
+"Paddfloat"
+"Psubfloat"
+"Pmulfloat"
+"Pdivfloat"]
+   constr_position = "end"
+   constr_new_arguments = [ "locid" ]
+   constr_prev_nargs = 0;
+}
+
+
+
+patch add_constructor_arguments_pat {
+   constr_names = [
+                "Pfloatfield"
+                   "Pccall"
+"Parrayrefu"
+"Parrayrefs"
+"Pbintofint"
+"Pnegbint"  
+"Paddbint"  
+"Psubbint"  
+"Pmulbint"  
+(* "Pdivbint"  *)
+(* "Pmodbint"  *)
+"Pandbint"  
+"Porbint"   
+"Pxorbint"  
+"Plslbint"  
+"Plsrbint"  
+"Pasrbint"  
+"Pstring_load_32"
+"Pstring_load_64"
+"Pbigstring_load_32"
+"Pbigstring_load_64"
+"Pbbswap"     
+]
+   constr_position = "end"
+   constr_new_arguments = [ "locid" ]
+   constr_prev_nargs = 1;
+}
+
+patch add_constructor_arguments_pat {
+   constr_names = [
+   "Pduprecord"
+"Pduparray"
+"Pmakearray"
+"Pcvtbint"  
+   ]
+   constr_position = "end"
+   constr_new_arguments = [ "locid" ]
+   constr_prev_nargs = 2;
+}
+
+patch add_constructor_arguments_pat {
+   constr_names = [ "Pmakeblock" ]
+   constr_position = "end"
+   constr_new_arguments = [ "locid" ]
+   constr_prev_nargs = 3;
+}
+
+patch add_constructor_arguments_pat {
+   constr_names = [
+   "Pbigarrayref"
+]
+   constr_position = "end"
+   constr_new_arguments = [ "locid" ]
+   constr_prev_nargs = 4;
+}
+
+
+patch add_constructor_arguments_pat {
+   constr_names = [
+   "Prevapply";
+  "Pdirapply"
+   ]
+   constr_position = "end"
+   constr_new_arguments = [ "lp" ]
+   constr_prev_nargs = 0;
+}

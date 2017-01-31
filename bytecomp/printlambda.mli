@@ -23,3 +23,6 @@ val program: formatter -> program -> unit
 val primitive: formatter -> primitive -> unit
 val name_of_primitive : primitive -> string
 val value_kind : value_kind -> string
+
+(* memprof *)
+val locid: formatter -> locid -> unit

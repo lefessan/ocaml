@@ -24,7 +24,7 @@ $(PLUGIN_CMA): \
    $(ROOTDIR)/$(PRE)/ocamlc $(OCPP_MLS) ../$(POST)/compiler/witness
 	$(MAKE) -f Makefile.plugin $(OCPP_CMOS)
 	$(CAMLC) -a -o $(PLUGIN_CMA) $(OCPP_CMOS)
-	cp -f ocpp.cmi ../sempatch/
+#	cp -f ocpp.cmi ../sempatch/
 	rm -f *.cmi *.cmti *.cmo *.cmt
 
 beforedepend:: $(OCPP_MLS)

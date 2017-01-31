@@ -1,0 +1,42 @@
+cleanup.cmo : ../boot2/compiler/symtable.cmi
+cleanup.cmx : ../boot2/compiler/symtable.cmi
+ocpp.cmi : ../boot2/compiler/parser.cmi ../boot2/compiler/location.cmi
+ocpstd.cmo : ocpstd.cmi
+ocpstd.cmx : ocpstd.cmi
+ocpstd.cmi :
+parsetree_iter.cmo : ../boot2/compiler/parsetree.cmi \
+    ../boot2/compiler/asttypes.cmi parsetree_iter.cmi
+parsetree_iter.cmx : ../boot2/compiler/parsetree.cmi \
+    ../boot2/compiler/asttypes.cmi parsetree_iter.cmi
+parsetree_iter.cmi : ../boot2/compiler/parsetree.cmi \
+    ../boot2/compiler/asttypes.cmi
+parsetree_map.cmo : ../boot2/compiler/parsetree.cmi \
+    ../boot2/compiler/misc.cmi parsetree_map.cmi
+parsetree_map.cmx : ../boot2/compiler/parsetree.cmi \
+    ../boot2/compiler/misc.cmi parsetree_map.cmi
+parsetree_map.cmi : ../boot2/compiler/parsetree.cmi
+patch_engine.cmo : patch_types.cmo parsetree_map.cmi parsetree_iter.cmi \
+    ../boot2/compiler/parsetree.cmi ../boot2/compiler/parser.cmi \
+    ../boot2/compiler/longident.cmi ../boot2/compiler/location.cmi \
+    ../boot2/compiler/lexer.cmi ../boot2/compiler/asttypes.cmi
+patch_engine.cmx : patch_types.cmx parsetree_map.cmx parsetree_iter.cmx \
+    ../boot2/compiler/parsetree.cmi ../boot2/compiler/parser.cmi \
+    ../boot2/compiler/longident.cmi ../boot2/compiler/location.cmi \
+    ../boot2/compiler/lexer.cmi ../boot2/compiler/asttypes.cmi
+patch_lexer.cmo : stringCompat.cmo
+patch_lexer.cmx : stringCompat.cmx
+patch_main.cmo : stringCompat.cmo ../boot2/compiler/pparse.cmi \
+    patch_types.cmo patch_parser.cmi patch_lexer.cmo patch_engine.cmo \
+    ocpstd.cmi ocpp.cmi ../boot2/compiler/misc.cmi
+patch_main.cmx : stringCompat.cmx ../boot2/compiler/pparse.cmi \
+    patch_types.cmx patch_parser.cmx patch_lexer.cmx patch_engine.cmx \
+    ocpstd.cmx ocpp.cmi ../boot2/compiler/misc.cmi
+patch_parser.cmo : patch_types.cmo patch_parser.cmi
+patch_parser.cmx : patch_types.cmx patch_parser.cmi
+patch_parser.cmi : patch_types.cmo
+patch_types.cmo :
+patch_types.cmx :
+sempatch_plugin.cmo :
+sempatch_plugin.cmx :
+stringCompat.cmo :
+stringCompat.cmx :

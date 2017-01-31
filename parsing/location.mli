@@ -143,3 +143,9 @@ val report_exception: formatter -> exn -> unit
 val report_backtrace : string -> unit
   (* Attach a printed backtrace to the current exception. Be careful that
      it must be the last exception of the program. *)
+
+val force_loc : t option ref
+  (* When set to [Some loc], the functions [symbol_rloc], [symbol_gloc] and
+    [rhs_loc] will always return that same [loc]. It can be used to
+    set the location of an entire parsetree where it should be
+     included. *)

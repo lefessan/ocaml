@@ -1,0 +1,13 @@
+
+patch add_function_argument {
+  fun_new_argument = "location"
+  fun_names = [
+       "bind"
+       "staticfail"
+       "name_lambda"
+       "name_lambda_list"
+  ]
+}
+
+include "lambda_lambda_typ.sempatch"
+include "lambda_prims_typ.sempatch"

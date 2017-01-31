@@ -118,6 +118,7 @@ let transl_label_init_flambda f =
      method_cache variable to be initialised to be able to generate
      method accesses. *)
   let expr, size = f () in
+  let locid = Memprof.internal lp.l lp.p "method_cache" in
   let expr =
     if !method_count = 0 then expr
     else
@@ -129,9 +130,11 @@ let transl_label_init_flambda f =
   in
   transl_label_init_general (fun () -> expr, size)
 
-let transl_store_label_init glob size f arg =
+let transl_store_label_init module_name glob size f arg =
   assert(not Config.flambda);
   assert(!Clflags.native_code);
+  let locid = Memprof.internal lp.l lp.p
+    (Printf.sprintf "methods(%s)" module_name) in
   method_cache := Lprim(Pfield size,
                         [Lprim(Pgetglobal glob, [], Location.none)],
                         Location.none);
@@ -165,7 +168,7 @@ let classes = ref []
 let method_ids = ref IdentSet.empty
 
 let oo_add_class id =
-  classes := id :: !classes;
+  classes := (id, locid) :: !classes;
   (!top_env, !cache_required)
 
 let oo_wrap env req f x =
@@ -182,12 +185,12 @@ let oo_wrap env req f x =
     let lambda = f x in
     let lambda =
       List.fold_left
-        (fun lambda id ->
+        (fun lambda (id,locid) ->
           Llet(StrictOpt, Pgenval, id,
                Lprim(Pmakeblock(0, Mutable, None),
                      [lambda_unit; lambda_unit; lambda_unit],
                      Location.none),
-               lambda))
+               lambda, locid.Memprof.loc))
         lambda !classes
     in
     wrapping := false;

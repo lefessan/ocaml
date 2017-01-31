@@ -1,0 +1,22 @@
+
+include "../bytecomp/lambda_lambda_exp.sempatch"
+include "../bytecomp/lambda_lambda_patany.sempatch"
+include "../bytecomp/lambda_prims_exp.sempatch"
+include "../bytecomp/lambda_prims_patany.sempatch"
+
+patch add_record_fields {
+  record_labels = [ "attr" ]
+  record_new_labels = [ "flocid" ]
+}
+
+patch add_record_fields {
+  record_labels = [ "ap_loc" ]
+  record_new_labels = [ "ap_lp" ]
+}
+
+patch add_function_argument {
+  fun_new_argument = "locid"
+  fun_names = [
+    "Simplif.split_default_wrapper"
+  ]
+}

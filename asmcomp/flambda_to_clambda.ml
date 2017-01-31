@@ -28,6 +28,8 @@ type t = {
   imported_units : for_one_or_more_units;
 }
 
+let locid = Memprof.nolocid
+
 type ('a, 'b) declaration_position =
   | Current_unit of 'a
   | Imported_unit of 'b

@@ -61,18 +61,18 @@ type instruction =
   | Kappterm of int * int               (* number of arguments, slot size *)
   | Kreturn of int                      (* slot size *)
   | Krestart
-  | Kgrab of int * alloc                (* number of arguments *)
-  | Kclosure of label * int * alloc
-  | Kclosurerec of label list * int * alloc
+  | Kgrab of int                        (* number of arguments *)
+  | Kclosure of label * int
+  | Kclosurerec of label list * int
   | Koffsetclosure of int
   | Kgetglobal of Ident.t
   | Ksetglobal of Ident.t
   | Kconst of structured_constant
-  | Kmakeblock of int * int * alloc     (* size, tag *)
-  | Kmakefloatblock of int * alloc
+  | Kmakeblock of int * int             (* size, tag *)
+  | Kmakefloatblock of int
   | Kgetfield of int
   | Ksetfield of int
-  | Kgetfloatfield of int * alloc
+  | Kgetfloatfield of int
   | Ksetfloatfield of int
   | Kvectlength
   | Kgetvectitem
@@ -90,7 +90,7 @@ type instruction =
   | Kpoptrap
   | Kraise of raise_kind
   | Kcheck_signals
-  | Kccall of string * int * alloc
+  | Kccall of string * int
   | Knegint | Kaddint | Ksubint | Kmulint | Kdivint | Kmodint
   | Kandint | Korint | Kxorint | Klslint | Klsrint | Kasrint
   | Kintcomp of comparison

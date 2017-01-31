@@ -91,6 +91,11 @@ let rec eliminate_ref id = function
 
 (* Simplification of exits *)
 
+
+(* memprof: disable warnings introduced by semantic patches *)
+[@@@warning "-27"]
+
+
 let simplify_exits lam =
 
   (* Count occurrences of (exit n ...) statements *)
@@ -200,7 +205,7 @@ let simplify_exits lam =
   | Lapply ap ->
       Lapply{ap with ap_func = simplif ap.ap_func;
                      ap_args = List.map simplif ap.ap_args}
-  | Lfunction{kind; params; body = l; attr; loc} ->
+  | Lfunction{kind; params; body = l; attr; loc; flocid} ->
      Lfunction{kind; params; body = simplif l; attr; loc}
   | Llet(str, kind, v, l1, l2) -> Llet(str, kind, v, simplif l1, simplif l2)
   | Lletrec(bindings, body) ->
@@ -214,6 +219,7 @@ let simplify_exits lam =
         Lapply {ap with ap_args = ap.ap_args @ [x]; ap_loc = loc}
       | Prevapply, [x; f] -> Lapply {ap_should_be_tailcall=false;
                                      ap_loc=loc;
+                                     ap_lp = lp;
                                      ap_func=f;
                                      ap_args=[x];
                                      ap_inlined=Default_inline;
@@ -225,6 +231,7 @@ let simplify_exits lam =
         Lapply {ap with ap_args = ap.ap_args @ [x]; ap_loc = loc}
       | Pdirapply, [f; x] -> Lapply {ap_should_be_tailcall=false;
                                      ap_loc=loc;
+                                     ap_lp = lp;
                                      ap_func=f;
                                      ap_args=[x];
                                      ap_inlined=Default_inline;
@@ -355,11 +362,12 @@ let simplify_lets lam =
   | Lconst _ -> ()
   | Lvar v ->
       use_var bv v 1
-  | Lapply{ap_func = Lfunction{kind = Curried; params; body}; ap_args = args}
-    when optimize && List.length params = List.length args ->
+  | Lapply{ap_func = Lfunction{kind = Curried; params; body};
+           ap_args = args; ap_lp = lp}
+      when optimize && List.length params = List.length args ->
       count bv (beta_reduce params body args)
   | Lapply{ap_func = Lfunction{kind = Tupled; params; body};
-           ap_args = [Lprim(Pmakeblock _, args, _)]}
+           ap_args = [Lprim(Pmakeblock _, args, _)]; ap_lp = lp}
     when optimize && List.length params = List.length args ->
       count bv (beta_reduce params body args)
   | Lapply{ap_func = l1; ap_args = ll} ->
@@ -448,16 +456,17 @@ let simplify_lets lam =
         l
       end
   | Lconst _ as l -> l
-  | Lapply{ap_func = Lfunction{kind = Curried; params; body}; ap_args = args}
+  | Lapply{ap_func = Lfunction{kind = Curried; params; body};
+           ap_args = args; ap_lp = lp}
     when optimize && List.length params = List.length args ->
       simplif (beta_reduce params body args)
   | Lapply{ap_func = Lfunction{kind = Tupled; params; body};
-           ap_args = [Lprim(Pmakeblock _, args, _)]}
+           ap_args = [Lprim(Pmakeblock _, args, _)]; ap_lp = lp}
     when optimize && List.length params = List.length args ->
       simplif (beta_reduce params body args)
   | Lapply ap -> Lapply {ap with ap_func = simplif ap.ap_func;
                                  ap_args = List.map simplif ap.ap_args}
-  | Lfunction{kind; params; body = l; attr; loc} ->
+  | Lfunction{kind; params; body = l; attr; loc; flocid} ->
       begin match simplif l with
         Lfunction{kind=Curried; params=params'; body; attr; loc}
         when kind = Curried && optimize ->
@@ -650,6 +659,7 @@ let split_default_wrapper ~id:fun_id ~kind ~params ~body ~attr ~loc =
         let inner_id = Ident.create (Ident.name fun_id ^ "_inner") in
         let map_param p = try List.assoc p map with Not_found -> p in
         let args = List.map (fun p -> Lvar (map_param p)) params in
+        let ap_lp = flocid.Memprof.loc in
         let wrapper_body =
           Lapply {
             ap_func = Lvar inner_id;

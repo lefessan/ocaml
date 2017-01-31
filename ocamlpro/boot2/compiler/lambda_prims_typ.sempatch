@@ -1,0 +1,58 @@
+
+patch add_constructor_arguments_typ {
+   constr_names = [
+   "Pmakeblock";
+   "Pfloatfield";
+   "Pduprecord";
+   "Pccall";
+"Pintoffloat"
+"Pfloatofint"
+"Pnegfloat"
+"Pabsfloat"
+"Paddfloat"
+"Psubfloat"
+"Pmulfloat"
+"Pdivfloat"
+"Pmakearray"
+"Parrayrefu"
+"Parrayrefs"
+"Pbintofint"
+"Pcvtbint"  
+"Pnegbint"  
+"Paddbint"  
+"Psubbint"  
+"Pmulbint"  
+(* creer un patch pour les inline records !!!
+"Pdivbint"  
+"Pmodbint"
+*)
+"Pandbint"  
+"Porbint"   
+"Pxorbint"  
+"Plslbint"  
+"Plsrbint"  
+"Pasrbint"  
+"Pbigarrayref"
+"Pstring_load_32"
+"Pstring_load_64"
+"Pbigstring_load_32"
+"Pbigstring_load_64"
+"Pbbswap"
+
+"Pduparray"
+]
+   constr_position = "end"
+   constr_new_arguments = [ "'a" ]
+(*   constr_prev_nargs = 3; *)
+}
+
+
+patch add_constructor_arguments_typ {
+   constr_names = [
+   "Prevapply";
+   "Pdirapply"
+   ]
+   constr_position = "end"
+   constr_new_arguments = [ "location" ]
+   constr_prev_nargs = 0;
+}

@@ -66,6 +66,20 @@ let rhs_loc n = {
   loc_ghost = false;
 };;
 
+
+let force_loc = ref None
+let symbol_rloc () =
+  match !force_loc with None -> symbol_rloc ()
+  | Some loc -> loc
+let symbol_gloc () =
+  match !force_loc with None -> symbol_gloc ()
+  | Some loc -> loc
+let rhs_loc n =
+  match !force_loc with None -> rhs_loc n
+  | Some loc -> loc
+
+
+
 let input_name = ref "_none_"
 let input_lexbuf = ref (None : lexbuf option)
 
