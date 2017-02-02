@@ -7,6 +7,8 @@
 /*                                                                        */
 /**************************************************************************/
 
+#define _OCP_OCAML
+
 #define MEMPROF_INSIDE
 #define CAML_INTERNALS
 
@@ -49,14 +51,15 @@
 #include "caml/weak.h"
 #define OCP_NEED_LOCINFO
 #include "caml/backtrace.h"
+#include "caml/backtrace_prim.h"
 
 #define CAML_MORE_CALLBACK_H
+#include "caml/ocp_utils.h"
 #include "caml/ocp_memprof.h"
 
 #ifdef _WIN32
 extern int32 win32_getppid_c(void);
 #endif
-
 
 #define ATOM MAKE_ATOM
 #include "caml/instruct.h"
@@ -70,7 +73,7 @@ extern int32 win32_getppid_c(void);
 #include "caml/startup.h"
 #else
 #include "caml/stack.h"
-extern value caml_globals[];
+extern value* caml_globals[];
 extern char caml_globals_map[];
 #endif
 extern value caml_make_vect(value len, value init);
@@ -648,7 +651,7 @@ static void store_roots(FILE *file_oc)
   int c_count, finalised_count, hook_count;
 #ifdef NATIVE_CODE
   int i, j;
-  value glob;
+  value* glob;
 #endif
 
   // Adapted from [caml_do_root] in '{byterun,asmrun}/roots.c'
@@ -701,7 +704,7 @@ static void store_roots(FILE *file_oc)
 
   /* Finalised values */
   root_count = 0;
-  caml_final_do_strong_roots(dump_store_root);
+  caml_final_do_roots(dump_store_root);
   finalised_count = root_count;
 
   /* Hook */
@@ -718,7 +721,7 @@ static void store_roots(FILE *file_oc)
 #endif
 
   store_threads(file_oc);
-  caml_iter_named_value(dump_store_named);
+  caml_iterate_named_values(dump_store_named);
   ocp_heapdump_store_uint(0, file_oc); /* end of named roots */
 
   /* Store counts: LAST THING to do in this section ! 
@@ -837,6 +840,8 @@ static void store_block_fields(mlsize_t sz, value v, char *base, FILE *file_oc)
 
 }
 
+#if HAS_WEAK_POINTERS
+
 /* WEAK section */
 static void store_weaks(FILE *file_oc)
 {
@@ -871,6 +876,18 @@ static void store_weaks(FILE *file_oc)
   }
 }
 
+#else
+
+/* Not implemented yet for trunk */
+
+/* WEAK section */
+static void store_weaks(FILE *file_oc)
+{
+  store_word(0, file_oc);
+}
+
+#endif
+
 /* STRS section */
 static void store_strings(FILE *file_oc)
 {
@@ -898,7 +915,7 @@ static void store_block(char *hp, FILE* file_oc)
   header_t hd = Hd_val(v);
   tag_t tag = Tag_hd(hd);
   mlsize_t sz = Wosize_hd(hd);
-  locid_t locid = Locid_hd(hd);
+  uintnat locid = Profinfo_hd(hd);
 
   block_count ++;
 
@@ -1134,29 +1151,23 @@ static void dump_store_dynglobal_root(char *name, value v)
 }
 #endif
 
-
-static int final_counter = 0;
-static void final_count(value f, value* fp){ final_counter++; }
+static int final_set;
+static int final_counter[5];
+static void final_count(value f, value* fp){
+  if( fp == NULL ){
+    store_uint( final_counter[final_set], file_oc );
+    final_set++;
+    final_counter[final_set] = 0;
+  } else {
+    final_counter[final_set]++;
+  }
+}
 
 static void store_final(FILE* file_oc)
 {
-  int old;
-  int young; /* our young is different, it is (young - old) */ 
-
-  final_counter=0;
-  caml_final_do_weak_roots(final_count); /* old */
-  old = final_counter;
-  final_counter=0;
-  caml_final_do_young_roots(final_count); /* young x 2 */
-  young = final_counter/2;
-  final_counter=0;
-
-  store_uint(old, file_oc );
-  caml_final_do_weak_roots( dump_store_root ); /* store the [val] x old */
-  store_uint( young ,file_oc ); /* in case of triggered dump, we must
-                          also save the young final roots ! */
-  /* store [fun] and [val], young times */ 
-  caml_final_do_young_roots( dump_store_root );
+  final_set = 0;
+  caml_final_do( final_count );
+  caml_final_do( dump_store_root );
 }
 
 void store_string(char*s, FILE* file_oc){
@@ -1272,7 +1283,7 @@ void ocp_heapdump_do_dump(char *dumpname, value kind)
   /* Store weak pointers */
   start_section("WEAK", file_oc);
   store_weaks(file_oc);
-
+  
   /* Store finalise information */
   start_section("FINA", file_oc);
   store_final(file_oc);
@@ -1330,7 +1341,7 @@ void ocp_heapdump_do_dump(char *dumpname, value kind)
   /* Computing md5 of dumps */
   fseek(file_oc, 0, SEEK_SET);
   md5_chan = caml_open_descriptor_in(fileno(file_oc));
-  md5 = caml_md5_from_channel(md5_chan, -1);
+  md5 = caml_md5_channel(md5_chan, Long_val(-1));
   caml_close_channel(md5_chan);
   
   fclose(file_oc);

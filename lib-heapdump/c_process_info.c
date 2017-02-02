@@ -8,6 +8,7 @@
 /**************************************************************************/
 
 #define MEMPROF_INSIDE
+#define CAML_INTERNALS
 
 #include <string.h>
 
@@ -25,53 +26,47 @@
 #include <libgen.h>
 #endif
 
-#include "caml/internals/alloc.h"
-#include "caml/internals/callback.h"
-#include "caml/internals/fail.h"
-#include "caml/internals/finalise.h"
-#include "caml/internals/gc_ctrl.h"
-#include "caml/internals/globroots.h"
-#include "caml/internals/intext.h"
-#include "caml/internals/memory.h"
-#include "caml/internals/memprof.h"
-#include "caml/internals/minor_gc.h"
-#include "caml/internals/mlvalues.h"
-#include "caml/internals/roots.h"
-#include "caml/internals/signals.h"
-#include "caml/internals/sys.h"
-#include "caml/internals/exec.h"
+#include "caml/alloc.h"
+#include "caml/callback.h"
+#include "caml/fail.h"
+#include "caml/finalise.h"
+#include "caml/gc_ctrl.h"
+#include "caml/globroots.h"
+#include "caml/intext.h"
+#include "caml/memory.h"
+#include "caml/ocp_utils.h"
+#include "caml/ocp_memprof.h"
+#include "caml/minor_gc.h"
+#include "caml/mlvalues.h"
+#include "caml/roots.h"
+#include "caml/signals.h"
+#include "caml/sys.h"
+#include "caml/exec.h"
 #include "caml/unixsupport.h"
-#include "caml/internals/md5.h"
-#include "caml/internals/camlio.h"
-#include "caml/internals/weak.h"
+#include "caml/md5.h"
+#include "caml/caml_io.h"
+#include "caml/weak.h"
 #define OCP_NEED_LOCINFO
-#include "caml/internals/backtrace.h"
+#include "caml/backtrace.h"
 #include "c_heapprof.h"
 
 #ifndef NATIVE_CODE
-#include "caml/internals/fix_code.h"
-#include "caml/internals/stacks.h"
+#include "caml/fix_code.h"
+#include "caml/stacks.h"
 #define caml_code_area_start ((char *) caml_start_code)
 #define caml_code_area_end ((char *) caml_start_code + caml_code_size)
-#include "caml/internals/startup.h"
+#include "caml/startup.h"
 #else
-#include "caml/internals/stack.h"
-extern value caml_globals[];
+#include "caml/stack.h"
+extern value *caml_globals[];
 extern char caml_globals_map[];
 #endif
 
-#if OCAML_VERSION_OCP == 4010001
-#define Heapdump_process_magic_number "OCP-2014P001"
-#elif OCAML_VERSION_OCP == 4020101
-#define Heapdump_process_magic_number "OCP-2014P002"
-#else
-#error "Bad OCaml version"
-#endif
-
+#define Heapdump_process_magic_number "OCP-2017P001"
 #define Heapdump_process_magic_number_len sizeof(Heapdump_process_magic_number)
 
 
-value caml_sys_get_argv(value unit); // From sys.c
+// value caml_sys_get_argv(value unit); // From sys.c
 
 
 

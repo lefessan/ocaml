@@ -852,6 +852,8 @@ partialclean::
 
 ocp-clean::
 	rm -f boot2/ocamlc boot2/*.cm?
+	rm -f ocamlpro/boot/stdlib/*.cm?
+	rm -f ocamlpro/boot/compiler/*.cm?
 	rm -f ocamlpro/boot2/stdlib/*.cm?
 	rm -f ocamlpro/boot2/compiler/*.cm?
 	rm -f ocamlpro/boot2/*.cm?

@@ -1,2 +1,2 @@
-#define OCP_COMMIT "566275c"
-#define OCP_DATE "20170131-1551"
+#define OCP_COMMIT "8081f58"
+#define OCP_DATE "20170131-1613"

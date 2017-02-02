@@ -68,6 +68,9 @@ semantic patches
 
 A VERIFIER:
 ===========
+* dynlink natdynlink
+* weak pointers
+* threads
 * caml_alloc_shr_no_raise fournit un profinfo = 0, pourquoi ?
 	 (utiliser dans intern.c)
 * byterun/caml/memory.h:

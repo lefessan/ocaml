@@ -55,6 +55,7 @@
 */
 
 #define MEMPROF_INSIDE
+#define CAML_INTERNALS
 
 #ifdef _WIN32
 
@@ -66,7 +67,7 @@
 
 #endif
 
-#include "caml/internals/mlvalues.h"
+#include "caml/mlvalues.h"
 
 /* ocpwin: for getpid */
 #ifdef HAS_UNISTD
@@ -80,16 +81,18 @@
 #endif
 
 #include <string.h>
-#include "caml/internals/alloc.h"
-#include "caml/internals/intext.h"
-#include "caml/internals/memory.h"
-#include "caml/internals/memprof.h"
-#include "caml/internals/sys.h"
-#include "caml/internals/fix_code.h"
+#include "caml/alloc.h"
+#include "caml/intext.h"
+#include "caml/memory.h"
+#include "caml/sys.h"
+#include "caml/fix_code.h"
 
 #include <stdio.h>
 #include <errno.h>
 #include "c_gcprof.h"
+#include "caml/ocp_utils.h"
+#include "caml/ocp_gcprof.h"
+#include "caml/ocp_memprof.h"
 
 #ifndef PATH_MAX
 #ifdef MAXPATHLEN
@@ -127,7 +130,7 @@ extern char ** caml_main_argv;
 
 
 typedef unsigned short gcprof_count_type;
-typedef uint64 gcprof_volume_type;
+typedef uint64_t gcprof_volume_type;
 
 static gcprof_count_type  gcprof_minor_count = 0;
 static FILE*              gcprof_output = NULL;
@@ -212,7 +215,7 @@ static void gcprof_open_file()
   int argn = 0;
   int pid = GCPROF_GETPID();
   char *path = caml_stat_alloc(PATH_MAX);
-  int64 seed;
+  int64_t seed;
   sprintf(path, "%s-%d.gcprof", gcprof_filename, pid);
   gcprof_output = fopen(path, "w");
   
@@ -320,7 +323,7 @@ void ocp_gcprof_exit()
 
 void ocp_gcprof_header(value hd, int kind)
 {
-  profiling_t locid = Locid_hd(hd);
+  uintnat locid = Profinfo_hd(hd);
   mlsize_t sz =  Wosize_hd(hd);
   int tag =  Tag_hd(hd);
 
@@ -770,9 +773,9 @@ void ocp_gcprof_gctime(int gcevent)
 
 #ifdef NATIVE_CODE
 
-#include "caml/internals/stack.h"
+#include "caml/stack.h"
 #define OCP_NEED_LOCINFO
-#include "caml/internals/backtrace.h"
+#include "caml/backtrace.h"
 
 struct prof_backtrace {
   mlsize_t bt_size;

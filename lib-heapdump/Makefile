@@ -2,9 +2,9 @@ all: byte opt
 tests:  byte-test opt-test
 
 byte:  ocp-memprof-bytecode.so
-byte-test: byte ocp-memprof-native.test
+byte-test: byte ocp-memprof-bytecode.test
 opt: ocp-memprof-native.so
-opt-test: opt ocp-memprof-bytecode.test
+opt-test: byte ocp-memprof-native.test
 
 include ../config/Makefile
 
@@ -19,6 +19,10 @@ FILES=\
 
 BYTEOBJS=$(FILES:.c=.byte.o)
 NATOBJS=$(FILES:.c=.native.o)
+
+INCLUDES=-I ../byterun -I ../stdlib
+OCAMLC=../boot/ocamlrun ../ocamlc $(INCLUDES)
+OCAMLOPT=../boot/ocamlrun ../ocamlopt $(INCLUDES)
 
 ifneq ($(shell cat COMMIT 2>/dev/null),$(shell git rev-parse --short HEAD))
 .PHONY: COMMIT
@@ -36,7 +40,7 @@ ocp-memprof-native.so: $(NATOBJS) $(CDEPS)
 	$(MKDLL) -o ocp-memprof-native.so $(NATOBJS)
 
 ocp-memprof-native.test: ocp-memprof-native.so test.ml
-	ocamlopt -o ocp-memprof-native.test test.ml -cclib ocp-memprof-native.so
+	$(OCAMLOPT) -o ocp-memprof-native.test test.ml -cclib ocp-memprof-native.so
 
 ocp-memprof-bytecode.so: $(BYTEOBJS) $(CDEPS) 
 	$(MKDLL) -o ocp-memprof-bytecode.so $(BYTEOBJS)
@@ -48,14 +52,11 @@ test.ml: Makefile
 	echo > test.ml
 
 ocp-memprof-bytecode.test: ocp-memprof-bytecode.so test.ml
-	ocamlc -custom -o ocp-memprof-bytecode.test test.ml -cclib ocp-memprof-bytecode.so
+	$(OCAMLC) -custom -o ocp-memprof-bytecode.test test.ml -cclib ocp-memprof-bytecode.so
 
 clean:
 	rm -f *~ *.o *.so *.test test.ml
 	rm -f *.byte.c *.native.c *.cm?
-
-INCLUDES=-I ../byterun
-OCAMLC=../boot/ocamlrun ../ocamlc $(INCLUDES)
 
 .SUFFIXES: .native.o .c .byte.o
 
@@ -67,6 +68,7 @@ OCAMLC=../boot/ocamlrun ../ocamlc $(INCLUDES)
 
 
 .c.native.o:
-	cp -f $*.c $*.native.c
-	../boot/ocamlrun ../ocamlopt -verbose -ccopt "-DNATIVE_CODE -DTARGET_$(ARCH) -DSYS_$(SYSTEM) -shared -fPIC" -c $*.native.c
+	echo '#1 "'"$*.c"'"' > $*.native.c
+	cat $*.c >> $*.native.c
+	$(OCAMLOPT) -verbose -ccopt "-DNATIVE_CODE -DTARGET_$(ARCH) -DSYS_$(SYSTEM) -shared -fPIC" -c $*.native.c
 	rm -f $*.native.c

@@ -31,6 +31,10 @@ void caml_final_update_minor_roots(void);
 value caml_final_register (value f, value v);
 void caml_final_invariant_check(void);
 
+/* Call [f] on all functions and values of all sets. Call [f(0,NULL)]
+   at the end of each one of the 5 sets. */
+void caml_final_do(scanning_action f);
+
 #endif /* CAML_INTERNALS */
 
 #endif /* CAML_FINALISE_H */

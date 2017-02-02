@@ -9,7 +9,7 @@
 
 #define MEMPROF_INSIDE
 
-#include "caml/internals/mlvalues.h"
+#include "caml/mlvalues.h"
 
 /* ocpwin: for getpid */
 #ifdef HAS_UNISTD
@@ -23,11 +23,11 @@
 #endif
 
 #include <string.h>
-#include "caml/internals/alloc.h"
-#include "caml/internals/intext.h"
-#include "caml/internals/memory.h"
-#include "caml/internals/memprof.h"
-#include "caml/internals/sys.h"
+#include "caml/alloc.h"
+#include "caml/intext.h"
+#include "caml/memory.h"
+#include "caml/ocp_memprof.h"
+#include "caml/sys.h"
 
 #include "c_gcprof.h"
 
@@ -45,12 +45,12 @@
 
 #ifdef NATIVE_CODE
 
-#include "caml/internals/stack.h"
+#include "caml/stack.h"
 #define OCP_NEED_LOCINFO
-#include "caml/internals/backtrace.h"
+#include "caml/backtrace.h"
 
 #define CAML_MORE_ALLOC_H
-#include "caml/internals/memprof.h"
+#include "caml/ocp_memprof.h"
 
 static char* allocprof_filename = NULL;
 

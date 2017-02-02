@@ -18,6 +18,16 @@
 extern "C" {
 #endif
 
+extern int caml_memprof_next_location_id;
+CAMLextern int caml_heapdump_in_dump;
+
+
+typedef struct {
+  const char *filename;
+  const int line;
+  const int locid;
+} memprof_id_desc;
+  
 #ifdef _WIN32
 
 #define HEAPDUMP_GETPPID() win32_getppid_c()

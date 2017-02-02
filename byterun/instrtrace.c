@@ -32,6 +32,8 @@
 #include "caml/stacks.h"
 #include "caml/startup_aux.h"
 
+#include "caml/ocp_bytecode.h"
+
 extern code_t caml_start_code;
 
 intnat caml_icount = 0;
@@ -154,21 +156,30 @@ char * caml_instr_string (code_t pc)
             (unsigned long) pc[0] & 0xffff);
     break;
     /* Instructions with a C primitive as operand */
-  case C_CALLN:
-    snprintf(buf, sizeof(buf), "%s %d,", nam, pc[0]);
+  case C_CALLN:{
+    int prim = caml_ocp_bytecode_has_locid(instr);
+    snprintf(buf, sizeof(buf), "%s %d,", nam, pc[prim]);
     pc++;
-    /* fallthrough */
+    if (pc[prim] < 0 || pc[prim] >= caml_prim_name_table.size)
+      snprintf(buf, sizeof(buf), "%s unknown primitive %d", nam, pc[prim]);
+    else
+      snprintf(buf, sizeof(buf), "%s %s",
+               nam, (char *) caml_prim_name_table.contents[pc[prim]]);
+    break;
+  }
   case C_CALL1:
   case C_CALL2:
   case C_CALL3:
   case C_CALL4:
-  case C_CALL5:
-    if (pc[0] < 0 || pc[0] >= caml_prim_name_table.size)
-      snprintf(buf, sizeof(buf), "%s unknown primitive %d", nam, pc[0]);
+  case C_CALL5:{
+    int prim = caml_ocp_bytecode_has_locid(instr);
+    if (pc[prim] < 0 || pc[prim] >= caml_prim_name_table.size)
+      snprintf(buf, sizeof(buf), "%s unknown primitive %d", nam, pc[prim]);
     else
       snprintf(buf, sizeof(buf), "%s %s",
-               nam, (char *) caml_prim_name_table.contents[pc[0]]);
+               nam, (char *) caml_prim_name_table.contents[pc[prim]]);
     break;
+  }
   default:
     snprintf(buf, sizeof(buf), "%s", nam);
     break;
