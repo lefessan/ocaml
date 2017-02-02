@@ -105,13 +105,8 @@ void caml_fixup_endianness(code_t code, asize_t len)
 
 #endif
 
-/* This code is needed only if we're using threaded code */
-
-#ifdef THREADED_CODE
-
-char ** caml_instr_table;
-char * caml_instr_base;
-
+/* ocp-memprof: the interest of this function is to be able to use
+   it for other reasons than threaded code. */
 static int* opcode_nargs = NULL;
 CAMLexport int* caml_init_opcode_nargs(void)
 {
@@ -145,6 +140,13 @@ CAMLexport int* caml_init_opcode_nargs(void)
   }
   return opcode_nargs;
 }
+
+/* This code is needed only if we're using threaded code */
+
+#ifdef THREADED_CODE
+
+char ** caml_instr_table;
+char * caml_instr_base;
 
 void caml_thread_code (code_t code, asize_t len)
 {
@@ -183,13 +185,6 @@ void caml_thread_code (code_t code, asize_t len)
     }
   }
   Assert(p == code + len);
-}
-
-#else
-
-int* caml_init_opcode_nargs()
-{
-  return NULL;
 }
 
 #endif /* THREADED_CODE */

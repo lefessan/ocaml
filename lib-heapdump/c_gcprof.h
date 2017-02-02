@@ -16,7 +16,7 @@ CAMLextern uintnat ocp_gcprof_profile_period;
 CAMLextern int ocp_gcprof_profile_major;
 
 CAMLextern void ocp_gcprof_alloc_major(mlsize_t sz, tag_t tag,
-                                       profiling_t locid);
+                                       uintnat locid);
 CAMLextern void ocp_gcprof_minor_collection();
 CAMLextern void ocp_gcprof_future_minor_alloc(char* young_ptr, 
                                               mlsize_t size_plus_header);

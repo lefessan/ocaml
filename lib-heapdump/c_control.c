@@ -7,11 +7,14 @@
 /*                                                                        */
 /**************************************************************************/
 
-#include "caml/internals/mlvalues.h"
-#include "caml/internals/fail.h"
-#include "caml/internals/memory.h"
-#include "caml/internals/alloc.h"
+#define CAML_INTERNALS
 
+#include "caml/mlvalues.h"
+#include "caml/fail.h"
+#include "caml/memory.h"
+#include "caml/alloc.h"
+
+#include "caml/ocp_utils.h"
 #include "c_heapprof.h"
 
 #define INPUT_OPCODE_DUMP 0

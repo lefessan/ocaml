@@ -19,6 +19,10 @@
 extern "C" {
 #endif
 
+
+CAMLextern value caml_sys_time (value); /* sys.c */
+CAMLextern void caml_minor_collection(void); /* minor_gc.c */
+
 CAMLextern int (*caml_execute_signal_hook)(int);
 CAMLextern int caml_hooked_signal;
 

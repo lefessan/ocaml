@@ -146,8 +146,8 @@ code_t caml_ocp_bytecode_fix_locids(code_t src_code, asize_t* src_size)
   int i, nargs;
   opcode_t* opcode_nargs;
   
-  if( getenv("MEMP_DEBUG") != NULL ) debug_print = 1;
-  if( getenv("MEMP_DISABLED") != NULL ) memprof_info = NULL;
+  if( getenv("OCP_MEMP_DEBUG") != NULL ) debug_print = 1;
+  if( getenv("OCP_MEMP_DISABLED") != NULL ) memprof_info = NULL;
 
   XXX fprintf(stderr, "memprof_info %ld\n", (value)memprof_info);
   

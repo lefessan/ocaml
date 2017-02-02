@@ -232,6 +232,45 @@ void caml_final_do_roots (scanning_action f)
   }
 }
 
+/* Call a scanning_action [f] on [x]. */
+#define Call_action_NULL(f) (*(f))(0,NULL)
+
+void caml_final_do(scanning_action f)
+{
+  uintnat i;
+  struct to_do *todo;
+
+  Assert (finalisable_first.old <= finalisable_first.young);
+  for (i = 0; i < finalisable_first.old; i++){
+    Call_action (f, finalisable_first.table[i].fun);
+    Call_action (f, finalisable_first.table[i].val);
+  };
+  Call_action_NULL (f);
+  for (i = finalisable_first.old; i < finalisable_first.young; i++){
+    Call_action (f, finalisable_first.table[i].fun);
+    Call_action (f, finalisable_first.table[i].val);
+  };
+  Call_action_NULL (f);
+  Assert (finalisable_last.old <= finalisable_last.young);
+  for (i = 0; i < finalisable_last.old; i++){
+    Call_action (f, finalisable_last.table[i].fun);
+    Call_action (f, finalisable_last.table[i].val);
+  };
+  Call_action_NULL (f);
+  for (i = finalisable_last.old; i < finalisable_last.young; i++){
+    Call_action (f, finalisable_last.table[i].fun);
+    Call_action (f, finalisable_last.table[i].val);
+  };
+  Call_action_NULL (f);
+  for (todo = to_do_hd; todo != NULL; todo = todo->next){
+    for (i = 0; i < todo->size; i++){
+      Call_action (f, todo->item[i].fun);
+      Call_action (f, todo->item[i].val);
+    }
+  }
+  Call_action_NULL (f);
+}
+
 /* Call invert_root on the values of the finalisable set. This is called
    directly by the compactor.
 */

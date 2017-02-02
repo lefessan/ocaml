@@ -9,12 +9,12 @@
 
 
 #define MEMPROF_INSIDE
+#define CAML_INTERNALS
 
 
+#include "caml/mlvalues.h"
 
-#include "caml/internals/mlvalues.h"
-
-#include "caml/internals/roots.h"
+#include "caml/roots.h"
 
 /* ocpwin: for getpid */
 #ifdef HAS_UNISTD
@@ -22,13 +22,13 @@
 #endif
 
 #include <string.h>
-#include "caml/internals/alloc.h"
-#include "caml/internals/intext.h"
-#include "caml/internals/memory.h"
-#include "caml/internals/memprof.h"
-/* #include "caml/internals/sys.h" */
-/* #include "caml/internals/fix_code.h" */
-#include "caml/internals/signals.h"
+#include "caml/alloc.h"
+#include "caml/intext.h"
+#include "caml/memory.h"
+#include "caml/sys.h"
+/* #include "caml/sys.h" */
+/* #include "caml/fix_code.h" */
+#include "caml/signals.h"
 #include "c_heapprof.h"
 
 #ifdef _WIN32
@@ -40,9 +40,11 @@
 #endif
 #include <signal.h>
 
-#define MEMPROF_LOCID_LOCATION_TABLE 2
+#include "caml/ocp_utils.h"
+#include "caml/ocp_memprof.h"
+#include "caml/ocp_gcprof.h"
 
-value caml_sys_get_argv(value unit); // From sys.c
+#define MEMPROF_LOCID_LOCATION_TABLE 2
 
 #include <stdio.h>
 #include <errno.h>
@@ -85,7 +87,7 @@ void memprof_dump_location_tables(FILE* pi_file)
   if (heapdump_hook_saved) heapdump_hook_saved(pi_file);
 
   if( !inited ){
-    int64 seed = ocp_memprof_seed();
+    int64_t seed = ocp_memprof_seed();
     ocp_heapdump_pi_section(pi_file, "SEED", 8);
     fwrite(&seed, 8, 1, pi_file);
     inited = 1;
@@ -150,15 +152,16 @@ CAMLprim value ocp_memprof_register_locid(value name_v)
 CAMLprim value ocp_memprof_set_locid (value arg, value new_locid)
 {
   value hd = Hd_val(arg);
-  profiling_t old_locid = Locid_hd(hd);
-  Hd_val(arg) = Patchlocid_hd(hd, new_locid);
+  profinfo_t old_locid = Profinfo_hd(hd);
+  Hd_val(arg) = Hd_no_profinfo(hd)
+    | Make_header_with_profinfo(0,0,0,new_locid);
   return Val_int(old_locid);
 }
 
 CAMLprim value ocp_memprof_get_locid(value arg)
 {
   if (!Is_in_value_area (arg)) return Val_int(-1);
-  return Val_int(Locid_val(arg));
+  return Val_int(Profinfo_val(arg));
 }
 
 CAMLprim value ocp_memprof_register_table (value table, value elems, value ui_name)
@@ -385,9 +388,9 @@ static void fput_word(value v, FILE*oc)
   for (i = 0; i < sizeof(value) * 8 ; i += 8) putc(v >> i, oc);
 }
 
-static void fput_uint(uint64 c, FILE*oc)
+static void fput_uint(uint64_t c, FILE*oc)
 {
-  uint64 m = c >> 7;
+  uint64_t m = c >> 7;
   while( m != 0 ){
     putc( c & 0x7f, oc);
     c = m;
@@ -446,13 +449,13 @@ file. */
 #include <sys/types.h>
 #include <sys/time.h>
 
-CAMLexport int64 ocp_memprof_seed()
+CAMLexport int64_t ocp_memprof_seed()
 {
   static int inited = 0;
-  static int64 seed = 0;
+  static int64_t seed = 0;
   if( !inited ){
     struct timeval tp;
-    union { double d; int64 i; int32 h[2]; } u;
+    union { double d; int64_t i; int32_t h[2]; } u;
     
     gettimeofday(&tp, NULL);
 
