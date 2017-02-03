@@ -425,22 +425,24 @@ let string_of_memprof_info memprof_info =
 (*  Printf.eprintf "ntables=%d\n" (List.length memprof_info); *)
   let position = ref 0 in
   List.iter (fun mp ->
+    (*
     if mp.mp_table_size <> 0 then
       Printf.eprintf "Empty memprof locid table for %s\n%!" mp.mp_name;
-        buf_binary_int oc !position;
-        position := !position + mp.mp_nopcodes;
-        buf_binary_int oc (String.length mp.mp_table);
-        Buffer.add_string oc mp.mp_table;
-        Buffer.add_char oc '\000';
-        buf_binary_int oc mp.mp_table_size;
-        buf_binary_int oc (Array.length mp.mp_locids);
-        Array.iter (fun (pos, locid) ->
-            buf_binary_int oc pos;
-            let patch = match locid with
-              | Lambda.NoAlloc -> 0
-              | Lambda.LocId n -> n+1 in
+    *)
+    buf_binary_int oc !position;
+    position := !position + mp.mp_nopcodes;
+    buf_binary_int oc (String.length mp.mp_table);
+    Buffer.add_string oc mp.mp_table;
+    Buffer.add_char oc '\000';
+    buf_binary_int oc mp.mp_table_size;
+    buf_binary_int oc (Array.length mp.mp_locids);
+    Array.iter (fun (pos, locid) ->
+      buf_binary_int oc pos;
+      let patch = match locid with
+        | Lambda.NoAlloc -> 0
+        | Lambda.LocId n -> n+1 in
             (*      Printf.eprintf "  %d @ %d\n" patch pos; *)
-            buf_binary_int oc patch)
-          mp.mp_locids;
+      buf_binary_int oc patch)
+      mp.mp_locids;
   )  memprof_info;
   Buffer.to_bytes oc

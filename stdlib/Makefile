@@ -58,7 +58,7 @@ OTHERS=list.cmo char.cmo bytes.cmo string.cmo sys.cmo \
   arrayLabels.cmo listLabels.cmo bytesLabels.cmo \
   stringLabels.cmo moreLabels.cmo stdLabels.cmo \
   spacetime.cmo camlinternalBigarray.cmo \
-  stringCompat.cmo ocpstd.cmo
+  ocpstd.cmo
 
 .PHONY: all
 all: stdlib.cma std_exit.cmo camlheader target_camlheader camlheader_ur

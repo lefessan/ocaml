@@ -196,7 +196,7 @@ while : ; do
 #            3[012]);;
 #            *) err "--reserved-header-bits argument must be less than 32"
 #        esac
-        ;;
+#        ;;
     -gc-hooks|--gc-hooks)
         with_gc_hooks=true;;
     -no-cfi|--no-cfi)

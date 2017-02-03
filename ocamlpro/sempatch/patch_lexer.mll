@@ -12,7 +12,8 @@
 (******************************************************************************)
 
 {
-  open StringCompat
+
+(* open StringCompat *)
 
 (* open Lexing *)
 
@@ -193,7 +194,7 @@ rule token = parse
   | "-."
 
   | ['!' '~'] symbolchar *
-      
+
   | '?' symbolchar2 *
 
   | ['=' '<' '>' '|' '&' '$'] symbolchar *

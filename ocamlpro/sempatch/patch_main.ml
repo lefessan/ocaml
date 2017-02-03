@@ -9,8 +9,10 @@
 (*                                                                     *)
 (***********************************************************************)
 
-open StringCompat
+(* open StringCompat *)
 open Patch_types
+
+module StringMap = Patch_engine.StringMap
 
 let cut_at s c = try Misc.cut_at s c with Not_found -> s,""
 

@@ -224,6 +224,11 @@ value caml_invoke_traced_function(value codeptr, value env, value arg)
   return Val_unit; /* not reached */
 }
 
+value caml_prepare_reify_bytecode(value memprof_info_v)
+{
+  return Val_unit;
+}
+
 value caml_reify_bytecode(value prog, value len)
 {
   caml_invalid_argument("Meta.reify_bytecode");

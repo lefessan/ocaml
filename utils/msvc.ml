@@ -21,7 +21,7 @@ When MSVC is detected:
 
 *)
 
-open StringCompat
+(* open StringCompat *)
 
 let verbose = ref false
 let export = ref false
@@ -239,7 +239,7 @@ let reg32_query ( (path,name,_) as key) =
   let slashify_filename s =
     let s = Bytes.of_string s in
     for i = 0 to Bytes.length s - 1 do
-      if Bytes.get s i = '\\' then s.[i] <- '/'
+      if Bytes.get s i = '\\' then Bytes.set s i '/'
     done;
     Bytes.to_string s
 

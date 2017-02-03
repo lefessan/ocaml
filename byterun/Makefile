@@ -113,12 +113,10 @@ PICOBJS=$(OBJS:.$(O)=.pic.$(O))
 all: $(LIBRARIES) $(PROGRAMS)
 
 ld.conf: ../config/Makefile
-	echo "+stublibs" > $@
+	echo "$(STUBLIBDIR)" > $@
+	echo "$(LIBDIR)" >> $@
+	echo "+stublibs" >> $@
 	echo "+" >> $@
-# Our ocaml is relocatable, so should the shared libs be. We need to upstream
-# a patch to ocamlfind for this to work completely
-#	echo "$(STUBLIBDIR)" > $@
-#	echo "$(LIBDIR)" >> $@
 
 .PHONY: install
 install:

@@ -18,7 +18,6 @@ SEMPATCH_CMOS:= \
   parsetree_iter.cmo \
   parsetree_map.cmo \
   patch_types.cmo \
-  stringCompat.cmo \
   patch_lexer.cmo		\
   patch_parser.cmo \
   patch_engine.cmo	\

@@ -20,7 +20,8 @@ LINKEDFILES=misc.c freelist.c major_gc.c minor_gc.c memory.c alloc.c array.c \
   parsing.c gc_ctrl.c terminfo.c md5.c obj.c lexing.c printexc.c callback.c \
   weak.c compact.c finalise.c meta.c custom.c main.c globroots.c cplugins.c \
   $(UNIX_OR_WIN32).c dynlink.c signals.c debugger.c startup_aux.c \
-  backtrace.c afl.c
+  backtrace.c afl.c \
+  ocp_memprof.c ocp_utils.c ocp_gcprof.c ocp_win.c
 
 INSTALL_LIBDIR=$(DESTDIR)$(LIBDIR)
 
@@ -77,7 +78,8 @@ COBJS=startup_aux.$(O) startup.$(O) main.$(O) fail.$(O)		\
   custom.$(O) globroots.$(O) backtrace_prim.$(O) backtrace.$(O)		\
   natdynlink.$(O) debugger.$(O) meta.$(O) dynlink.$(O) cplugins.$(O)    \
   clambda_checks.$(O) spacetime.$(O) spacetime_snapshot.$(O)		\
-  spacetime_offline.$(O) afl.$(O)
+  spacetime_offline.$(O) afl.$(O) \
+  ocp_memprof.$(O) ocp_utils.$(O) ocp_gcprof.$(O) ocp_win.$(O)
 
 OBJS=$(COBJS) $(ASMOBJS)
 
