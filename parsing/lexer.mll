@@ -333,7 +333,6 @@ rule token = parse
         | Some _ -> EOL
       }
 (* tryocaml: accept js_of_ocaml method invocation *)
-  | "##" { SHARPJS }
   | space + { token lexbuf }
   | tabulation space* {
     (match !check_spaces with | None -> ()
