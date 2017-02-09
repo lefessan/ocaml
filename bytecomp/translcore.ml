@@ -24,9 +24,11 @@ open Typedtree
 open Typeopt
 open Lambda
 
-let nolocid = Memprof.nolocid
+
+[@@@ocaml.warning "-27"]
+(* let nolocid = Memprof.nolocid *)
 let locid = Memprof.nolocid
-let flocid = locid
+(*let flocid = locid *)
 
 type error =
     Illegal_letrec_pat
@@ -54,7 +56,7 @@ let transl_object =
 
 let prim_fresh_oo_id =
   Pccall (Primitive.simple ~name:"caml_fresh_oo_id" ~arity:1 ~alloc:false,
-  nolocid)
+  Memprof.nolocid)
 
 let transl_extension_constructor env path ext =
   let name =
@@ -81,7 +83,9 @@ let transl_extension_constructor env path ext =
 
 (* Translation of primitives *)
 
-let comparisons_table = create_hashtable 11 [
+let comparisons_table =
+  let locid = Memprof.nolocid in
+  create_hashtable 11 [
   "%equal",
       (Pccall(Primitive.simple ~name:"caml_equal" ~arity:2 ~alloc:true),
        Pintcomp Ceq,
@@ -180,8 +184,11 @@ let create_hashtable3 n l =
   create_hashtable n (List.map (fun (x,y,z) -> x, (y,z)) l)
   *)
 
+let mklocid ty = Memprof.locid lp.l lp.p ty
+let memprof_cprim name = Memprof.cprim lp.l lp.p name
+let memprof_noalloc lp = Memprof.noalloc lp.l lp.p
+
 let primitives_table prim_name =
-  let lp = locid.Memprof.loc in
   match prim_name with
 | "%identity" -> Pidentity
 | "%bytes_to_string" -> Pbytes_to_string
@@ -197,8 +204,10 @@ let primitives_table prim_name =
 | "%field0" -> Pfield 0;
 | "%field1" -> Pfield 1;
 | "%setfield0" -> Psetfield(0, Pointer, Assignment);
-| "%makeblock" -> Pmakeblock(0, Immutable, None);
-| "%makemutable" -> Pmakeblock(0, Mutable, None);
+| "%makeblock" -> Pmakeblock(0, Immutable, None,
+                             memprof_cprim "%makeblock")
+| "%makemutable" -> Pmakeblock(0, Mutable, None,
+                               memprof_cprim "%makemutable");
 | "%raise" -> Praise Raise_regular;
 | "%reraise" -> Praise Raise_reraise;
 | "%raise_notrace" -> Praise Raise_notrace;
@@ -258,65 +267,67 @@ let primitives_table prim_name =
 | "%bytes_unsafe_get" -> Pbytesrefu;
 | "%bytes_unsafe_set" -> Pbytessetu;
 | "%array_length" -> Parraylength Pgenarray;
-| "%array_safe_get" -> Parrayrefs Pgenarray;
+(* only allocate in the float array case *)
+| "%array_safe_get" -> Parrayrefs (Pgenarray, mklocid Predef.type_float);
 | "%array_safe_set" -> Parraysets Pgenarray;
-| "%array_unsafe_get" -> Parrayrefu Pgenarray;
+(* only allocate in the float array case *)
+| "%array_unsafe_get" -> Parrayrefu (Pgenarray, mklocid Predef.type_float);
 | "%array_unsafe_set" -> Parraysetu Pgenarray;
 | "%obj_size" -> Parraylength Pgenarray;
-| "%obj_field" -> Parrayrefu Pgenarray;
+| "%obj_field" -> Parrayrefu (Pgenarray, mklocid Predef.type_float);
 | "%obj_set_field" -> Parraysetu Pgenarray;
 | "%obj_is_int" -> Pisint;
 | "%lazy_force" -> Plazyforce;
-| "%nativeint_of_int" -> Pbintofint Pnativeint;
+| "%nativeint_of_int" -> Pbintofint (Pnativeint, mklocid Predef.type_nativeint);
 | "%nativeint_to_int" -> Pintofbint Pnativeint;
-| "%nativeint_neg" -> Pnegbint Pnativeint;
-| "%nativeint_add" -> Paddbint Pnativeint;
-| "%nativeint_sub" -> Psubbint Pnativeint;
-| "%nativeint_mul" -> Pmulbint Pnativeint;
-| "%nativeint_div" -> Pdivbint { size = Pnativeint; is_safe = Safe };
-| "%nativeint_mod" -> Pmodbint { size = Pnativeint; is_safe = Safe };
-| "%nativeint_and" -> Pandbint Pnativeint;
-| "%nativeint_or" ->  Porbint Pnativeint;
-| "%nativeint_xor" -> Pxorbint Pnativeint;
-| "%nativeint_lsl" -> Plslbint Pnativeint;
-| "%nativeint_lsr" -> Plsrbint Pnativeint;
-| "%nativeint_asr" -> Pasrbint Pnativeint;
-| "%int32_of_int" -> Pbintofint Pint32;
+| "%nativeint_neg" -> Pnegbint (Pnativeint, mklocid Predef.type_nativeint);
+| "%nativeint_add" -> Paddbint (Pnativeint, mklocid Predef.type_nativeint);
+| "%nativeint_sub" -> Psubbint (Pnativeint, mklocid Predef.type_nativeint);
+| "%nativeint_mul" -> Pmulbint (Pnativeint, mklocid Predef.type_nativeint);
+| "%nativeint_div" -> Pdivbint { size = Pnativeint; is_safe = Safe; locid = mklocid Predef.type_nativeint };
+| "%nativeint_mod" -> Pmodbint { size = Pnativeint; is_safe = Safe; locid = mklocid Predef.type_nativeint };
+| "%nativeint_and" -> Pandbint (Pnativeint, mklocid Predef.type_nativeint);
+| "%nativeint_or" ->  Porbint (Pnativeint, mklocid Predef.type_nativeint);
+| "%nativeint_xor" -> Pxorbint (Pnativeint, mklocid Predef.type_nativeint);
+| "%nativeint_lsl" -> Plslbint (Pnativeint, mklocid Predef.type_nativeint);
+| "%nativeint_lsr" -> Plsrbint (Pnativeint, mklocid Predef.type_nativeint);
+| "%nativeint_asr" -> Pasrbint (Pnativeint, mklocid Predef.type_nativeint);
+| "%int32_of_int" -> Pbintofint (Pint32, mklocid Predef.type_int32);
 | "%int32_to_int" -> Pintofbint Pint32;
-| "%int32_neg" -> Pnegbint Pint32;
-| "%int32_add" -> Paddbint Pint32;
-| "%int32_sub" -> Psubbint Pint32;
-| "%int32_mul" -> Pmulbint Pint32;
-| "%int32_div" -> Pdivbint { size = Pint32; is_safe = Safe };
-| "%int32_mod" -> Pmodbint { size = Pint32; is_safe = Safe };
-| "%int32_and" -> Pandbint Pint32;
-| "%int32_or" ->  Porbint Pint32;
-| "%int32_xor" -> Pxorbint Pint32;
-| "%int32_lsl" -> Plslbint Pint32;
-| "%int32_lsr" -> Plsrbint Pint32;
-| "%int32_asr" -> Pasrbint Pint32;
-| "%int64_of_int" -> Pbintofint Pint64;
+| "%int32_neg" -> Pnegbint (Pint32, mklocid Predef.type_int32);
+| "%int32_add" -> Paddbint (Pint32, mklocid Predef.type_int32);
+| "%int32_sub" -> Psubbint (Pint32, mklocid Predef.type_int32);
+| "%int32_mul" -> Pmulbint (Pint32, mklocid Predef.type_int32);
+| "%int32_div" -> Pdivbint { size = Pint32; is_safe = Safe; locid = mklocid Predef.type_int32 };
+| "%int32_mod" -> Pmodbint { size = Pint32; is_safe = Safe; locid = mklocid Predef.type_int32 };
+| "%int32_and" -> Pandbint (Pint32, mklocid Predef.type_int32);
+| "%int32_or" ->  Porbint (Pint32, mklocid Predef.type_int32);
+| "%int32_xor" -> Pxorbint (Pint32, mklocid Predef.type_int32);
+| "%int32_lsl" -> Plslbint (Pint32, mklocid Predef.type_int32);
+| "%int32_lsr" -> Plsrbint (Pint32, mklocid Predef.type_int32);
+| "%int32_asr" -> Pasrbint (Pint32, mklocid Predef.type_int32);
+| "%int64_of_int" -> Pbintofint (Pint64, mklocid Predef.type_int64);
 | "%int64_to_int" -> Pintofbint Pint64;
-| "%int64_neg" -> Pnegbint Pint64;
-| "%int64_add" -> Paddbint Pint64;
-| "%int64_sub" -> Psubbint Pint64;
-| "%int64_mul" -> Pmulbint Pint64;
-| "%int64_div" -> Pdivbint { size = Pint64; is_safe = Safe };
-| "%int64_mod" -> Pmodbint { size = Pint64; is_safe = Safe };
-| "%int64_and" -> Pandbint Pint64;
-| "%int64_or" ->  Porbint Pint64;
-| "%int64_xor" -> Pxorbint Pint64;
-| "%int64_lsl" -> Plslbint Pint64;
-| "%int64_lsr" -> Plsrbint Pint64;
-| "%int64_asr" -> Pasrbint Pint64;
-| "%nativeint_of_int32" -> Pcvtbint(Pint32, Pnativeint);
-| "%nativeint_to_int32" -> Pcvtbint(Pnativeint, Pint32);
-| "%int64_of_int32" -> Pcvtbint(Pint32, Pint64);
-| "%int64_to_int32" -> Pcvtbint(Pint64, Pint32);
-| "%int64_of_nativeint" -> Pcvtbint(Pnativeint, Pint64);
-| "%int64_to_nativeint" -> Pcvtbint(Pint64, Pnativeint);
+| "%int64_neg" -> Pnegbint (Pint64, mklocid Predef.type_int64);
+| "%int64_add" -> Paddbint (Pint64, mklocid Predef.type_int64);
+| "%int64_sub" -> Psubbint (Pint64, mklocid Predef.type_int64);
+| "%int64_mul" -> Pmulbint (Pint64, mklocid Predef.type_int64);
+| "%int64_div" -> Pdivbint { size = Pint64; is_safe = Safe; locid = mklocid Predef.type_int64 };
+| "%int64_mod" -> Pmodbint { size = Pint64; is_safe = Safe; locid = mklocid Predef.type_int64 };
+| "%int64_and" -> Pandbint (Pint64, mklocid Predef.type_int64);
+| "%int64_or" ->  Porbint (Pint64, mklocid Predef.type_int64);
+| "%int64_xor" -> Pxorbint (Pint64, mklocid Predef.type_int64);
+| "%int64_lsl" -> Plslbint (Pint64, mklocid Predef.type_int64);
+| "%int64_lsr" -> Plsrbint (Pint64, mklocid Predef.type_int64);
+| "%int64_asr" -> Pasrbint (Pint64, mklocid Predef.type_int64);
+| "%nativeint_of_int32" -> Pcvtbint(Pint32, Pnativeint, mklocid Predef.type_nativeint);
+| "%nativeint_to_int32" -> Pcvtbint(Pnativeint, Pint32, mklocid Predef.type_int32);
+| "%int64_of_int32" -> Pcvtbint(Pint32, Pint64, mklocid Predef.type_int64);
+| "%int64_to_int32" -> Pcvtbint(Pint64, Pint32, mklocid Predef.type_int32);
+| "%int64_of_nativeint" -> Pcvtbint(Pnativeint, Pint64, mklocid Predef.type_int64);
+| "%int64_to_nativeint" -> Pcvtbint(Pint64, Pnativeint, mklocid Predef.type_nativeint);
 | "%caml_ba_ref_1" ->
-    Pbigarrayref(false, 1, Pbigarray_unknown, Pbigarray_unknown_layout);
+    Pbigarrayref(false, 1, Pbigarray_unknown, Pbigarray_unknown_layout,lp);
 | "%caml_ba_ref_2" ->
     Pbigarrayref(false, 2, Pbigarray_unknown, Pbigarray_unknown_layout);
 | "%caml_ba_ref_3" ->
@@ -367,9 +378,9 @@ let primitives_table prim_name =
 | "%caml_bigstring_set64" -> Pbigstring_set_64(false);
 | "%caml_bigstring_set64u" -> Pbigstring_set_64(true);
 | "%bswap16" -> Pbswap16;
-| "%bswap_int32" -> Pbbswap(Pint32);
-| "%bswap_int64" -> Pbbswap(Pint64);
-| "%bswap_native" -> Pbbswap(Pnativeint);
+| "%bswap_int32" -> Pbbswap(Pint32, mklocid Predef.type_int32);
+| "%bswap_int64" -> Pbbswap(Pint64, mklocid Predef.type_int64);
+| "%bswap_native" -> Pbbswap(Pnativeint, mklocid Predef.type_nativeint);
 | "%int_as_pointer" -> Pint_as_pointer;
 | "%opaque" -> Popaque
 | _ -> raise Not_found
@@ -396,6 +407,7 @@ let specialize_comparison table env ty =
    raise Not_found if primitive is unknown  *)
 
 let specialize_primitive p env ty ~has_constant_constructor =
+  let lp = locid.Memprof.loc in
   try
     let table = Hashtbl.find comparisons_table p.prim_name in
     let (gencomp, intcomp, _, _, _, _, _, _, simplify_constant_constructor) =
@@ -436,6 +448,18 @@ let specialize_primitive p env ty ~has_constant_constructor =
         Pmakeblock(tag, mut, Some shape)
     | _ -> p
 
+let specialize_primitive p env ty ~has_constant_constructor =
+  let lp = locid.Memprof.loc in
+  match specialize_primitive p env ty ~has_constant_constructor with
+  | Pccall (p, alocid) when p.prim_alloc && alocid == Memprof.nolocid ->
+    if p.prim_memprof then
+      Pccall (p, locid)
+    else
+      let locid = memprof_cprim p.prim_name in
+      Pccall p
+  | prim -> prim
+
+
 (* Eta-expand a primitive *)
 
 let used_primitives = Hashtbl.create 7
@@ -448,12 +472,14 @@ let add_used_primitive loc env path =
       then Hashtbl.add used_primitives path loc
   | _ -> ()
 
-let transl_primitive lp loc p env ty path =
+let transl_primitive loc p env ty path =
   let prim =
-    try specialize_primitive p env ty ~has_constant_constructor:false
+    try
+      let locid = Memprof.nolocid in
+      specialize_primitive p env ty ~has_constant_constructor:false
     with Not_found ->
       add_used_primitive loc env path;
-      Pccall p
+      Pccall (p, Memprof.nolocid)
   in
   match prim with
   | Plazyforce ->
@@ -482,8 +508,9 @@ let transl_primitive lp loc p env ty path =
     end
   | _ ->
     let prim = match prim with
-      | Pccall ({ prim_alloc = true } as p) ->
-        let locid = Memprof.cprim loc lp.p p.prim_name in
+      (* since we don't know the final type, let's use cprim *)
+      | Pccall (p, alocid) when p.prim_alloc ->
+        let locid = memprof_cprim p.prim_name in
         Pccall p
       | _ -> prim
     in
@@ -513,7 +540,6 @@ let transl_primitive_application loc prim env ty path args =
       raise(Error(loc, Unknown_builtin_primitive prim_name));
     add_used_primitive loc env path;
     Pccall prim
-
 
 (* To check the well-formedness of r.h.s. of "let rec" definitions *)
 
@@ -695,9 +721,11 @@ let event_function exp lam =
 let primitive_is_ccall = function
   (* Determine if a primitive is a Pccall or will be turned later into
      a C function call that may raise an exception *)
-  | Pccall _ | Pstringrefs  | Pbytesrefs | Pbytessets | Parrayrefs _ |
-    Parraysets _ | Pbigarrayref _ | Pbigarrayset _ | Pduprecord _ | Pdirapply |
-    Prevapply -> true
+  | Pccall _  | Parrayrefs _ -> true
+  | Prevapply | Pdirapply -> true
+  | Pstringrefs  | Pbytesrefs | Pbytessets |
+    Parraysets _ | Pbigarrayref _ | Pbigarrayset _ | Pduprecord _
+      -> true
   | _ -> false
 
 (* Assertions *)
@@ -706,7 +734,8 @@ let assert_failed exp =
   let (fname, line, char) =
     Location.get_pos_info exp.exp_loc.Location.loc_start in
   Lprim(Praise Raise_regular, [event_after exp
-    (Lprim(Pmakeblock(0, Immutable, None),
+     (Lprim(Pmakeblock(0, Immutable, None,
+              Memprof.locid exp.exp_loc Predef.path_exn Predef.type_exn),
           [transl_normal_path Predef.path_assert_failure;
            Lconst(Const_block(0,
               [Const_base(Const_string (fname, None));
@@ -732,7 +761,7 @@ let rec transl_exp e =
     | _ -> true
   in
   if eval_once then transl_exp0 e else
-  (*  (newl lp e.exp_loc) *)
+    let lp = newl lp e.exp_loc in
   Translobj.oo_wrap e.exp_env true transl_exp0 e
 
 and transl_exp0 e =
@@ -761,7 +790,7 @@ and transl_exp0 e =
                   flocid = expr_locid;
                  }
       else
-        transl_primitive lp lp.l p e.exp_env e.exp_type (Some path)
+        transl_primitive lp.l p e.exp_env e.exp_type (Some path)
   | Texp_ident(_, _, {val_kind = Val_anc _}) ->
       raise(Error(e.exp_loc, Free_super_var))
   | Texp_ident(path, _, {val_kind = Val_reg | Val_self _}) ->
@@ -827,7 +856,9 @@ and transl_exp0 e =
           wrap (Lsend(Cached, meth, obj, [cache; pos], e.exp_loc))
         | _ -> assert false
       else begin
-        let prim = transl_primitive_application
+        let prim =
+          let locid = expr_locid in
+          transl_primitive_application
             e.exp_loc p e.exp_env prim_type (Some path) args in
         match (prim, args) with
           (Praise k, [arg1]) ->
@@ -845,7 +876,7 @@ and transl_exp0 e =
           lam_of_loc kind e.exp_loc
         | (Ploc kind, [arg1]) ->
           let lam = lam_of_loc kind arg1.exp_loc in
-          Lprim(Pmakeblock(0, Immutable, None), lam :: argl, e.exp_loc)
+          Lprim(Pmakeblock(0, Immutable, None, expr_locid), lam :: argl, e.exp_loc)
         | (Ploc _, _) -> assert false
         | (_, _) ->
             begin match (prim, argl) with
@@ -881,7 +912,7 @@ and transl_exp0 e =
       begin try
         Lconst(Const_block(0, List.map extract_constant ll))
       with Not_constant ->
-        Lprim(Pmakeblock(0, Immutable, Some shape), ll, e.exp_loc)
+        Lprim(Pmakeblock(0, Immutable, Some shape, expr_locid), ll, e.exp_loc)
       end
   | Texp_construct(_, cstr, args) ->
       let ll, shape = transl_list_with_shape lp args in
@@ -897,13 +928,13 @@ and transl_exp0 e =
           begin try
             Lconst(Const_block(n, List.map extract_constant ll))
           with Not_constant ->
-            Lprim(Pmakeblock(n, Immutable, Some shape), ll, e.exp_loc)
+            Lprim(Pmakeblock(n, Immutable, Some shape, expr_locid), ll, e.exp_loc)
           end
       | Cstr_extension(path, is_const) ->
           if is_const then
             transl_path e.exp_env path
           else
-            Lprim(Pmakeblock(0, Immutable, Some (Pgenval :: shape)),
+            Lprim(Pmakeblock(0, Immutable, Some (Pgenval :: shape), expr_locid),
                   transl_path e.exp_env path :: ll, e.exp_loc)
       end
   | Texp_extension_constructor (_, path) ->
@@ -918,7 +949,7 @@ and transl_exp0 e =
             Lconst(Const_block(0, [Const_base(Const_int tag);
                                    extract_constant lam]))
           with Not_constant ->
-            Lprim(Pmakeblock(0, Immutable, None),
+            Lprim(Pmakeblock(0, Immutable, None, expr_locid),
                   [Lconst(Const_base(Const_int tag)); lam], e.exp_loc)
       end
   | Texp_record {fields; representation; extended_expression} ->
@@ -930,7 +961,7 @@ and transl_exp0 e =
           Record_regular | Record_inlined _ ->
           Lprim (Pfield lbl.lbl_pos, [targ], e.exp_loc)
         | Record_unboxed _ -> targ
-        | Record_float -> Lprim (Pfloatfield lbl.lbl_pos, [targ], e.exp_loc)
+        | Record_float -> Lprim (Pfloatfield (lbl.lbl_pos, expr_locid), [targ], e.exp_loc)
         | Record_extension ->
           Lprim (Pfield (lbl.lbl_pos + 1), [targ], e.exp_loc)
       end
@@ -973,9 +1004,9 @@ and transl_exp0 e =
                When not [Pfloatarray], the exception propagates to the handler
                below. *)
             let imm_array =
-              Lprim (Pmakearray (kind, Immutable), ll, e.exp_loc)
+              Lprim (Pmakearray (kind, Immutable, expr_locid), ll, e.exp_loc)
             in
-            Lprim (Pduparray (kind, Mutable), [imm_array], e.exp_loc)
+            Lprim (Pduparray (kind, Mutable, expr_locid), [imm_array], e.exp_loc)
         | cl ->
             let imm_array =
               match kind with
@@ -986,10 +1017,10 @@ and transl_exp0 e =
               | Pgenarray ->
                   raise Not_constant    (* can this really happen? *)
             in
-            Lprim (Pduparray (kind, Mutable), [imm_array], e.exp_loc)
+            Lprim (Pduparray (kind, Mutable, expr_locid), [imm_array], e.exp_loc)
         end
       with Not_constant ->
-        Lprim(Pmakearray (kind, Mutable), ll, e.exp_loc)
+        Lprim(Pmakearray (kind, Mutable, expr_locid), ll, e.exp_loc)
       end
   | Texp_ifthenelse(cond, ifso, Some ifnot) ->
       Lifthenelse(transl_exp cond,
@@ -1028,7 +1059,7 @@ and transl_exp0 e =
              ap_lp = lp;
             }
   | Texp_instvar(path_self, path, _) ->
-      Lprim(Parrayrefu Paddrarray,
+      Lprim(Parrayrefu (Paddrarray, memprof_noalloc lp),
             [transl_normal_path path_self; transl_normal_path path], e.exp_loc)
   | Texp_setinstvar(path_self, path, _, expr) ->
       transl_setinstvar e.exp_loc (transl_normal_path path_self) path expr
@@ -1080,7 +1111,7 @@ and transl_exp0 e =
       | Texp_constant(Const_float _) ->
           (* We don't need to wrap with Popaque: this forward
              block will never be shortcutted since it points to a float. *)
-          Lprim(Pmakeblock(Obj.forward_tag, Immutable, None),
+          Lprim(Pmakeblock(Obj.forward_tag, Immutable, None, expr_locid),
                 [transl_exp e], e.exp_loc)
       | Texp_ident _ ->
           (* CR-someday mshinwell: Consider adding a new primitive
@@ -1092,7 +1123,8 @@ and transl_exp0 e =
           if Typeopt.lazy_val_requires_forward e.exp_env e.exp_type
           then
             Lprim (Popaque,
-                   [Lprim(Pmakeblock(Obj.forward_tag, Immutable, None),
+                   [Lprim(Pmakeblock(Obj.forward_tag, Immutable, None,
+                    expr_locid),
                           [transl_exp e], e.exp_loc)],
                    e.exp_loc)
           else transl_exp e
@@ -1104,11 +1136,12 @@ and transl_exp0 e =
                              body = transl_exp e;
                              flocid = expr_locid;
                             } in
-          Lprim(Pmakeblock(Config.lazy_tag, Mutable, None), [fn], e.exp_loc)
+          Lprim(Pmakeblock(Config.lazy_tag, Mutable, None, expr_locid), [fn], e.exp_loc)
       end
   | Texp_object (cs, meths) ->
       let cty = cs.cstr_type in
       let cl = Ident.create "class" in
+      let locid = Memprof.anonymous_class_locid lp.l lp.p cl cty in
       !transl_object locid cl meths
         { cl_desc = Tcl_structure cs;
           cl_loc = e.exp_loc;
@@ -1206,6 +1239,8 @@ and transl_apply ?(should_be_tailcall=false) ?(inlined = Default_inline)
         and l = List.map (fun (arg, opt) -> may_map (protect "arg") arg, opt) l
         and id_arg = Ident.create "param" in
         let body =
+          let flocid = Memprof.internal lp.l lp.p
+            "Translcore.build_apply" in
           match build_apply handle ((Lvar id_arg, optional)::args') l with
             Lfunction{kind = Curried; params = ids; body = lam; attr; loc} ->
               Lfunction{kind = Curried; params = id_arg::ids; body = lam; attr;

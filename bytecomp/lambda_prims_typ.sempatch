@@ -5,7 +5,6 @@ patch add_constructor_arguments_typ {
    "Pfloatfield";
    "Pduprecord";
    "Pccall";
-"Pintoffloat"
 "Pfloatofint"
 "Pnegfloat"
 "Pabsfloat"
@@ -22,10 +21,6 @@ patch add_constructor_arguments_typ {
 "Paddbint"  
 "Psubbint"  
 "Pmulbint"  
-(* creer un patch pour les inline records !!!
-"Pdivbint"  
-"Pmodbint"
-*)
 "Pandbint"  
 "Porbint"   
 "Pxorbint"  
@@ -44,6 +39,32 @@ patch add_constructor_arguments_typ {
    constr_position = "end"
    constr_new_arguments = [ "'a" ]
 (*   constr_prev_nargs = 3; *)
+}
+
+
+
+patch add_constructor_arguments_typ {
+   constr_names = [
+     "Pbigarrayref"  
+     "Pstring_load_32"
+     "Pstring_load_64"
+     "Pbigstring_load_32"
+     "Pbigstring_load_64"
+   ]
+   constr_position = "end"
+   constr_new_arguments = [ "Memprof.location" ]
+}
+
+
+
+patch add_constructor_arguments_typ {
+   constr_names = [
+     "Pdivbint"  
+     "Pmodbint"
+   ]
+   constr_position = "end"
+   constr_new_arguments = [ "'a" ]
+   constr_labels = [ "locid" ]
 }
 
 

@@ -3,9 +3,6 @@ patch add_constructor_arguments_pat {
    constr_names = [
    "Prevapply";
    "Pdirapply"
-   "Pintoffloat"
-   "Pfloatofint"
-   "Pintoffloat"
    "Pfloatofint"
    "Pnegfloat"
    "Pabsfloat"
@@ -99,9 +96,6 @@ patch add_constructor_arguments_pat {
    constr_names = [
    "Lambda.Prevapply";
    "Lambda.Pdirapply"
-   "Lambda.Pintoffloat"
-   "Lambda.Pfloatofint"
-   "Lambda.Pintoffloat"
    "Lambda.Pfloatofint"
    "Lambda.Pnegfloat"
    "Lambda.Pabsfloat"

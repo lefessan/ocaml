@@ -1,7 +1,7 @@
 include "lambda_lambda_exp.sempatch"
 include "lambda_lambda_pat.sempatch"
 include "lambda_prims_exp.sempatch"
-include "lambda_prims_patany.sempatch"
+include "lambda_prims_pat.sempatch"
 
 patch add_record_fields {
   record_labels = [ "body" ]
@@ -23,11 +23,13 @@ patch add_function_argument {
      "Matching.for_tupled_function"
      "Matching.for_let"
      "Matching.for_multiple_match"
-     
+
     "transl_exp";
     "transl_exp0"; (* "transl_list"; *)
     "transl_let";
-(*    "primitives_table"; *)
+    "transl_primitive"
+    "primitives_table"; 
+    "find_primitive"; 
     "transl_case"
     "transl_cases"
     "transl_guard"
@@ -39,5 +41,33 @@ patch add_function_argument {
     "transl_record"
     "transl_setinstvar"
     "transl_match"
+
+    "memprof_cprim"
+    "mklocid"
+
   ]
+}
+
+
+patch add_function_argument {
+  fun_new_argument = "locid"
+  fun_names = [
+    "specialize_primitive";
+    "transl_primitive_application";
+  ]
+}
+
+patch add_constructor_arguments_exp {
+   constr_names = [
+      "Pfloatofint"
+      "Pfloatofint"
+      "Pnegfloat"
+      "Pabsfloat"
+      "Paddfloat"
+      "Psubfloat"
+      "Pmulfloat"
+      "Pdivfloat"]
+   constr_position = "end"
+   constr_new_arguments = [ "mklocid lp Predef.type_float" ]
+   constr_prev_nargs = 0;
 }

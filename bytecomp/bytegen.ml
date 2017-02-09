@@ -318,6 +318,10 @@ let comp_bint_primitive bi suff args =
 let comp_bint_primitive_noloc bi suff args =
   let locid = Memprof.nolocid in
   comp_bint_primitive bi suff args
+let prof_int32 loc =
+  Memprof.get_alloc (Memprof.locid loc.l loc.p Predef.type_int32).id
+let prof_int64 loc =
+  Memprof.get_alloc (Memprof.locid loc.l loc.p Predef.type_int64).id
 
 let comp_primitive p args =
   match p with
@@ -345,7 +349,7 @@ let comp_primitive p args =
   | Pasrint -> Kasrint
   | Poffsetint n -> Koffsetint n
   | Poffsetref n -> Koffsetref n
-  | Pintoffloat -> Kccall("caml_int_of_float", 1)
+  | Pintoffloat -> Kccall("caml_int_of_float", 1, tmpalloc)
   | Pfloatofint -> Kccall("caml_float_of_int", 1)
   | Pnegfloat -> Kccall("caml_neg_float", 1)
   | Pabsfloat -> Kccall("caml_abs_float", 1)
@@ -367,8 +371,8 @@ let comp_primitive p args =
   | Pstringrefu | Pbytesrefu -> Kgetstringchar
   | Pbytessetu -> Ksetstringchar
   | Pstring_load_16(_) -> Kccall("caml_string_get16", 2, tmpalloc)
-  | Pstring_load_32(_) -> Kccall("caml_string_get32", 2)
-  | Pstring_load_64(_) -> Kccall("caml_string_get64", 2)
+  | Pstring_load_32(_) -> Kccall("caml_string_get32", 2, prof_int32 lp)
+  | Pstring_load_64(_) -> Kccall("caml_string_get64", 2, prof_int64 lp)
   | Pstring_set_16(_) -> Kccall("caml_string_set16", 3, tmpalloc)
   | Pstring_set_32(_) -> Kccall("caml_string_set32", 3, tmpalloc)
   | Pstring_set_64(_) -> Kccall("caml_string_set64", 3, tmpalloc)
@@ -425,13 +429,16 @@ let comp_primitive p args =
   | Pbintcomp(_, Cgt) -> Kccall("caml_greaterthan", 2, tmpalloc)
   | Pbintcomp(_, Cle) -> Kccall("caml_lessequal", 2, tmpalloc)
   | Pbintcomp(_, Cge) -> Kccall("caml_greaterequal", 2, tmpalloc)
-  | Pbigarrayref(_, n, _, _) -> Kccall("caml_ba_get_" ^ string_of_int n, n + 1)
+  | Pbigarrayref(_, n, _, _) ->
+    let name = "caml_ba_get_" ^ string_of_int n in
+    let locid = Memprof.cprim lp.l lp.p name in
+    Kccall(name, n + 1)
   | Pbigarrayset(_, n, _, _) ->
     Kccall("caml_ba_set_" ^ string_of_int n, n + 2, tmpalloc)
   | Pbigarraydim(n) -> Kccall("caml_ba_dim_" ^ string_of_int n, 1, tmpalloc)
   | Pbigstring_load_16(_) -> Kccall("caml_ba_uint8_get16", 2, tmpalloc)
-  | Pbigstring_load_32(_) -> Kccall("caml_ba_uint8_get32", 2)
-  | Pbigstring_load_64(_) -> Kccall("caml_ba_uint8_get64", 2)
+  | Pbigstring_load_32(_) -> Kccall("caml_ba_uint8_get32", 2, prof_int32 lp)
+  | Pbigstring_load_64(_) -> Kccall("caml_ba_uint8_get64", 2, prof_int64 lp)
   | Pbigstring_set_16(_) -> Kccall("caml_ba_uint8_set16", 3, tmpalloc)
   | Pbigstring_set_32(_) -> Kccall("caml_ba_uint8_set32", 3, tmpalloc)
   | Pbigstring_set_64(_) -> Kccall("caml_ba_uint8_set64", 3, tmpalloc)
@@ -603,9 +610,9 @@ let rec comp_expr env exp sz cont =
       comp_expr env arg sz (add_const_unit cont)
   | Lprim(Pdirapply, [func;arg], loc)
   | Lprim(Prevapply, [arg;func], loc) ->
-      let ap_lp = lp in
       let exp = Lapply{ap_should_be_tailcall=false;
                        ap_loc=loc;
+                       ap_lp = lp;
                        ap_func=func;
                        ap_args=[arg];
                        ap_inlined=Default_inline;

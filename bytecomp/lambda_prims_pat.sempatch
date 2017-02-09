@@ -1,9 +1,6 @@
 
 patch add_constructor_arguments_pat {
    constr_names = [
-                "Pintoffloat"
-                "Pfloatofint"
-"Pintoffloat"
 "Pfloatofint"
 "Pnegfloat"
 "Pabsfloat"
@@ -37,14 +34,24 @@ patch add_constructor_arguments_pat {
 "Plslbint"  
 "Plsrbint"  
 "Pasrbint"  
-"Pstring_load_32"
-"Pstring_load_64"
-"Pbigstring_load_32"
-"Pbigstring_load_64"
 "Pbbswap"     
 ]
    constr_position = "end"
    constr_new_arguments = [ "locid" ]
+   constr_prev_nargs = 1;
+}
+
+
+
+patch add_constructor_arguments_pat {
+   constr_names = [
+"Pstring_load_32"
+"Pstring_load_64"
+"Pbigstring_load_32"
+"Pbigstring_load_64"
+]
+   constr_position = "end"
+   constr_new_arguments = [ "lp" ]
    constr_prev_nargs = 1;
 }
 
@@ -72,7 +79,7 @@ patch add_constructor_arguments_pat {
    "Pbigarrayref"
 ]
    constr_position = "end"
-   constr_new_arguments = [ "locid" ]
+   constr_new_arguments = [ "lp" ]
    constr_prev_nargs = 4;
 }
 
@@ -80,7 +87,7 @@ patch add_constructor_arguments_pat {
 patch add_constructor_arguments_pat {
    constr_names = [
    "Prevapply";
-  "Pdirapply"
+   "Pdirapply"
    ]
    constr_position = "end"
    constr_new_arguments = [ "lp" ]

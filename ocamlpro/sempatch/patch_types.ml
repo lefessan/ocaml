@@ -46,6 +46,7 @@ and add_function_argument = {
 and add_constructors_arguments = {
   constr_names : string list;
   constr_position : argpos;
+  constr_labels : string list;
   constr_new_arguments : string list;
   constr_total_nargs : int;
 }

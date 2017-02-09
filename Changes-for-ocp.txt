@@ -82,6 +82,10 @@ A VERIFIER:
 * dans bytecomp/matching.ml, vérifier les endroits où un "locid" ou
    un "lp" doit être généré
 
+
+* verifier 
+
+
 BYTECODE:
 =========
 

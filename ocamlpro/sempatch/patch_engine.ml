@@ -183,100 +183,61 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
   let need_dbi = ref false
 
 
-
-    (*
-      let rec args_of_function loc rem exp =
-      match exp.pexp_desc with
-      | Pexp_function ("",None, [
-      pat, body]) ->
-      args_of_function loc ((pat, body) :: rem) body
-      | Pexp_function ("", None, (((pat,_):: _) as pats)) ->
-      args_of_function loc rem
-      { exp with pexp_desc = Pexp_function("", None,[
-      { pat with ppat_desc = Ppat_var {loc with txt="ocp_arg"}},
-      { exp with pexp_desc = Pexp_match(
-      {exp with pexp_desc =
-      Pexp_ident({loc with txt=Lident"ocp_arg"})}, pats)}])}
-      | _ -> rem
-
-      let function_of_args exp bindings =
-      let rec iter exp bindings =
-      match bindings with
-      | [] -> assert false
-      | [pat, body] ->
-      { exp with pexp_desc =
-      Pexp_function("", None, [pat,body])}
-      | (pat, body) :: args ->
-      { exp with pexp_desc =
-      Pexp_function("",
-      None, [pat,
-      iter body args])}
-      in
-      iter exp (List.rev bindings)
-    *)
-
-  let leave_pattern pat =
-    match pat.ppat_desc with
-#if OCAML_VERSION = "4.01.0+ocp1"
-    | Ppat_construct({ txt = constr} as loc, exp, bool) ->
-#else
-    | Ppat_construct({ txt = constr} as loc, exp) ->
-#endif
-  let constr = String.concat "." (Longident.flatten constr) in
-  begin try
-              let (idents, used) = StringMap.find constr !box_constructors in
-              used := true;
-              match idents with
-                [] -> assert false
-              | ident :: _idents ->
-              { pat with ppat_desc =
-                  Ppat_record([ {loc with txt =
-                      Lident ident}, pat], Closed); }
-        with Not_found ->
-          try
-            let ((pos,args,total), used) =
-              StringMap.find constr !add_constructor_arguments_pat
+  let  do_add_constructor_arguments_pat constr (pos,args,total,labels) loc pat exp =
+    let add_args =
+      List.map (fun arg ->
+        { pat with ppat_desc =
+            (if arg = "_" then Ppat_any else
+                Ppat_var {loc with txt=arg}) }
+      ) args
+    in
+    let add_list orig =
+      match pos with
+      | Start -> add_args @ orig
+      | End -> orig @ add_args
+      | Pos i ->
+        let rec aux i before after =
+          if i = 0 then before @ add_args @ after
+          else
+            begin
+              match after with
+              | [] ->
+                Printf.eprintf
+                  "Invalid patch: not enough arguments to constructor %s\n%!"
+                  constr;
+                raise Patch_failure
+              | x :: tl -> aux (i-1) (before @ [x]) tl
+            end
+        in
+        if i < 0
+        then begin
+          Printf.eprintf "Invalid patch: negative position\n%!";
+          raise Patch_failure
+        end
+        else aux i [] orig
+    in
+    match exp with
+    | Some ({ ppat_desc = Ppat_record (lbls,closed) } as arg_pat) when labels <> []
+          ->
+      let lbls = List.fold_left2 (fun lbls lbl arg ->
+        if List.exists (fun (l,_) -> Longident.to_string l.txt = lbl) lbls
+        then
+            lbls
+          else
+            let pat = { pat with ppat_desc =
+                (if arg = "_" then Ppat_any else
+                    Ppat_var {loc with txt=arg}) }
             in
-            used := true;
-            let add_args =
-              List.map (fun arg ->
-                  { pat with ppat_desc =
-                               (if arg = "_" then Ppat_any else
-                                  Ppat_var {loc with txt=arg}) }
-                ) args
-            in
-            let add_list orig =
-              match pos with
-              | Start -> add_args @ orig
-              | End -> orig @ add_args
-              | Pos i ->
-                let rec aux i before after =
-                  if i = 0 then before @ add_args @ after
-                  else
-                    begin
-                      match after with
-                      | [] ->
-                        Printf.eprintf
-                          "Invalid patch: not enough arguments to constructor %s\n%!"
-                          constr;
-                        raise Patch_failure
-                      | x :: tl -> aux (i-1) (before @ [x]) tl
-                    end
-                in
-                if i < 0
-                then begin
-                  Printf.eprintf "Invalid patch: negative position\n%!";
-                  raise Patch_failure
-                end
-                else aux i [] orig
-            in
-            match exp with
-            | Some ({ ppat_desc = Ppat_tuple pat_args } as arg_pat) ->
-              if total >= 0 && total <> List.length pat_args then raise Not_found;
-              {
-                pat with ppat_desc = Ppat_construct(loc, Some
-                  { arg_pat with ppat_desc = Ppat_tuple (
-                    add_list pat_args) }
+            ({loc=loc.loc;txt=Longident.parse lbl}, pat) :: lbls
+      ) lbls labels args in
+      { arg_pat with ppat_desc = Ppat_record(lbls, closed) }
+
+    | Some ({ ppat_desc = Ppat_tuple pat_args } as arg_pat) ->
+      if total >= 0 && total <> List.length pat_args then raise Not_found;
+      {
+        pat with ppat_desc = Ppat_construct(loc, Some
+          { arg_pat with ppat_desc = Ppat_tuple (
+            add_list pat_args) }
 #if OCAML_VERSION = "4.01.0+ocp1"
                   ,bool)
 #else
@@ -345,15 +306,31 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
                   )
 #endif
               }
-(*
-            |  Some
-                {ppat_desc=(Ppat_alias (_, _)|Ppat_constant _|Ppat_interval (_, _)|
-             Ppat_construct (_, _)|Ppat_variant (_, _)|Ppat_array _|
-             Ppat_or (_, _)|Ppat_constraint (_, _)|Ppat_type _|Ppat_lazy _|
-             Ppat_unpack _|Ppat_exception _|Ppat_extension _|
-             Ppat_open (_, _)); } ->
-              Location.print Format.err_formatter loc.loc;
-  Printf.kprintf failwith "cannot add argument to %S" constr *)
+
+  let leave_pattern pat =
+    match pat.ppat_desc with
+#if OCAML_VERSION = "4.01.0+ocp1"
+    | Ppat_construct({ txt = constr} as loc, exp, bool) ->
+#else
+    | Ppat_construct({ txt = constr} as loc, exp) ->
+#endif
+  let constr = String.concat "." (Longident.flatten constr) in
+  begin try
+              let (idents, used) = StringMap.find constr !box_constructors in
+              used := true;
+              match idents with
+                [] -> assert false
+              | ident :: _idents ->
+              { pat with ppat_desc =
+                  Ppat_record([ {loc with txt =
+                      Lident ident}, pat], Closed); }
+        with Not_found ->
+          try
+            let ((pos,args,total,labels), used) =
+              StringMap.find constr !add_constructor_arguments_pat
+            in
+            used := true;
+            do_add_constructor_arguments_pat constr (pos,args,total,labels) loc pat exp
           with Not_found ->
           pat
       end
@@ -523,7 +500,7 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
                               Pexp_ident {loc with txt = Lident ident }}
                         ) idents, None); }
         with Not_found -> try
-            let ((pos,args,total), used) =
+            let ((pos,args,total,labels), used) =
               StringMap.find constr !add_constructor_arguments_exp in
             used := true;
             let arg_to_exp arg =
@@ -591,6 +568,23 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
 #endif
                   }
               end
+            | Some ({ pexp_desc = Pexp_record (lbls, None) } as erec)
+                when labels <> [] ->
+
+              let lbls = List.fold_left2 (fun lbls lbl exp ->
+                if List.exists (fun (l,_) ->
+                  Longident.to_string l.txt = lbl) lbls then lbls
+                else
+                  let lbl = Longident.parse lbl in
+                  let lbl = { loc = erec.pexp_loc; txt = lbl } in
+                   (lbl, exp) :: lbls
+              ) lbls labels exps in
+
+              let erec = { erec with pexp_desc = Pexp_record (lbls, None) } in
+
+              { exp with pexp_desc = Pexp_construct (loc,
+                                                     Some erec) }
+
             | Some ({ pexp_desc = Pexp_tuple expl } as etup) ->
               if total >= 0 && total <> List.length expl then raise Not_found;
               {exp with pexp_desc = Pexp_construct (loc,
@@ -900,24 +894,45 @@ module CmmgenPatch = Parsetree_map.MakeMap(struct
        | arg :: args ->
          arg :: do_add_constructor_arguments_typ (pos-1) args new_args
 
-     let do_add_constructor_arguments_typ = function
+     let do_add_constructor_arguments_typ cstr =
+       match cstr with
 #if OCAML_VERSION < "4.02"
-       | ( (name, pcd_args, pcd_res, pcd_loc) as cstr )
+       | (name, pcd_args, pcd_res, pcd_loc)
 #else
-       | { pcd_args = Pcstr_record _ } as cstr -> cstr
        | { pcd_name = { txt = name }; pcd_loc;
-           pcd_args = Pcstr_tuple pcd_args } as cstr
+           pcd_args (*  Pcstr_tuple *)  }
 #endif
            ->
      try
-       let ( (pos, new_args, total), used ) = StringMap.find name
+       let ( (pos, new_args, total, labels), used ) = StringMap.find name
          !add_constructor_arguments_typ in
        used := true;
-       if total >= 0 && List.length pcd_args <> total then raise Not_found;
        if verbose then
          Printf.eprintf "Patching constructor %S with arg %S\n%!" name
               (String.concat " " new_args);
        let new_args = build_constructor_arguments_typ pcd_loc new_args in
+#if OCAML_VERSION >= "4.02"
+    match pcd_args with
+    | Pcstr_record _ when labels = [] -> raise Not_found
+    | Pcstr_record lbls ->
+      let lbls = List.fold_left2 (fun lbls lbl typ ->
+        if List.exists (fun l -> l.pld_name.txt = lbl) lbls then
+          lbls
+        else
+          let pld = {
+            pld_name = { loc = pcd_loc; txt = lbl };
+            pld_mutable = Immutable;
+            pld_type = typ;
+            pld_loc = pcd_loc;
+            pld_attributes = [];
+          } in
+          pld :: lbls
+      ) lbls labels new_args
+      in
+      { cstr with pcd_args = Pcstr_record lbls }
+    | Pcstr_tuple pcd_args ->
+#endif
+       if total >= 0 && List.length pcd_args <> total then raise Not_found;
        let pcd_args =
          match pos with
          | Start -> new_args @ pcd_args
@@ -1121,29 +1136,33 @@ let rewrite_file map_ast  source_file patches ast =
 
       | PatchAddConstructorArgumentsPat
           { constr_names; constr_position;
-            constr_new_arguments; constr_total_nargs} ->
+            constr_new_arguments;
+            constr_total_nargs; constr_labels} ->
         add_to_map
           add_constructor_arguments_pat
           constr_names
-          (constr_position, constr_new_arguments, constr_total_nargs)
+          (constr_position, constr_new_arguments,
+           constr_total_nargs, constr_labels)
 
       | PatchAddConstructorArgumentsExp
           { constr_names; constr_position;
-            constr_new_arguments; constr_total_nargs } ->
+            constr_new_arguments; constr_total_nargs;
+            constr_labels} ->
         add_to_map
           add_constructor_arguments_exp
           constr_names
           (constr_position, constr_new_arguments,
-           constr_total_nargs)
+           constr_total_nargs, constr_labels)
 
       | PatchAddConstructorArgumentsTyp
           { constr_names; constr_position;
-            constr_new_arguments; constr_total_nargs } ->
+            constr_new_arguments; constr_total_nargs;
+            constr_labels} ->
         add_to_map
           add_constructor_arguments_typ
           constr_names
           (constr_position, constr_new_arguments,
-           constr_total_nargs)
+           constr_total_nargs, constr_labels)
 
       | PatchAddRecordFields { record_labels; record_new_labels } ->
         add_to_map add_record_fields record_labels record_new_labels

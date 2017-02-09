@@ -43,6 +43,7 @@ let read_patches filename =
           constr_position = End;
           constr_new_arguments = split arg ';';
           constr_total_nargs = -1;
+          constr_labels = [];
         }
 
       | "add_constructor_arguments_exp" ->
@@ -51,6 +52,7 @@ let read_patches filename =
           constr_position = End;
           constr_new_arguments = split arg ';';
           constr_total_nargs = -1;
+          constr_labels = [];
         }
 
       | "add_constructor_arguments_typ" ->
@@ -59,6 +61,7 @@ let read_patches filename =
           constr_position = End;
           constr_new_arguments = split arg ';';
           constr_total_nargs = -1;
+          constr_labels = [];
         }
 
       | "add_record_fields" ->
@@ -183,12 +186,16 @@ let token_of_token = function
 type parameter =
 | LIST of string list ref
 | STRING of string ref
+| LISTOPT of string list ref
+| STRINGOPT of string ref
 
 let parse_parameters patch parameters variables =
   let map = ref StringMap.empty in
   let has_default = function
     | LIST r -> !r <> []
     | STRING r -> !r <> ""
+    | LISTOPT _ -> true
+    | STRINGOPT _ -> true
   in
   List.iter (fun (var, value) ->
     map := StringMap.add var (ref (has_default value), value) !map
@@ -199,9 +206,9 @@ let parse_parameters patch parameters variables =
       let (set, ref) = StringMap.find param map in
       set := true;
       match ref,value with
-      | LIST ref, ASTList list -> ref := list
-      | STRING ref, ASTString string -> ref := string
-      | LIST ref, ASTString string -> ref := [ string ]
+      | (LIST ref | LISTOPT ref), ASTList list -> ref := list
+      | (STRING ref | STRINGOPT ref), ASTString string -> ref := string
+      | (LIST ref | LISTOPT ref), ASTString string -> ref := [ string ]
       | _ ->
         Printf.eprintf "Error: bad type for parameter %S in patch %S\n%!"
           param patch;
@@ -292,6 +299,7 @@ and interp_patch filename patch parameters =
   | "add_constructor_arguments"
   | "add_constructor_arguments_pat" ->
     let constr_names = ref [] in
+    let constr_labels = ref [] in
     let constr_position = ref "end" in
     let constr_new_arguments = ref [] in
     let constr_total_nargs = ref "-1" in
@@ -300,16 +308,19 @@ and interp_patch filename patch parameters =
       "constr_position", STRING constr_position;
       "constr_new_arguments", LIST constr_new_arguments;
       "constr_prev_nargs", STRING constr_total_nargs;
+      "constr_labels", LISTOPT constr_labels;
     ];
     PatchAddConstructorArgumentsPat {
       constr_names = !constr_names;
       constr_position = string_to_argpos !constr_position;
       constr_new_arguments = !constr_new_arguments;
       constr_total_nargs = int_of_string !constr_total_nargs;
+      constr_labels = !constr_labels;
     }
 
   | "add_constructor_arguments_exp" ->
     let constr_names = ref [] in
+    let constr_labels = ref [] in
     let constr_position = ref "end" in
     let constr_new_arguments = ref [] in
     let constr_total_nargs = ref "-1" in
@@ -318,16 +329,19 @@ and interp_patch filename patch parameters =
       "constr_position", STRING constr_position;
       "constr_new_arguments", LIST constr_new_arguments;
       "constr_prev_nargs", STRING constr_total_nargs;
+      "constr_labels", LISTOPT constr_labels;
     ];
     PatchAddConstructorArgumentsExp {
       constr_names = !constr_names;
       constr_position = string_to_argpos !constr_position;
       constr_new_arguments = !constr_new_arguments;
       constr_total_nargs = int_of_string !constr_total_nargs;
+      constr_labels = !constr_labels;
     }
 
   | "add_constructor_arguments_typ" ->
     let constr_names = ref [] in
+    let constr_labels = ref [] in
     let constr_position = ref "end" in
     let constr_new_arguments = ref [] in
     let constr_total_nargs = ref "-1" in
@@ -336,12 +350,14 @@ and interp_patch filename patch parameters =
       "constr_position", STRING constr_position;
       "constr_new_arguments", LIST constr_new_arguments;
       "constr_prev_nargs", STRING constr_total_nargs;
+      "constr_labels", LISTOPT constr_labels;
     ];
     PatchAddConstructorArgumentsTyp {
       constr_names = !constr_names;
       constr_position = string_to_argpos !constr_position;
       constr_new_arguments = !constr_new_arguments;
       constr_total_nargs = int_of_string !constr_total_nargs;
+      constr_labels = !constr_labels;
     }
 
   | "add_record_fields" ->
