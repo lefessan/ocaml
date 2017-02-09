@@ -1,12 +1,14 @@
 /**************************************************************************/
 /*                                                                        */
-/*   Copyright 2014-2017 OCamlPro SAS --- typerex-memprof                 */
+/*   Typerex Tools                                                        */
 /*                                                                        */
-/*   Do not redistribute, without permission of OCamlPro, source          */
-/*   or binary copies of this software.                                   */
+/*   Copyright 2011-2017 OCamlPro SAS                                     */
+/*                                                                        */
+/*   All rights reserved.  This file is distributed under the terms of    */
+/*   the GNU General Public License version 3 described in the file       */
+/*   LICENSE.                                                             */
 /*                                                                        */
 /**************************************************************************/
-
 
 #define MEMPROF_INSIDE
 #define CAML_INTERNALS
