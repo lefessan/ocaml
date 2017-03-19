@@ -13,6 +13,8 @@ O_FILES=$(C_FILES:=.o)
 ADD_CMO_FILES=$(ADD_MODULES:=.cmo)
 ADD_CMX_FILES=$(ADD_MODULES:=.cmx)
 
+SHELL=/usr/local/bin/zsh
+
 GENERATED_SOURCES=$(ML_LEX_FILES) $(ML_YACC_FILES) $(MLI_YACC_FILES)
 
 CUSTOM_FLAG=`if [ -z "$(C_FILES)" ]; then true; else echo '-custom'; fi`
@@ -30,11 +32,11 @@ compile: $(ML_FILES) $(CMO_FILES) $(CMX_FILES) $(MAIN_MODULE).cmo $(MAIN_MODULE)
 run:
 	@printf " ... testing with ocamlc"
 	@./program.byte $(EXEC_ARGS) > $(MAIN_MODULE).result || (echo " => failed" && exit 1)
-	@diff -q $(MAIN_MODULE).reference $(MAIN_MODULE).result > /dev/null || (echo " => failed" && exit 1)
+	@cmp $(MAIN_MODULE).reference $(MAIN_MODULE).result > /dev/null || (echo " => failed" && exit 1)
 	@printf " ocamlopt"
 	@./program.native $(EXEC_ARGS) > $(MAIN_MODULE).result || (echo " => failed" && exit 1)
-	@diff -q $(MAIN_MODULE).reference $(MAIN_MODULE).result > /dev/null || (echo " => failed" && exit 1)
+	@cmp $(MAIN_MODULE).reference $(MAIN_MODULE).result > /dev/null || (echo " => failed" && exit 1)
 	@echo " => passed"
 
 clean: defaultclean
-	@rm -f *.result ./program.* $(GENERATED_SOURCES) $(O_FILES)
+	@rm -f *.result; rm -f ./program.* $(GENERATED_SOURCES) $(O_FILES)

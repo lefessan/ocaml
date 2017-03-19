@@ -40,7 +40,7 @@ type specific_operation =
 
 (* Sizes, endianness *)
 
-let big_endian = false
+let big_endian = true (* Fabrice *)
 
 let size_addr = 8
 let size_int = 8

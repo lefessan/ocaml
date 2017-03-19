@@ -1,6 +1,7 @@
 # $Id: Makefile.common 10713 2010-10-08 11:53:19Z doligez $
 
-TOPDIR=$(BASEDIR)/..
+BASEDIR ?= ../..
+TOPDIR := ${BASEDIR}/..
 
 include $(TOPDIR)/config/Makefile
 
@@ -20,7 +21,7 @@ DUMPOBJ=$(OCAMLRUN) $(TOPDIR)/tool/dumpobj$(EXE)
 #FORTRAN_LIBRARY=
 
 defaultclean:
-	@rm -f *.cmo *.cmi *.cmx *.cma *.cmxa *.cmxs *.$(O) *.$(SO) *.$(A)
+	@rm -f *.cmo; rm -f *.cmi; rm -f *.cmx; rm -f *.cma; rm -f *.cmxa; rm -f *.cmxs; rm -f *.$(O); rm -f *.$(SO); rm -f *.$(A)
 	@for dsym in *.dSYM; do \
 	  if [ -d $$dsym ]; then \
 	    rm -fr $$dsym; \
@@ -57,7 +58,7 @@ defaultclean:
 
 .cmm.o:
 	@$(OCAMLRUN) ./codegen $*.cmm > $*.s
-	@$(AS) $(ASFLAGS) -o $*.o $*.s
+	@$(ASM) $(ASFLAGS) -o $*.o $*.s
 
 .S.o:
 	@$(ASPP) $(ASPPFLAGS) -DSYS_$(SYSTEM) -o $*.o $*.S

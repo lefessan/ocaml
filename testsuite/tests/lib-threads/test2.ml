@@ -10,6 +10,8 @@ let _ = yield := (Array.length Sys.argv > 1)
 let t1 = Thread.create print_message 'a'
 let t2 = Thread.create print_message 'b'
 let _ = Thread.join t1
-let _ = Thread.join t2
+let _ = 
+  Thread.join t2;
+  print_newline ()
 
 ;;

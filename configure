@@ -325,6 +325,10 @@ case "$bytecc,$host" in
     echo "#ifndef __PIC__" >> m.h
     echo "#  define ARCH_CODE32" >> m.h
     echo "#endif" >> m.h;;
+  gcc*,ia64-hp-*)
+    echo GCC on ia64-HPUX
+    bytecc="$cc -mlp64"
+    bytecccompopts="-fno-defer-pop $gcc_warnings";;
   gcc*)
     bytecccompopts="-fno-defer-pop $gcc_warnings";;
 esac
@@ -433,7 +437,7 @@ esac
 # Determine alignment constraints
 
 case "$host" in
-  sparc*-*-*|hppa*-*-*|arm*-*-*|mips*-*-*)
+  sparc*-*-*|hppa*-*-*|arm*-*-*|mips*-*-*|ia64-*)
     # On Sparc V9 with certain versions of gcc, determination of double
     # alignment is not reliable (PR#1521), hence force it.
     # Same goes for hppa.
@@ -467,7 +471,7 @@ esac
 if $int64_native; then
   case "$host" in
     # PR#5088: autodetection is unreliable on ARM.  PR#5280: also on MIPS.
-    sparc*-*-*|hppa*-*-*|arm*-*-*|mips*-*-*)
+    sparc*-*-*|hppa*-*-*|arm*-*-*|mips*-*-*|ia64-*)
       if test $2 = 8; then
         echo "64-bit integers can be word-aligned."
         echo "#undef ARCH_ALIGN_INT64" >> m.h
@@ -522,6 +526,14 @@ if test $withsharedlibs = "yes"; then
       mkmaindll="$flexlink -maindll"
       shared_libraries_supported=true;;
     *-*-linux-gnu|*-*-linux|*-*-freebsd[3-9]*|*-*-openbsd*|*-*-netbsd*|*-*-gnu*)
+      sharedcccompopts="-fPIC"
+      mksharedlib="$bytecc -shared"
+      bytecclinkopts="$bytecclinkopts -Wl,-E"
+      byteccrpath="-Wl,-rpath,"
+      mksharedlibrpath="-Wl,-rpath,"
+      natdynlinkopts="-Wl,-E"
+      shared_libraries_supported=true;;
+    ia64-hp-*)
       sharedcccompopts="-fPIC"
       mksharedlib="$bytecc -shared"
       bytecclinkopts="$bytecclinkopts -Wl,-E"
@@ -636,6 +648,7 @@ if test $withsharedlibs = "yes"; then
     i[345]86-*-netbsd*)           natdynlink=true;;
     x86_64-*-netbsd*)             natdynlink=true;;
     i386-*-gnu0.3)                natdynlink=true;;
+    ia64-hp-*)                    natdynlink=true;;
   esac
 fi
 
@@ -694,6 +707,7 @@ case "$host" in
   arm*-*-gnu*)                  arch=arm; system=gnu;;
   ia64-*-linux*)                arch=ia64; system=linux;;
   ia64-*-gnu*)                  arch=ia64; system=gnu;;
+  ia64-hp-*)                    arch=ia64; system=hpux;;
   ia64-*-freebsd*)              arch=ia64; system=freebsd;;
   x86_64-*-linux*)              arch=amd64; system=linux;;
   x86_64-*-gnu*)                arch=amd64; system=gnu;;
@@ -766,6 +780,8 @@ case "$arch,$model,$system" in
                     aspp='/usr/ccs/bin/as -P';;
   i386,*,*)         as='as'
                     aspp='gcc -c';;
+  ia64,*,hpux)      as='as -xexplicit -mlp64'
+                    aspp='gcc -c -Wa,-xexplicit -mlp64';;
   ia64,*,*)         as='as -xexplicit'
                     aspp='gcc -c -Wa,-xexplicit';;
   mips,*,irix)      as='as -n32 -O2 -nocpp -g0'

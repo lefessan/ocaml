@@ -1,1 +1,1 @@
-sort testA.result | diff -q testA.reference -
+sort testA.result | cmp testA.reference -

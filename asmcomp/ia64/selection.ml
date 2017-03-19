@@ -112,6 +112,9 @@ method! select_operation op args =
       (Iintop_imm(Imod, n), [arg])
   | (Cmodi, _) ->
       (Iextcall("__moddi3", false), args)
+
+	(*  Different rounding => disabled
+
   (* Recognize mult-add and mult-sub instructions *)
   | (Caddf, [Cop(Cmulf, [arg1; arg2]); arg3]) ->
       (Ispecific Imultaddf, [arg1; arg2; arg3])
@@ -121,6 +124,8 @@ method! select_operation op args =
       (Ispecific Imultsubf, [arg1; arg2; arg3])
   | (Csubf, [arg3; Cop(Cmulf, [arg1; arg2])]) ->
       (Ispecific Isubmultf, [arg1; arg2; arg3])
+	   *)
+
   (* Use default selector otherwise *)
   | _ ->
       super#select_operation op args

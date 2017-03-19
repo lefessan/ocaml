@@ -162,6 +162,9 @@ let instruction_table = create_hashtable 73 [
   "fmacond", {opcode = "fma.d.s0"; latency = 5; kind = KF; format = F_rrr_r_pred};
   "fmas1cond", {opcode = "fma.s1"; latency = 5; kind = KF; format = F_rrr_r_pred};
   "fmads1cond", {opcode = "fma.d.s1"; latency = 5; kind = KF; format = F_rrr_r_pred};
+  "fmadcond", {opcode = "fma.d"; latency = 5; kind = KF; format = F_rrr_r_pred};
+  "fmpys1cond", {opcode = "fmpy.s1"; latency = 5; kind = KF; format = F_rr_r_pred};
+  "fmpyds1cond", {opcode = "fmpy.d.s1"; latency = 5; kind = KF; format = F_rr_r_pred};
   "fmpy.d", {opcode = "fmpy.d"; latency = 5; kind = KF; format = F_rr_r};
   "fms.d", {opcode = "fms.d"; latency = 5; kind = KF; format = F_rrr_r};
   "fneg", {opcode = "fneg"; latency = 1; kind = KF; format = F_r_r};
@@ -622,7 +625,8 @@ let float_bits f =
   let b = Buffer.create 18 in
   let bytes = (Obj.magic f : string) in
   Buffer.add_string b "0x";
-  for i = 7 downto 0 do (* little-endian *)
+(*  for i = 7 downto 0 do (* little-endian *) *)
+  for i = 0 to 7 do (* Fabrice: big-endian *)
     Buffer.add_string b
        (sprintf "%02x" (Char.code (String.unsafe_get bytes i)))
   done;
@@ -1041,6 +1045,22 @@ let emit_instr i =
         and t1 = new_temp_float() and t2 = new_temp_float()
         and t3 = new_temp_float() and t4 = new_temp_float()
         and p = new_pred() in
+
+	if true then begin
+
+          insert "frcpa" [| a; b |] [| t1; p |]; (* a = f3; b = f2 *)
+          insert "fnmas1cond" [| p; b; t1; "f1" |] [| t2 |];
+          insert "fmas1cond" [| p; t2; t1; t1 |] [| t1 |];
+          insert "fmpys1cond" [| p; t2; t2 |] [| t2  |];
+          insert "fmas1cond" [| p; t2; t1; t1 |] [| t1 |];
+          insert "fmpys1cond" [| p; t2; t2 |] [| t2 |];
+          insert "fmas1cond" [| p; t2; t1; t1 |] [| t1 |];
+          insert "fmpyds1cond" [| p; a; t1 |] [| t2 |];
+          insert "fnmads1cond" [| p; b; t2; a |] [| t3 |];
+          insert "fmadcond" [| p; t3; t1; t2 |] [| r |]
+
+	end else begin
+
         insert "frcpa" [| a; b |] [| t1; p |];
         insert "fmas1cond" [| p; a; t1; "f0" |] [| t2 |];
         insert "fnmas1cond" [| p; b; t1; "f1" |] [| t3 |];
@@ -1055,6 +1075,9 @@ let emit_instr i =
         insert "fnmads1cond" [| p; b; t2; a |] [| t3 |];
         insert "mov" [| t1 |] [| r |];
         insert "fmacond" [| p; t3; t1; t2 |] [| r |]
+
+	end
+
     | Lop(Ifloatofint) ->
         let src = regs i.arg and dst = regs i.res in
         insert "setf.sig" src dst;
@@ -1180,7 +1203,7 @@ let emit_instr i =
           `	add	r2 = r2, r3 ;;\n`;
           `	mov	b6 = r2 ;;\n`;
           `	br	b6 ;;\n`;
-          `	.align 4\n`;
+          `	.align 8\n`; (* Fabrice: align on 8 *)
           `{emit_label lbl_jumptbl}:\n`;
           for i = 0 to numcases - 1 do
             `	data4	{emit_label jumptbl.(i)} - {emit_label lbl_jumptbl}\n`
@@ -1237,7 +1260,7 @@ let fundecl f =
   fastcode_flag := f.fun_fast;
   stack_offset := 0;
   `	.text\n`;
-  `	.align	4\n`;
+  `	.align	8\n`; (* Fabrice: align on 8 *)
   `	.global	{emit_symbol f.fun_name}#\n`;
   `	.proc	{emit_symbol f.fun_name}#\n`;
   `{emit_symbol f.fun_name}:\n`;
@@ -1319,7 +1342,8 @@ let end_assembly () =
   emit_define_symbol (Compilenv.make_symbol (Some "data_end"));
   `	.text\n`;
   emit_define_symbol (Compilenv.make_symbol (Some "code_end"));
-  `	.rodata\n`;
+(*  `	.rodata\n`; *)
+  `     .section        .data.rel,\"aw\",@progbits\n`;
   `	.align 8\n`;
   emit_define_symbol (Compilenv.make_symbol (Some "frametable"));
   `	data8	{emit_int (List.length !frame_descriptors)}\n`;

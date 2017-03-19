@@ -2,3 +2,4 @@
 pid=$!
 sleep 5
 kill -9 $pid
+echo >> test3.result

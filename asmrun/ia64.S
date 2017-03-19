@@ -506,12 +506,14 @@ caml_ml_array_bound_error:
         br.sptk caml_c_call             /* never returns */
 
         .rodata
-
+        .section        .data.rel,"aw",@progbits
+	.align 8
         .global caml_system__frametable#
         .type   caml_system__frametable#, @object
         .size   caml_system__frametable#, 8
 caml_system__frametable:
         data8   1               /* one descriptor */
+/*        data8   @fptr(.L102)  */          /* return address into callback */ 
         data8   .L102           /* return address into callback */
         data2   -1              /* negative frame size => use callback link */
         data2   0               /* no roots here */

@@ -18,7 +18,7 @@ include config/Makefile
 include stdlib/StdlibModules
 
 CAMLC=boot/ocamlrun boot/ocamlc -nostdlib -I boot
-CAMLOPT=boot/ocamlrun ./ocamlopt -nostdlib -I stdlib -I otherlibs/dynlink
+CAMLOPT=boot/ocamlrun ./ocamlopt -S -nostdlib -I stdlib -I otherlibs/dynlink
 COMPFLAGS=-strict-sequence -warn-error A $(INCLUDES)
 LINKFLAGS=
 
@@ -327,23 +327,17 @@ clean:: partialclean
 
 ocamlc: $(COMPOBJS)
 	$(CAMLC) $(LINKFLAGS) -o ocamlc $(COMPOBJS)
-	@sed -e 's|@compiler@|$$topdir/boot/ocamlrun $$topdir/ocamlc|' \
-	  driver/ocamlcomp.sh.in > ocamlcomp.sh
-	@chmod +x ocamlcomp.sh
 
 partialclean::
-	rm -f ocamlc ocamlcomp.sh
+	rm -f ocamlc
 
 # The native-code compiler
 
 ocamlopt: $(OPTOBJS)
 	$(CAMLC) $(LINKFLAGS) -o ocamlopt $(OPTOBJS)
-	@sed -e 's|@compiler@|$$topdir/boot/ocamlrun $$topdir/ocamlopt|' \
-	  driver/ocamlcomp.sh.in > ocamlcompopt.sh
-	@chmod +x ocamlcompopt.sh
 
 partialclean::
-	rm -f ocamlopt ocamlcompopt.sh
+	rm -f ocamlopt
 
 # The toplevel
 
@@ -440,9 +434,6 @@ ocamlc.opt: $(COMPOBJS:.cmo=.cmx)
 	$(CAMLOPT) $(LINKFLAGS) -ccopt "$(BYTECCLINKOPTS)" -o ocamlc.opt \
 	  $(COMPOBJS:.cmo=.cmx) \
 	  asmrun/meta.o asmrun/dynlink.o -cclib "$(BYTECCLIBS)"
-	@sed -e 's|@compiler@|$$topdir/ocamlc.opt|' \
-	  driver/ocamlcomp.sh.in > ocamlcomp.sh
-	@chmod +x ocamlcomp.sh
 
 partialclean::
 	rm -f ocamlc.opt
@@ -451,9 +442,6 @@ partialclean::
 
 ocamlopt.opt: $(OPTOBJS:.cmo=.cmx)
 	$(CAMLOPT) $(LINKFLAGS) -o ocamlopt.opt $(OPTOBJS:.cmo=.cmx)
-	@sed -e 's|@compiler@|$$topdir/ocamlopt.opt|' \
-	  driver/ocamlcomp.sh.in > ocamlcompopt.sh
-	@chmod +x ocamlcompopt.sh
 
 partialclean::
 	rm -f ocamlopt.opt
