@@ -17,7 +17,7 @@ BASEDIR=../..
 LIBRARIES=unix threads
 ADD_COMPFLAGS=-thread -I $(OTOPDIR)/otherlibs/systhreads \
 	      -I $(OTOPDIR)/otherlibs/$(UNIXLIBVAR)unix
-LD_PATH=$(TOPDIR)/otherlibs/systhreads:$(TOPDIR)/otherlibs/$(UNIXLIBVAR)unix
+LD_PATH=$(TOPDIR)/otherlibs/systhreads:$(TOPDIR)/otherlibs/$(UNIXLIB)
 
 default:
 	@$(if $(filter msvc mingw,$(TOOLCHAIN)),$(MAKE) sigint.exe,true)

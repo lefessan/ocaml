@@ -15,8 +15,8 @@
 
 BASEDIR=../..
 
-COMPFLAGS=-I $(OTOPDIR)/otherlibs/$(UNIXLIBVAR)unix
-LD_PATH=$(TOPDIR)/otherlibs/$(UNIXLIBVAR)unix
+COMPFLAGS=-I $(OTOPDIR)/otherlibs/$(UNIXLIB)
+LD_PATH=$(TOPDIR)/otherlibs/$(UNIXLIB)
 
 MYRUNTIME=`if [ -z "$(CUSTOM)" ]; then echo '$(OCAMLRUN)'; fi`
 

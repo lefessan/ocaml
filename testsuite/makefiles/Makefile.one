@@ -13,6 +13,8 @@
 #*                                                                        *
 #**************************************************************************
 
+SHELL=/usr/local/bin/zsh
+
 CMI_FILES=$(MODULES:=.cmi)
 CMO_FILES=$(MODULES:=.cmo)
 CMX_FILES=$(MODULES:=.cmx)
@@ -86,6 +88,7 @@ promote: defaultpromote
 
 .PHONY: clean
 clean: defaultclean
-	@rm -f *.result program.byte program.byte.exe \
-	       program.native program.native.exe \
-	       $(GENERATED_SOURCES) $(O_FILES) $(TEST_TEMP_FILES)
+	@rm -f *.result; rm -f program.byte; rm -f program.byte.exe; \
+	       rm -f program.native; rm -f program.native.exe; \
+	       rm -f $(GENERATED_SOURCES) $(O_FILES) $(TEST_TEMP_FILES); \
+	       echo Cleaning...

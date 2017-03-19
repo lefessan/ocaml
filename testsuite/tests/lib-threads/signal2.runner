@@ -18,4 +18,4 @@ pid=$!
 sleep 2
 kill -INT $pid
 sleep 1
-kill -9 $pid 2>&- || true
+kill -9 $pid 2> /dev/null > /dev/null || true

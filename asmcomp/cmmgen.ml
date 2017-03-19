@@ -345,9 +345,18 @@ let rec div_int c1 c2 dbg =
                      let t = lsr_int t (Cconst_int (Nativeint.size - l)) in
                      add_int c1 t);
                    Cconst_int l])
-      else if n < 0 then
+      else
+      if Config.system = "hpux" then
+        if n = 0 then
+          Cop(Craise (Raise_regular, dbg),
+                        [Cconst_symbol "caml_exn_Division_by_zero"])
+        else
+          Cop(Cdivi, [c1; Cconst_int n])
+      else
+      if n < 0 then
         sub_int (Cconst_int 0) (div_int c1 (Cconst_int (-n)) dbg)
-      else begin
+      else
+	begin
         let (m, p) = divimm_parameters (Nativeint.of_int n) in
         (* Algorithm:
               t = multiply-high-signed(c1, m)

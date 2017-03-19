@@ -42,4 +42,4 @@ promote: defaultpromote
 
 .PHONY: clean
 clean: defaultclean
-	@rm -f program.byte *.cm* *.result
+	@rm -f program.byte; rm -f *.cm*; rm -f *.result

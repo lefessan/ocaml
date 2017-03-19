@@ -15,10 +15,10 @@
 
 BASEDIR=$(shell pwd)/../..
 
-COMPFLAGS=-I $(OTOPDIR)/otherlibs/$(UNIXLIBVAR)unix \
+COMPFLAGS=-I $(OTOPDIR)/otherlibs/$(UNIXLIB) \
 	  -I $(OTOPDIR)/otherlibs/systhreads \
           -I $(OTOPDIR)/otherlibs/dynlink
-LD_PATH = $(TOPDIR)/otherlibs/$(UNIXLIBVAR)unix:$(TOPDIR)/otherlibs/systhreads\
+LD_PATH = $(TOPDIR)/otherlibs/$(UNIXLIB):$(TOPDIR)/otherlibs/systhreads\
 :$(TOPDIR)/otherlibs/dynlink
 
 .PHONY: default

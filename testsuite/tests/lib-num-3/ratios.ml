@@ -2,7 +2,7 @@
 (*                                                                        *)
 (*                                OCaml                                   *)
 (*                                                                        *)
-(*             Xavier Leroy, projet Cristal, INRIA Rocquencourt           *)
+(*     Valerie Menissier-Morain, projet Cristal, INRIA Rocquencourt       *)
 (*                                                                        *)
 (*   Copyright 1996 Institut National de Recherche en Informatique et     *)
 (*     en Automatique.                                                    *)
@@ -13,15 +13,23 @@
 (*                                                                        *)
 (**************************************************************************)
 
-let print_message delay c =
-  while true do
-    print_char c; flush stdout; Thread.delay delay
-  done
+external myldexp : (float) -> (int) -> (float) =
+  "caml_ldexp_float"
 
-let _ =
-  ignore (Thread.sigmask Unix.SIG_BLOCK [Sys.sigint; Sys.sigterm]);
-  ignore (Thread.create (print_message 0.6666666666) 'a');
-  ignore (Thread.create (print_message 1.0) 'b'); 
-  let s = Thread.wait_signal [Sys.sigint; Sys.sigterm] in
-  Printf.printf "Got signal %d, exiting...\n" s
+let f () =
+  let p = 6061966420939680.
+  and pexp = 22
+  and q = 8711087657624833.
+  and qexp = 83 in
+  let a = myldexp ( p) pexp in
+  Printf.printf "%f\n" a;
+  let b = myldexp ( q) qexp in
+  Printf.printf "%f\n" b;
+  let c = a /. b in
+  print_float c;
+  print_newline ();
+  Printf.printf "%.40f\n" c;
+()
+
+let () = f ()
 

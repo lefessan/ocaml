@@ -439,6 +439,8 @@ case "$bytecc,$target" in
     echo "#ifndef __PIC__" >> m.h
     echo "#  define ARCH_CODE32" >> m.h
     echo "#endif" >> m.h;;
+  gcc*,ia64-hp-*)
+    bytecc="$cc -mlp64"
 esac
 
 # Configure compiler to use in further tests.
@@ -587,7 +589,7 @@ esac
 # Determine alignment constraints
 
 case "$target" in
-  sparc*-*-*|hppa*-*-*|arm*-*-*|mips*-*-*)
+  sparc*-*-*|hppa*-*-*|arm*-*-*|mips*-*-*|ia64-*)
     # On Sparc V9 with certain versions of gcc, determination of double
     # alignment is not reliable (PR#1521), hence force it.
     # Same goes for hppa.
@@ -625,7 +627,7 @@ esac
 
 case "$target" in
   # PR#5088: autodetection is unreliable on ARM.  PR#5280: also on MIPS.
-  sparc*-*-*|hppa*-*-*|arm*-*-*|mips*-*-*)
+  sparc*-*-*|hppa*-*-*|arm*-*-*|mips*-*-*|ia64-*)
     if test $2 = 8; then
       inf "64-bit integers can be word-aligned."
       echo "#undef ARCH_ALIGN_INT64" >> m.h
@@ -671,7 +673,7 @@ if test $with_sharedlibs = "yes"; then
       mkmaindll="$flexlink -maindll"
       shared_libraries_supported=true;;
     *-*-linux-gnu|*-*-linux|*-*-freebsd[3-9]*|*-*-freebsd[1-9][0-9]*\
-    |*-*-openbsd*|*-*-netbsd*|*-*-gnu*|*-*-haiku*)
+    |*-*-openbsd*|*-*-netbsd*|*-*-gnu*|*-*-haiku*|ia64-hp-*)
       sharedcccompopts="-fPIC"
       mksharedlib="$bytecc -shared"
       bytecclinkopts="$bytecclinkopts -Wl,-E"
@@ -791,6 +793,7 @@ if test $with_sharedlibs = "yes"; then
     arm*-*-freebsd*)              natdynlink=true;;
     earm*-*-netbsd*)              natdynlink=true;;
     aarch64-*-linux*)             natdynlink=true;;
+    ia64-hp-*)                    natdynlink=true;;
   esac
 fi
 
@@ -859,6 +862,7 @@ case "$target" in
   x86_64-*-mingw*)              arch=amd64; system=mingw;;
   aarch64-*-linux*)             arch=arm64; system=linux;;
   x86_64-*-cygwin*)             arch=amd64; system=cygwin;;
+  ia64-hp-*)                    arch=ia64; system=hpux;;
 esac
 
 # Some platforms exist both in 32-bit and 64-bit variants, not distinguished
@@ -935,6 +939,9 @@ case "$arch,$system" in
   amd64,*|arm,*|arm64,*|i386,*|power,bsd*|sparc,*)
                   as="${TOOLPREF}as"
                   aspp="${TOOLPREF}gcc -c";;
+  ia64,hpux)    as='${TOOLPREF}as -xexplicit -mlp64'
+                  aspp='${TOOLPREF}gcc -c -Wa,-xexplicit -mlp64';;
+ 
 esac
 
 if test -n "$asoption"; then as="$asoption"; fi

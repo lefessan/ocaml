@@ -39,7 +39,8 @@ let convert_address address =
   with Not_found ->
     match Sys.os_type with
       "Win32" -> failwith "Unix sockets not supported"
-    | _ -> (PF_UNIX, ADDR_UNIX address)
+    | _ -> 
+	(PF_UNIX, ADDR_UNIX address)
 
 (*** Report a unix error. ***)
 let report_error = function

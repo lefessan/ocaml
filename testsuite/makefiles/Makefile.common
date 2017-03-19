@@ -22,7 +22,8 @@ WINTOPDIR=`cygpath -m "$(TOPDIR)"`
 OTOPDIR=$(TOPDIR)
 CTOPDIR=$(TOPDIR)
 CYGPATH=echo
-DIFF=diff -q
+DIFF=cmp
+#DIFF=diff -q
 SORT=sort
 SET_LD_PATH=CAML_LD_LIBRARY_PATH="$(LD_PATH)"
 
@@ -107,12 +108,7 @@ defaultpromote:
 	done
 
 defaultclean:
-	@rm -f *.cmo *.cmi *.cmx *.cma *.cmxa *.cmxs *.$(O) *.$(SO) *.$(A) *.exe
-	@for dsym in *.dSYM; do \
-	  if [ -d $$dsym ]; then \
-	    rm -fr $$dsym; \
-	  fi \
-	done
+	@rm -f *.cmo; rm -f *.cmi; rm -f *.cmx; rm -f *.cma; rm -f *.cmxa; rm -f *.cmxs; rm -f *.$(O); rm -f *.$(SO); rm -f *.$(A); rm -f *.exe; echo cleaning...
 
 .SUFFIXES:
 .SUFFIXES: .mli .ml .mly .mll .cmi .cmo .cmx .cmm .cmxa .s .S .$(O) .so .c .f

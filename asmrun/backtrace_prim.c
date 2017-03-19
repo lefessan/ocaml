@@ -65,6 +65,7 @@ frame_descr * caml_next_frame_descriptor(uintnat * pc, char ** sp)
       *sp -= (d->frame_size & 0xFFFC);
 #endif
       *pc = Saved_return_address(*sp);
+
 #ifdef Mask_already_scanned
       *pc = Mask_already_scanned(*pc);
 #endif

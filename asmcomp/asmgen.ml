@@ -102,8 +102,10 @@ let compile_fundecl (ppf : formatter) fd_cmm =
   ++ pass_dump_if ppf dump_selection "After instruction selection"
   ++ Timings.(accumulate_time (Comballoc build)) Comballoc.fundecl
   ++ pass_dump_if ppf dump_combine "After allocation combining"
+(*
   ++ Timings.(accumulate_time (CSE build)) CSE.fundecl
   ++ pass_dump_if ppf dump_cse "After CSE"
+*)
   ++ Timings.(accumulate_time (Liveness build)) (liveness ppf)
   ++ Timings.(accumulate_time (Deadcode build)) Deadcode.fundecl
   ++ pass_dump_if ppf dump_live "Liveness analysis"
