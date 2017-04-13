@@ -673,12 +673,20 @@ if test $with_sharedlibs = "yes"; then
       mkmaindll="$flexlink -maindll"
       shared_libraries_supported=true;;
     *-*-linux-gnu|*-*-linux|*-*-freebsd[3-9]*|*-*-freebsd[1-9][0-9]*\
-    |*-*-openbsd*|*-*-netbsd*|*-*-gnu*|*-*-haiku*|ia64-hp-*)
+    |*-*-openbsd*|*-*-netbsd*|*-*-gnu*|*-*-haiku*)
       sharedcccompopts="-fPIC"
       mksharedlib="$bytecc -shared"
       bytecclinkopts="$bytecclinkopts -Wl,-E"
       byteccrpath="-Wl,-rpath,"
       mksharedlibrpath="-Wl,-rpath,"
+      natdynlinkopts="-Wl,-E"
+      shared_libraries_supported=true;;
+    ia64-hp-*)
+      sharedcccompopts="-fPIC"
+      mksharedlib="$bytecc -shared"
+      bytecclinkopts="$bytecclinkopts -Wl,-E"
+      byteccrpath="-Wl,+b,"
+      mksharedlibrpath="-Wl,+b,"
       natdynlinkopts="-Wl,-E"
       shared_libraries_supported=true;;
     alpha*-*-osf*)
