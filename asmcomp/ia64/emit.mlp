@@ -1096,6 +1096,7 @@ let emit_instr i =
           insert "fmas1cond" [| p; t2; t1; t1 |] [| t1 |];
           insert "fmpyds1cond" [| p; a; t1 |] [| t2 |];
           insert "fnmads1cond" [| p; b; t2; a |] [| t3 |];
+          insert "mov" [| t1 |] [| r |]; 
           insert "fmadcond" [| p; t3; t1; t2 |] [| r |]
 	    
 	end else begin
