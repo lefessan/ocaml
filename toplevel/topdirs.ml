@@ -157,6 +157,7 @@ let load_compunit ic filename ppf compunit =
   end
 
 let rec load_file recursive ppf name =
+  let name = expand_directory Config.standard_library name in
   let filename =
     try Some (Load_path.find name) with Not_found -> None
   in

@@ -19,13 +19,14 @@ build: [
     {os != "openbsd" & os != "freebsd" & os != "macos"}
   [
     "./configure"
-    "--prefix=%{prefix}%"
+    "--prefix=/RELOCATABLE"
+#    "--prefix=%{prefix}%"
     "CC=cc"
     "ASPP=cc -c"
     "--enable-flambda"
   ] {os = "openbsd" | os = "freebsd" | os = "macos"}
-  [make "-j%{jobs}%" {os != "cygwin"} "world"]
-  [make "-j%{jobs}%" {os != "cygwin"} "world.opt"]
+  [make "-j" {os != "cygwin"} "world"]
+  [make "-j" {os != "cygwin"} "world.opt"]
 ]
 install: [make "install"]
 url {

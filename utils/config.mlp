@@ -17,7 +17,136 @@
 (* The main OCaml version string has moved to ../VERSION *)
 let version = Sys.ocaml_version
 
-let standard_library_default = "%%LIBDIR%%"
+module RELOCATABLE = struct
+(*
+   Find the ocaml library directory relatively to the path of the command.
+   We use two strategies:
+   * If OPAM_SWITCH_PREFIX is defined, we use it, with "lib/ocaml" appended.
+     It should work for packages like ppx_tools that link the compilerlibs
+     and call their tool in its build directory, i.e. with a wrong relative
+     path to the standard library.
+   * Otherwise, it's "../../lib/ocaml" appended to the name of the
+     command. We simplify and normalize the filename, hopefully in a
+     Windows-compatible way.
+*)
+
+  let find_in_path path name =
+    if not (Filename.is_implicit name) then
+      if Sys.file_exists name then name else raise Not_found
+    else begin
+      let rec try_dir = function
+          [] -> raise Not_found
+        | dir::rem ->
+            let fullname = Filename.concat dir name in
+            if Sys.file_exists fullname then fullname else try_dir rem
+      in try_dir path
+    end
+
+  (* split a string [s] at every char [c], and return the list of sub-strings *)
+  let split s c =
+    let len = String.length s in
+    let rec iter pos to_rev =
+      if pos = len then List.rev ("" :: to_rev) else
+        match try
+            Some ( String.index_from s pos c )
+          with Not_found -> None
+        with
+          Some pos2 ->
+            if pos2 = pos then iter (pos+1) ("" :: to_rev) else
+              iter (pos2+1) ((String.sub s pos (pos2-pos)) :: to_rev)
+        | None -> List.rev ( String.sub s pos (len-pos) :: to_rev )
+    in
+    iter 0 []
+
+  let simplify path =
+    let rec simplify path rev =
+      match path with
+      | [] -> List.rev rev
+      | ".." :: path ->
+          begin
+            match rev with
+            | [] -> simplify path rev
+            | _ :: rev -> simplify path rev
+          end
+      | "." :: path -> simplify path rev
+      | "" :: path -> simplify path rev
+      | dir :: path -> simplify path ( dir :: rev )
+    in
+    simplify path []
+
+  let normalize_filename filename =
+
+    (* make relative path absolute *)
+    let filename =
+      if Filename.is_relative filename then
+        Filename.concat (Sys.getcwd ()) filename
+      else
+        filename
+    in
+
+    (* replace backslashes by slashes *)
+    let len = String.length filename in
+    let bytes = Bytes.of_string filename in
+    for i = 0 to len -1 do
+      if filename.[i] = '\\' then
+        Bytes.set bytes i '/'
+    done;
+    let filename = Bytes.to_string bytes in
+
+    (*    Printf.eprintf "normalize %S\n%!" filename; *)
+
+    let path = split filename '/' in
+    (*    Printf.eprintf "path: %s\n%!" (String.concat " // " path); *)
+    let has_leading_slash = len > 0 && filename.[0] = '/' in
+    if has_leading_slash then
+      String.concat "/" ("" :: simplify path)
+    else
+      match path with
+      | [] -> assert false
+      | partition :: path ->
+          String.concat "/" (partition :: simplify path)
+
+  (* When called from the Windows shell, Sys.executable_name is not
+     correct, we have to search it again in the PATH to make it
+     absolute. *)
+  let path_sep = if Sys.win32 then ';' else ':'
+  let env_path =
+    try
+      split (Sys.getenv "PATH") path_sep
+    with Not_found -> []
+
+  (*  let () = Printf.eprintf "executable_name=%S\n%!" executable_name *)
+
+  let standard_library_default =
+    match Sys.getenv "OPAM_SWITCH_PREFIX" with
+    | dirname ->
+        Filename.concat dirname "lib/ocaml"
+    | exception Not_found ->
+        let executable_name =
+          let executable_name = Sys.executable_name in
+          if Filename.is_implicit executable_name then
+            let executable_name =
+              if Sys.win32 &&
+                 not ( Filename.check_suffix executable_name ".exe" ) then
+                executable_name ^ ".exe" else
+                executable_name in
+            try
+              find_in_path env_path executable_name
+            with Not_found ->
+              executable_name
+          else
+            executable_name
+        in
+        normalize_filename
+          ( executable_name ^ "/../../lib/ocaml" )
+  (*
+  let () = Printf.eprintf "standard_library_default=%S\n%!"
+      standard_library_default
+*)
+end
+
+let standard_library_default = RELOCATABLE.standard_library_default
+(* let standard_library_default = "%%LIBDIR%%" *)
 
 let standard_library =
   try

@@ -140,10 +140,12 @@ CAMLHEADERS =\
 # patterns and $(subst ...) since `camlheader%:` wouldn't match `camlheader`
 ifeq "$(HASHBANGSCRIPTS)" "true"
 camlhead%: $(ROOTDIR)/Makefile.config Makefile
-	echo '#!$(BINDIR)/ocamlrun$(subst er,,$*)' > $@
+	echo '#!/usr/bin/env ocamlrun$(subst er,,$*)' > $@
+#	echo '#!$(BINDIR)/ocamlrun$(subst er,,$*)' > $@
 
 target_%: $(ROOTDIR)/Makefile.config Makefile
-	echo '#!$(TARGET_BINDIR)/ocamlrun$(subst camlheader,,$*)' > $@
+	echo '#!/usr/bin/env ocamlrun$(subst camlheader,,$*)' > $@
+#	echo '#!$(TARGET_BINDIR)/ocamlrun$(subst camlheader,,$*)' > $@
 
 camlheader_ur: Makefile
 	echo '#!' | tr -d '\012' > $@

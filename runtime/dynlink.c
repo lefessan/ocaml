@@ -17,6 +17,7 @@
 
 /* Dynamic loading of C primitives. */
 
+#include <stdio.h>
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
@@ -85,9 +86,17 @@ static char_os * parse_ld_conf(void)
   struct stat st;
 #endif
   int ldconf, nread;
+  int must_free_stdlib = 0;
 
   stdlib = caml_secure_getenv(T("OCAMLLIB"));
   if (stdlib == NULL) stdlib = caml_secure_getenv(T("CAMLLIB"));
+  if (stdlib == NULL) {
+    char_os *opam_prefix = caml_secure_getenv("OPAM_SWITCH_PREFIX");
+    if( opam_prefix != NULL ){
+      stdlib = caml_stat_strconcat_os(3, opam_prefix, T("/"), "lib/ocaml");
+      must_free_stdlib = 1;
+    }
+  }
   if (stdlib == NULL) stdlib = OCAML_STDLIB_DIR;
   ldconfname = caml_stat_strconcat_os(3, stdlib, T("/"), LD_CONF_NAME);
   if (stat_os(ldconfname, &st) == -1) {
@@ -111,12 +120,19 @@ static char_os * parse_ld_conf(void)
   for (p = wconfig; *p != 0; p++) {
     if (*p == '\n') {
       *p = 0;
-      caml_ext_table_add(&caml_shared_libs_path, q);
+      if( *q == '+' ){
+        char_os* dest = caml_stat_strconcat_os(3, stdlib, T("/"), q+1);
+        //        fprintf(stderr, "+dest: '%s'\n", dest);
+        caml_ext_table_add(&caml_shared_libs_path, dest);
+      } else {
+        caml_ext_table_add(&caml_shared_libs_path, q);
+      }
       q = p + 1;
     }
   }
   if (q < p) caml_ext_table_add(&caml_shared_libs_path, q);
   close(ldconf);
+  if(must_free_stdlib) caml_stat_free(stdlib);
   caml_stat_free(ldconfname);
   return wconfig;
 }
