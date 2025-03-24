@@ -75,6 +75,7 @@ void caml_init_domain (void)
   Caml_state->backtrace_active = 0;
   Caml_state->backtrace_pos = 0;
   Caml_state->backtrace_buffer = NULL;
+  Caml_state->backtrace_ring = NULL;
   Caml_state->backtrace_last_exn = Val_unit;
 
   Caml_state->compare_unordered = 0;

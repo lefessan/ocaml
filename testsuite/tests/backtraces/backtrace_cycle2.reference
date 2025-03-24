@@ -1,0 +1,5 @@
+Fatal error: exception Not_found
+Next cycle of 2 calls repeated 1000 times
+Called from Backtrace_cycle2.g in file "backtrace_cycle2.ml", line 12, characters 6-15
+Called from Backtrace_cycle2.f in file "backtrace_cycle2.ml", line 9, characters 6-14
+Called from Backtrace_cycle2 in file "backtrace_cycle2.ml", line 18, characters 8-15

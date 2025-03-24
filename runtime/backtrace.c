@@ -37,8 +37,21 @@ void caml_init_backtrace(void)
 /* Start or stop the backtrace machinery */
 CAMLexport void caml_record_backtraces(int flag)
 {
-  if (flag != Caml_state->backtrace_active) {
+  int is_limited = flag & 2 ;
+  int no_cycles = flag & 4 ;
+  flag &= 1;
+  if (flag != Caml_state->backtrace_active
+      || is_limited != Caml_state->backtrace_is_limited
+      || no_cycles != Caml_state->backtrace_no_cycles
+    ) {
     Caml_state->backtrace_active = flag;
+
+    /* is_limited can only be set, not unset. Otherwise,
+    Printexc.record_backtrace would unset it all the time. */
+    if (is_limited && !Caml_state->backtrace_is_limited)
+      Caml_state->backtrace_is_limited = 1 ;
+    if (no_cycles && !Caml_state->backtrace_no_cycles)
+      Caml_state->backtrace_no_cycles = 1 ;
     Caml_state->backtrace_pos = 0;
     Caml_state->backtrace_last_exn = Val_unit;
     /* Note: We do lazy initialization of Caml_state->backtrace_buffer when
@@ -50,6 +63,9 @@ CAMLexport void caml_record_backtraces(int flag)
   return;
 }
 
+/* Funily, caml_record_backtraces can take any value in flag, but some
+   assembler implementations will only work with 1. We extend this
+   behavior so that bit 2 means that backtraces should be limited. */
 CAMLprim value caml_record_backtrace(value flag)
 {
   caml_record_backtraces(Int_val(flag));
@@ -76,7 +92,29 @@ static void print_location(struct caml_loc_info * li, int index)
   char * inlined;
 
   /* Ignore compiler-inserted raise */
-  if (!li->loc_valid && li->loc_is_raise) return;
+  if (li->loc_kind == CAML_LOC_KIND_UNKNOWN && li->loc_is_raise) return;
+
+#ifdef ARCH_SIXTYFOUR
+  /* WARNING: because of the previous line, the line for some loc_info
+     may not be printed, causing this message to be wrong. */
+  if (li->loc_kind == CAML_LOC_KIND_REPEATED){
+    int cycle_len = li->loc_is_raise ;
+    int ncycles = li->loc_lnum;
+    if (cycle_len == 0) {
+      if (ncycles == 0) {
+        fprintf (stderr, "Skipped many calls");
+      } else {
+        fprintf (stderr, "Skipped %d calls", ncycles);
+      }
+    } else
+    if (cycle_len == 1) {
+      fprintf (stderr, "Next call repeated %d times", ncycles);
+    } else {
+      fprintf (stderr, "Next cycle of %d calls repeated %d times", cycle_len, ncycles);
+    }
+    return;
+  }
+#endif
 
   if (li->loc_is_raise) {
     /* Initial raise if index == 0, re-raise otherwise */
@@ -95,7 +133,7 @@ static void print_location(struct caml_loc_info * li, int index)
   } else {
     inlined = "";
   }
-  if (! li->loc_valid) {
+  if (li->loc_kind == CAML_LOC_KIND_UNKNOWN) {
     fprintf(stderr, "%s unknown location%s\n", info, inlined);
   } else {
     fprintf (stderr, "%s %s in file \"%s\"%s, line %d, characters %d-%d\n",
@@ -116,6 +154,8 @@ CAMLexport void caml_print_exception_backtrace(void)
                     "no debug information available)\n");
     return;
   }
+
+  caml_backtrace_ring_finish ();
 
   for (i = 0; i < Caml_state->backtrace_pos; i++) {
     for (dbg = caml_debuginfo_extract(Caml_state->backtrace_buffer[i]);
@@ -172,7 +212,10 @@ CAMLprim value caml_get_exception_raw_backtrace(value unit)
     res = caml_alloc(0, 0);
   }
   else {
-    intnat i, len = Caml_state->backtrace_pos;
+    intnat i, len;
+
+    caml_backtrace_ring_finish ();
+    len = Caml_state->backtrace_pos;
 
     res = caml_alloc(len, 0);
     for (i = 0; i < len; i++)
@@ -211,9 +254,10 @@ CAMLprim value caml_restore_raw_backtrace(value exn, value backtrace)
   }
 
   Caml_state->backtrace_pos = bt_size;
-  for(i=0; i < Caml_state->backtrace_pos; i++){
+  for(i=0; i < bt_size; i++){
     Caml_state->backtrace_buffer[i] = Backtrace_slot_val(Field(backtrace, i));
   }
+  caml_backtrace_ring_restore ();
 
   return Val_unit;
 }
@@ -230,7 +274,7 @@ static value caml_convert_debuginfo(debuginfo dbg)
 
   caml_debuginfo_location(dbg, &li);
 
-  if (li.loc_valid) {
+  if (li.loc_kind == CAML_LOC_KIND_KNOWN) {
     fname = caml_copy_string(li.loc_filename);
     dname = caml_copy_string(li.loc_defname);
     p = caml_alloc_small(7, 0);
@@ -241,6 +285,15 @@ static value caml_convert_debuginfo(debuginfo dbg)
     Field(p, 4) = Val_int(li.loc_endchr);
     Field(p, 5) = Val_bool(li.loc_is_inlined);
     Field(p, 6) = dname;
+#ifdef ARCH_SIXTYFOUR
+  } else
+    if (li.loc_kind == CAML_LOC_KIND_REPEATED) {
+      int cycle_len = li.loc_is_raise ;
+      int ncycles = li.loc_lnum;
+      p = caml_alloc_small(2, 2);
+      Field(p, 0) = Val_int(cycle_len);
+      Field(p, 1) = Val_int(ncycles);
+#endif
   } else {
     p = caml_alloc_small(1, 1);
     Field(p, 0) = Val_bool(li.loc_is_raise);
@@ -270,6 +323,7 @@ CAMLprim value caml_convert_raw_backtrace(value bt)
   for (i = 0, index = 0; i < Wosize_val(bt); ++i)
   {
     debuginfo dbg;
+    //fprintf (stderr, "caml_convert_raw_backtrace field[%ld]\n", i);
     for (dbg = caml_debuginfo_extract(Backtrace_slot_val(Field(bt, i)));
          dbg != NULL;
          dbg = caml_debuginfo_next(dbg))
@@ -281,6 +335,7 @@ CAMLprim value caml_convert_raw_backtrace(value bt)
   for (i = 0, index = 0; i < Wosize_val(bt); ++i)
   {
     debuginfo dbg;
+    //fprintf (stderr, "caml_convert_raw_backtrace field[%ld]\n", i);
     for (dbg = caml_debuginfo_extract(Backtrace_slot_val(Field(bt, i)));
          dbg != NULL;
          dbg = caml_debuginfo_next(dbg))

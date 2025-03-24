@@ -1,0 +1,122 @@
+f1
+f2
+f3
+f4
+f5
+f4: exception with backtrace (Printexc.get_backtrace):
+Next cycle of 2 calls repeated 1000 times
+Called from Backtrace_extract_cycle2.g in file "backtrace_extract_cycle2.ml", line 13, characters 6-15
+Called from Backtrace_extract_cycle2.f in file "backtrace_extract_cycle2.ml", line 10, characters 6-14
+Called from Backtrace_main.f4 in file "backtrace_main.ml", line 40, characters 4-19
+
+f4: exception with backtrace (Printexc.raw_backtrace_to_string):
+Next cycle of 2 calls repeated 1000 times
+Called from Backtrace_extract_cycle2.g in file "backtrace_extract_cycle2.ml", line 13, characters 6-15
+Called from Backtrace_extract_cycle2.f in file "backtrace_extract_cycle2.ml", line 10, characters 6-14
+Called from Backtrace_main.f4 in file "backtrace_main.ml", line 40, characters 4-19
+
+raw_backtrace_length: 4
+bt_entries[0.0] = 'Next cycle of 2 calls repeated 1000 times'
+bt_entries[1.0] = 'Called from Backtrace_extract_cycle2.g in file "backtrace_extract_cycle2.ml", line 13, characters 6-15'
+bt_entries[2.0] = 'Called from Backtrace_extract_cycle2.f in file "backtrace_extract_cycle2.ml", line 10, characters 6-14'
+bt_entries[3.0] = 'Called from Backtrace_main.f4 in file "backtrace_main.ml", line 40, characters 4-19'
+f3: exception with backtrace (Printexc.get_backtrace):
+Next cycle of 2 calls repeated 1000 times
+Called from Backtrace_extract_cycle2.g in file "backtrace_extract_cycle2.ml", line 13, characters 6-15
+Called from Backtrace_extract_cycle2.f in file "backtrace_extract_cycle2.ml", line 10, characters 6-14
+Called from Backtrace_main.f4 in file "backtrace_main.ml", line 40, characters 4-19
+Re-raised at Backtrace_main.check_backtrace in file "backtrace_main.ml", line 35, characters 4-40
+Called from Backtrace_main.f3 in file "backtrace_main.ml", line 48, characters 4-19
+
+f3: exception with backtrace (Printexc.raw_backtrace_to_string):
+Next cycle of 2 calls repeated 1000 times
+Called from Backtrace_extract_cycle2.g in file "backtrace_extract_cycle2.ml", line 13, characters 6-15
+Called from Backtrace_extract_cycle2.f in file "backtrace_extract_cycle2.ml", line 10, characters 6-14
+Called from Backtrace_main.f4 in file "backtrace_main.ml", line 40, characters 4-19
+Re-raised at Backtrace_main.check_backtrace in file "backtrace_main.ml", line 35, characters 4-40
+Called from Backtrace_main.f3 in file "backtrace_main.ml", line 48, characters 4-19
+
+raw_backtrace_length: 6
+bt_entries[0.0] = 'Next cycle of 2 calls repeated 1000 times'
+bt_entries[1.0] = 'Called from Backtrace_extract_cycle2.g in file "backtrace_extract_cycle2.ml", line 13, characters 6-15'
+bt_entries[2.0] = 'Called from Backtrace_extract_cycle2.f in file "backtrace_extract_cycle2.ml", line 10, characters 6-14'
+bt_entries[3.0] = 'Called from Backtrace_main.f4 in file "backtrace_main.ml", line 40, characters 4-19'
+bt_entries[4.0] = 'Re-raised at Backtrace_main.check_backtrace in file "backtrace_main.ml", line 35, characters 4-40'
+bt_entries[5.0] = 'Called from Backtrace_main.f3 in file "backtrace_main.ml", line 48, characters 4-19'
+f2: exception with backtrace (Printexc.get_backtrace):
+Next cycle of 2 calls repeated 1000 times
+Called from Backtrace_extract_cycle2.g in file "backtrace_extract_cycle2.ml", line 13, characters 6-15
+Called from Backtrace_extract_cycle2.f in file "backtrace_extract_cycle2.ml", line 10, characters 6-14
+Called from Backtrace_main.f4 in file "backtrace_main.ml", line 40, characters 4-19
+Re-raised at Backtrace_main.check_backtrace in file "backtrace_main.ml", line 35, characters 4-40
+Called from Backtrace_main.f3 in file "backtrace_main.ml", line 48, characters 4-19
+Re-raised at Backtrace_main.check_backtrace in file "backtrace_main.ml", line 35, characters 4-40
+Called from Backtrace_main.f2 in file "backtrace_main.ml", line 56, characters 4-19
+
+f2: exception with backtrace (Printexc.raw_backtrace_to_string):
+Next cycle of 2 calls repeated 1000 times
+Called from Backtrace_extract_cycle2.g in file "backtrace_extract_cycle2.ml", line 13, characters 6-15
+Called from Backtrace_extract_cycle2.f in file "backtrace_extract_cycle2.ml", line 10, characters 6-14
+Called from Backtrace_main.f4 in file "backtrace_main.ml", line 40, characters 4-19
+Re-raised at Backtrace_main.check_backtrace in file "backtrace_main.ml", line 35, characters 4-40
+Called from Backtrace_main.f3 in file "backtrace_main.ml", line 48, characters 4-19
+Re-raised at Backtrace_main.check_backtrace in file "backtrace_main.ml", line 35, characters 4-40
+Called from Backtrace_main.f2 in file "backtrace_main.ml", line 56, characters 4-19
+
+raw_backtrace_length: 8
+bt_entries[0.0] = 'Next cycle of 2 calls repeated 1000 times'
+bt_entries[1.0] = 'Called from Backtrace_extract_cycle2.g in file "backtrace_extract_cycle2.ml", line 13, characters 6-15'
+bt_entries[2.0] = 'Called from Backtrace_extract_cycle2.f in file "backtrace_extract_cycle2.ml", line 10, characters 6-14'
+bt_entries[3.0] = 'Called from Backtrace_main.f4 in file "backtrace_main.ml", line 40, characters 4-19'
+bt_entries[4.0] = 'Re-raised at Backtrace_main.check_backtrace in file "backtrace_main.ml", line 35, characters 4-40'
+bt_entries[5.0] = 'Called from Backtrace_main.f3 in file "backtrace_main.ml", line 48, characters 4-19'
+bt_entries[6.0] = 'Re-raised at Backtrace_main.check_backtrace in file "backtrace_main.ml", line 35, characters 4-40'
+bt_entries[7.0] = 'Called from Backtrace_main.f2 in file "backtrace_main.ml", line 56, characters 4-19'
+f1: exception with backtrace (Printexc.get_backtrace):
+Next cycle of 2 calls repeated 1000 times
+Called from Backtrace_extract_cycle2.g in file "backtrace_extract_cycle2.ml", line 13, characters 6-15
+Called from Backtrace_extract_cycle2.f in file "backtrace_extract_cycle2.ml", line 10, characters 6-14
+Called from Backtrace_main.f4 in file "backtrace_main.ml", line 40, characters 4-19
+Re-raised at Backtrace_main.check_backtrace in file "backtrace_main.ml", line 35, characters 4-40
+Called from Backtrace_main.f3 in file "backtrace_main.ml", line 48, characters 4-19
+Re-raised at Backtrace_main.check_backtrace in file "backtrace_main.ml", line 35, characters 4-40
+Called from Backtrace_main.f2 in file "backtrace_main.ml", line 56, characters 4-19
+Re-raised at Backtrace_main.check_backtrace in file "backtrace_main.ml", line 35, characters 4-40
+Called from Backtrace_main.f1 in file "backtrace_main.ml", line 64, characters 4-19
+
+f1: exception with backtrace (Printexc.raw_backtrace_to_string):
+Next cycle of 2 calls repeated 1000 times
+Called from Backtrace_extract_cycle2.g in file "backtrace_extract_cycle2.ml", line 13, characters 6-15
+Called from Backtrace_extract_cycle2.f in file "backtrace_extract_cycle2.ml", line 10, characters 6-14
+Called from Backtrace_main.f4 in file "backtrace_main.ml", line 40, characters 4-19
+Re-raised at Backtrace_main.check_backtrace in file "backtrace_main.ml", line 35, characters 4-40
+Called from Backtrace_main.f3 in file "backtrace_main.ml", line 48, characters 4-19
+Re-raised at Backtrace_main.check_backtrace in file "backtrace_main.ml", line 35, characters 4-40
+Called from Backtrace_main.f2 in file "backtrace_main.ml", line 56, characters 4-19
+Re-raised at Backtrace_main.check_backtrace in file "backtrace_main.ml", line 35, characters 4-40
+Called from Backtrace_main.f1 in file "backtrace_main.ml", line 64, characters 4-19
+
+raw_backtrace_length: 10
+bt_entries[0.0] = 'Next cycle of 2 calls repeated 1000 times'
+bt_entries[1.0] = 'Called from Backtrace_extract_cycle2.g in file "backtrace_extract_cycle2.ml", line 13, characters 6-15'
+bt_entries[2.0] = 'Called from Backtrace_extract_cycle2.f in file "backtrace_extract_cycle2.ml", line 10, characters 6-14'
+bt_entries[3.0] = 'Called from Backtrace_main.f4 in file "backtrace_main.ml", line 40, characters 4-19'
+bt_entries[4.0] = 'Re-raised at Backtrace_main.check_backtrace in file "backtrace_main.ml", line 35, characters 4-40'
+bt_entries[5.0] = 'Called from Backtrace_main.f3 in file "backtrace_main.ml", line 48, characters 4-19'
+bt_entries[6.0] = 'Re-raised at Backtrace_main.check_backtrace in file "backtrace_main.ml", line 35, characters 4-40'
+bt_entries[7.0] = 'Called from Backtrace_main.f2 in file "backtrace_main.ml", line 56, characters 4-19'
+bt_entries[8.0] = 'Re-raised at Backtrace_main.check_backtrace in file "backtrace_main.ml", line 35, characters 4-40'
+bt_entries[9.0] = 'Called from Backtrace_main.f1 in file "backtrace_main.ml", line 64, characters 4-19'
+Fatal error: exception Not_found
+Next cycle of 2 calls repeated 1000 times
+Called from Backtrace_extract_cycle2.g in file "backtrace_extract_cycle2.ml", line 13, characters 6-15
+Called from Backtrace_extract_cycle2.f in file "backtrace_extract_cycle2.ml", line 10, characters 6-14
+Called from Backtrace_main.f4 in file "backtrace_main.ml", line 40, characters 4-19
+Re-raised at Backtrace_main.check_backtrace in file "backtrace_main.ml", line 35, characters 4-40
+Called from Backtrace_main.f3 in file "backtrace_main.ml", line 48, characters 4-19
+Re-raised at Backtrace_main.check_backtrace in file "backtrace_main.ml", line 35, characters 4-40
+Called from Backtrace_main.f2 in file "backtrace_main.ml", line 56, characters 4-19
+Re-raised at Backtrace_main.check_backtrace in file "backtrace_main.ml", line 35, characters 4-40
+Called from Backtrace_main.f1 in file "backtrace_main.ml", line 64, characters 4-19
+Re-raised at Backtrace_main.check_backtrace in file "backtrace_main.ml", line 35, characters 4-40
+Called from Backtrace_extract_cycle2 in file "backtrace_extract_cycle2.ml", line 16, characters 2-28

@@ -116,12 +116,17 @@ type backtrace_slot =
   | Unknown_location of {
       is_raise : bool
     }
+  | Repeated of {
+      cycle_len : int ; (* skipping `is_inline` backtrace_slots *)
+      ncycles : int ;
+    }
 
 (* to avoid warning *)
 let _ = [Known_location { is_raise = false; filename = "";
                           line_number = 0; start_char = 0; end_char = 0;
                           is_inline = false; defname = "" };
-         Unknown_location { is_raise = false }]
+         Unknown_location { is_raise = false };
+         Repeated { cycle_len = 0; ncycles = 0 }]
 
 external convert_raw_backtrace_slot:
   raw_backtrace_slot -> backtrace_slot = "caml_convert_raw_backtrace_slot"
@@ -151,6 +156,14 @@ let format_backtrace_slot pos slot =
               (info l.is_raise) l.defname l.filename
               (if l.is_inline then " (inlined)" else "")
               l.line_number l.start_char l.end_char)
+  | Repeated { cycle_len = 0 ; ncycles = 0 } ->
+      Some "Skipped many entries"
+  | Repeated { cycle_len = 0 ; ncycles } ->
+      Some (sprintf "Skipped %d entries" ncycles)
+  | Repeated { cycle_len = 1 ; ncycles } ->
+      Some (sprintf "Next call repeated %d times" ncycles)
+  | Repeated { cycle_len ; ncycles } ->
+      Some (sprintf "Next cycle of %d calls repeated %d times" cycle_len ncycles)
 
 let print_exception_backtrace outchan backtrace =
   match backtrace with
@@ -190,10 +203,12 @@ let raw_backtrace_to_string raw_backtrace =
 let backtrace_slot_is_raise = function
   | Known_location l -> l.is_raise
   | Unknown_location l -> l.is_raise
+  | Repeated _ -> false
 
 let backtrace_slot_is_inline = function
   | Known_location l -> l.is_inline
   | Unknown_location _ -> false
+  | Repeated _ -> false
 
 type location = {
   filename : string;
@@ -211,11 +226,13 @@ let backtrace_slot_location = function
       start_char  = l.start_char;
       end_char    = l.end_char;
     }
+  | Repeated _ -> None
 
 let backtrace_slot_defname = function
   | Unknown_location _
   | Known_location { defname = "" } -> None
   | Known_location l -> Some l.defname
+  | Repeated _ -> None
 
 let backtrace_slots raw_backtrace =
   (* The documentation of this function guarantees that Some is
@@ -229,7 +246,9 @@ let backtrace_slots raw_backtrace =
     | Some backtrace ->
       let usable_slot = function
         | Unknown_location _ -> false
-        | Known_location _ -> true in
+        | Known_location _ -> true
+        | Repeated _ -> true
+      in
       let rec exists_usable = function
         | (-1) -> false
         | i -> usable_slot backtrace.(i) || exists_usable (i - 1) in
