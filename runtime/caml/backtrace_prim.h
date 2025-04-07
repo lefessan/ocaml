@@ -32,8 +32,16 @@
 
 /* Extract location information for the given raw_backtrace_slot */
 
+#define CAML_LOC_KIND_UNKNOWN  0
+#define CAML_LOC_KIND_KNOWN    1
+#define CAML_LOC_KIND_REPEATED 2
+
+/* In the case of CAML_LOC_KIND_REPEATED, 
+  loc_is_raise gives the size of the cycle (3>cycle_len>0)
+  and loc_lnum gives the number of occurrences
+*/
 struct caml_loc_info {
-  int loc_valid;
+  int loc_kind;
   int loc_is_raise;
   char * loc_filename;
   char * loc_defname;
@@ -112,6 +120,14 @@ value caml_remove_debug_info(code_t start);
 
 intnat caml_collect_current_callstack(value** pbuffer, intnat* plen,
                                       intnat max_frames, int alloc_idx);
+
+/* copy whatever was stored in the backtrace_ring into the backtrace_buffer */
+void caml_backtrace_ring_finish ();
+
+/* copy the top of stack of a backtrace into the backtrace_ring if needed.
+   modifies backtrace_pos if needed */
+void caml_backtrace_ring_restore (void);
+
 
 #endif /* CAML_INTERNALS */
 

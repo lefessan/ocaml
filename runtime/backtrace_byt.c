@@ -487,10 +487,10 @@ void caml_debuginfo_location(debuginfo dbg,
     caml_is_instruction(*pc, RAISE) ||
     caml_is_instruction(*pc, RERAISE);
   if (event == NULL) {
-    li->loc_valid = 0;
+    li->loc_kind = CAML_LOC_KIND_UNKNOWN;
     return;
   }
-  li->loc_valid = 1;
+  li->loc_kind = CAML_LOC_KIND_KNOWN;
   li->loc_is_inlined = 0;
   li->loc_filename = event->ev_filename;
   li->loc_defname = event->ev_defname;
@@ -509,3 +509,10 @@ debuginfo caml_debuginfo_next(debuginfo dbg)
   /* No inlining in bytecode */
   return NULL;
 }
+
+
+void caml_backtrace_ring_finish ()
+{}
+
+void caml_backtrace_ring_restore (void)
+{}

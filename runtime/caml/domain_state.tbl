@@ -58,6 +58,9 @@ DOMAIN_STATE(value*, gc_regs)
 DOMAIN_STATE(intnat, backtrace_active)
 DOMAIN_STATE(intnat, backtrace_pos)
 DOMAIN_STATE(backtrace_slot*, backtrace_buffer)
+DOMAIN_STATE(intnat, backtrace_is_limited)
+DOMAIN_STATE(intnat, backtrace_no_cycles)
+DOMAIN_STATE(backtrace_slot*, backtrace_ring)
 DOMAIN_STATE(value, backtrace_last_exn)
 /* See backtrace.c */
 
